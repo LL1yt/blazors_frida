@@ -1,0 +1,127 @@
+@page "/memory-scanner"
+@using BlazorFridaApp.MemoryScanner
+@using BlazorFridaApp.Persistence
+@inject ProcessMemoryScanner Scanner
+@inject AppDbContext DbContext
+
+<PageTitle>Memory Scanner</PageTitle>
+
+<h3>Memory Scanner</h3>
+
+<div class="form-group">
+    <label>Process ID:</label>
+    <input @bind="processId" type="number" class="form-control" />
+</div>
+
+<div class="form-group">
+    <label>Pattern (hex bytes):</label>
+    <input @bind="patternInput" class="form-control" 
+           placeholder="00 AA FF ??" />
+</div>
+
+<div class="form-group">
+    <label>Mask:</label>
+    <input @bind="mask" class="form-control" 
+           placeholder="xx??xx" />
+</div>
+
+<button @onclick="ScanMemory" class="btn btn-primary" 
+        disabled="@isScanning">
+    @if (isScanning) {
+        <span class="spinner-border spinner-border-sm" role="status"></span>
+    }
+    Scan Memory
+</button>
+
+@if (scanResults.Any())
+{
+    <h4 class="mt-4">Scan Results</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Address</th>
+                <th>Current Value</th>
+                <th>New Value</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var result in scanResults)
+            {
+                <tr>
+                    <td>0x@(result.Address.ToString("X"))</td>
+                    <td>@BitConverter.ToString(result.CurrentValue)</td>
+                    <td>
+                        <input @bind="result.NewValue" 
+                               class="form-control form-control-sm" 
+                               placeholder="Hex bytes"/>
+                    </td>
+                    <td>
+                        <button @onclick="() => FreezeAddress(result)" 
+                                class="btn btn-sm @(result.IsFrozen ? "btn-success" : "btn-outline-secondary")">
+                            @(result.IsFrozen ? "Frozen" : "Freeze")
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private int processId;
+    private string patternInput = "";
+    private string mask = "";
+    private bool isScanning;
+    private List<ScanResult> scanResults = new();
+
+    class ScanResult
+    {
+        public nint Address { get; set; }
+        public byte[] CurrentValue { get; set; } = Array.Empty<byte>();
+        public string NewValue { get; set; } = "";
+        public bool IsFrozen { get; set; }
+    }
+
+    private async Task ScanMemory()
+    {
+        isScanning = true;
+        try
+        {
+            var pattern = ParseHexPattern(patternInput);
+            var addresses = await Scanner.ScanForPattern(processId, pattern, mask);
+            
+            scanResults = addresses.Select(a => new ScanResult {
+                Address = a,
+                CurrentValue = ReadAddressValue(a)
+            }).ToList();
+        }
+        finally
+        {
+            isScanning = false;
+        }
+    }
+
+    private byte[] ParseHexPattern(string input)
+    {
+        return input.Split(' ')
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p == "?" ? (byte)0 : Convert.ToByte(p, 16))
+            .ToArray();
+    }
+
+    private byte[] ReadAddressValue(nint address)
+    {
+        var buffer = new byte[4];
+        Scanner.ReadProcessMemory(Scanner.ProcessHandle, address, buffer, buffer.Length, out _);
+        return buffer;
+    }
+
+    private async Task FreezeAddress(ScanResult result)
+    {
+        var bytes = ParseHexPattern(result.NewValue);
+        await Scanner.WriteMemory(result.Address, bytes);
+        result.IsFrozen = true;
+        result.CurrentValue = bytes;
+    }
+}

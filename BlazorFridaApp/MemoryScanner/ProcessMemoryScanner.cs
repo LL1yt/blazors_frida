@@ -9,6 +9,7 @@ namespace BlazorFridaApp.MemoryScanner
     public class ProcessMemoryScanner
     {
         private readonly AppDbContext _dbContext;
+        public nint ProcessHandle => _processHandle;
         private nint _processHandle;
         private Timer? _freezeTimer;
 
@@ -16,7 +17,7 @@ namespace BlazorFridaApp.MemoryScanner
         private static extern nint OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool ReadProcessMemory(nint hProcess, nint lpBaseAddress, 
+        public static extern bool ReadProcessMemory(nint hProcess, nint lpBaseAddress,
             [Out] byte[] lpBuffer, int dwSize, out int lpNumberOfBytesRead);
 
         [DllImport("kernel32.dll", SetLastError = true)]
