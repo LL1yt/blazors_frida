@@ -1,0 +1,27 @@
+# Binaries
+bin/
+obj/
+
+# Build files
+*.exe
+*.dll
+*.pdb
+
+# User-specific files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+.vs/
+.vscode/
+
+# DotNet artifacts
+**/*.swp
+**/project.lock.json
+**/project.fragment.lock.json
+
+# Python
+__pycache__/
+*.pyc
+.env/
+venv/
