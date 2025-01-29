@@ -105,6 +105,42 @@ namespace BlazorFridaApp.MemoryScanner
             }, null, 0, 1000);
         }
 
+        public List<Process> GetProcesses()
+        {
+            return Process.GetProcesses()
+                .Where(p => !string.IsNullOrEmpty(p.ProcessName) && p.Id != 0)
+                .OrderBy(p => p.ProcessName)
+                .ToList();
+        }
+
+        public async Task SaveLastProcess(int processId)
+        {
+            var setting = await _dbContext.ApplicationSettings
+                .FirstOrDefaultAsync(a => a.Key == "LastProcess");
+            
+            if (setting == null)
+            {
+                setting = new ApplicationSetting { Key = "LastProcess" };
+                await _dbContext.AddAsync(setting);
+            }
+
+            setting.Value = processId.ToString();
+            setting.LastModified = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+        }
+
+        public async Task<int?> GetLastProcessId()
+        {
+            var setting = await _dbContext.ApplicationSettings
+                .FirstOrDefaultAsync(a => a.Key == "LastProcess");
+            
+            if (setting != null && int.TryParse(setting.Value, out int processId))
+            {
+                return processId;
+            }
+            return null;
+        }
+
         public async Task WriteMemory(nint address, byte[] value)
         {
             const int PROCESS_VM_WRITE = 0x0020;

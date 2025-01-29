@@ -9,8 +9,14 @@
 <h3>Memory Scanner</h3>
 
 <div class="form-group">
-    <label>Process ID:</label>
-    <input @bind="processId" type="number" class="form-control" />
+    <label>Select Process:</label>
+    <select @bind="selectedProcessId" class="form-control" @onchange="SaveProcessSelection">
+        <option value="">-- Select Process --</option>
+        @foreach (var proc in processes)
+        {
+            <option value="@proc.Id">@proc.ProcessName (PID: @proc.Id)</option>
+        }
+    </select>
 </div>
 
 <div class="form-group">
@@ -113,7 +119,7 @@
     private byte[] ReadAddressValue(nint address)
     {
         var buffer = new byte[4];
-        Scanner.ReadProcessMemory(Scanner.ProcessHandle, address, buffer, buffer.Length, out _);
+        ProcessMemoryScanner.ReadProcessMemory(Scanner.ProcessHandle, address, buffer, buffer.Length, out _);
         return buffer;
     }
 
