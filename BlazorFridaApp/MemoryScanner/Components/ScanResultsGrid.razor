@@ -38,10 +38,10 @@
 </RadzenDataGrid>
 
 @code {
-    [Parameter] public List<IntPtr> Results { get; set; }
-    [Parameter] public MemoryValueType ValueType { get; set; }
-    [Parameter] public Func<IntPtr, int> GetCurrentValue { get; set; }
-    [Parameter] public Func<IntPtr, bool> IsFrozen { get; set; }
+    [Parameter] public required List<IntPtr> Results { get; set; }
+    [Parameter] public required MemoryValueType ValueType { get; set; }
+    [Parameter] public required Func<IntPtr, int> GetCurrentValue { get; set; }
+    [Parameter] public required Func<IntPtr, bool> IsFrozen { get; set; }
     [Parameter] public EventCallback<(IntPtr address, int value)> OnValueChanged { get; set; }
     [Parameter] public EventCallback<IntPtr> OnFreezeToggle { get; set; }
 

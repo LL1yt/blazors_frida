@@ -20,7 +20,7 @@
 </RadzenStack>
 
 @code {
-    [Parameter] public List<Process> ProcessList { get; set; }
+    [Parameter] public required List<Process> ProcessList { get; set; }
     [Parameter] public int? SelectedProcessId { get; set; }
     [Parameter] public EventCallback OnProcessSelected { get; set; }
     [Parameter] public EventCallback OnRefreshClick { get; set; }

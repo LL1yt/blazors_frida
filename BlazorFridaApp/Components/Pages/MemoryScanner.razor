@@ -1,14 +1,24 @@
 @page "/memory-scanner"
+@page "/memory-scanner"
+@page "/memory-scanner"
 @using System.Diagnostics
 @using System.Security.Principal
 @using BlazorFridaApp.MemoryScanner
 @using BlazorFridaApp.MemoryScanner.Models
-@using BlazorFridaApp.MemoryScanner.Native
 @using BlazorFridaApp.MemoryScanner.Services
+@using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @using BlazorFridaApp.MemoryScanner.Components
 @using BlazorFridaApp.Persistence
 @using Radzen
 @using Radzen.Blazor
+
+@inject IProcessService ProcessService
+@inject IMemoryReaderService MemoryReader
+@inject IMemoryScannerService Scanner
+@inject IValueFreezerService Freezer
+@inject IScanProfileService ProfileService
+@inject ILogger<MemoryScanner> Logger
+@inject NotificationService NotificationService
 @implements IAsyncDisposable
 
 @inject ProcessService ProcessService
@@ -75,6 +85,15 @@
     private Dictionary<IntPtr, int> currentValues = new();
     private Dictionary<IntPtr, int> previousValues = new();
     
+    private List<Process> processList = new();
+    private int? selectedProcessId;
+    private string patternHex = "";
+    private string mask = "";
+    private List<IntPtr> scanResults = new();
+    private HashSet<IntPtr> frozenAddresses = new();
+    private Dictionary<IntPtr, int> currentValues = new();
+    private Dictionary<IntPtr, int> previousValues = new();
+    
     private ScanType selectedScanType = ScanType.ExactValue;
     private MemoryValueType selectedValueType = MemoryValueType.Int;
     private int searchValue;
@@ -84,8 +103,8 @@
 
     private ScanType _previousScanType;
     private MemoryValueType _previousValueType;
-    private Array scanTypes;
-    private Array valueTypes;
+    private Array scanTypes = Enum.GetValues(typeof(ScanType));
+    private Array valueTypes = Enum.GetValues(typeof(MemoryValueType));
 
     protected override void OnInitialized()
     {

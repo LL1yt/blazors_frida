@@ -1,6 +1,7 @@
 @using BlazorFridaApp.MemoryScanner.Models
 @using Radzen
 @using Radzen.Blazor
+@using Microsoft.AspNetCore.Components.Web
 
 <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
     <ErrorBoundary>
@@ -14,7 +15,10 @@
                           Placeholder="Scan type"/>
         </ChildContent>
         <ErrorContent>
-            <div class="alert alert-danger">@context.Message</div>
+            @{
+                var error = context as Exception;
+                <div class="alert alert-danger">@error?.Message</div>
+            }
         </ErrorContent>
     </ErrorBoundary>
     
@@ -29,7 +33,10 @@
                           Placeholder="Value type"/>
         </ChildContent>
         <ErrorContent>
-            <div class="alert alert-danger">@context.Message</div>
+            @{
+                var error = context as Exception;
+                <div class="alert alert-danger">@error?.Message</div>
+            }
         </ErrorContent>
     </ErrorBoundary>
 </RadzenStack>
@@ -74,10 +81,10 @@ else
 @code {
     [Parameter] public ScanType ScanType { get; set; }
     [Parameter] public MemoryValueType ValueType { get; set; }
-    [Parameter] public Array ScanTypes { get; set; }
-    [Parameter] public Array ValueTypes { get; set; }
-    [Parameter] public string PatternHex { get; set; }
-    [Parameter] public string Mask { get; set; }
+    [Parameter] public required Array ScanTypes { get; set; }
+    [Parameter] public required Array ValueTypes { get; set; }
+    [Parameter] public required string PatternHex { get; set; }
+    [Parameter] public required string Mask { get; set; }
     [Parameter] public int SearchValue { get; set; }
     [Parameter] public bool IsFirstScan { get; set; }
     [Parameter] public bool IsLoading { get; set; }
