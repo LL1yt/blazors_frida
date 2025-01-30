@@ -28,7 +28,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 Pattern = pattern,
                 Mask = mask,
                 Offsets = addresses.Any() ? 
-                    addresses.Select(a => (int)(a - addresses.First())).ToArray() : Array.Empty<int>(),
+                    addresses.Select(a => (int)(a - addresses.First())).ToArray() : System.Array.Empty<int>(),
                 Created = DateTime.UtcNow,
                 LastUsed = DateTime.UtcNow
             };
