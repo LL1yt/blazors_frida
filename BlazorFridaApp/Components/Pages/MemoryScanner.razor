@@ -31,12 +31,15 @@
     <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
         <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
             <RadzenDropDown @bind-Value="@selectedProcessId"
-                          Data="@processList"
-                          TextProperty="ProcessName"
-                          ValueProperty="Id"
-                          Placeholder="Select process"
-                          Change="@OnProcessSelected"
-                          Style="width: 80%"/>
+                           Data="@processList"
+                           TextProperty="ProcessName"
+                           ValueProperty="Id"
+                           Placeholder="Select process"
+                           Change="@OnProcessSelected"
+                           AllowClear="true"
+                           AllowFiltering="true"
+                           FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                           Style="width: 80%"/>
             <RadzenButton Icon="refresh"
                          Click="@RefreshProcessList"
                          ButtonStyle="ButtonStyle.Light"
@@ -45,15 +48,21 @@
         
         <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
             <RadzenDropDown @bind-Value="@selectedScanType"
-                          Data="@Enum.GetValues(typeof(ScanType))"
-                          Change="@OnScanTypeChanged"
-                          Style="width: 200px"
-                          Placeholder="Scan type"/>
+                           Data="@Enum.GetValues(typeof(ScanType))"
+                           Change="@OnScanTypeChanged"
+                           TextProperty="ToString"
+                           ValueProperty="ToString"
+                           AllowClear="true"
+                           Style="width: 200px"
+                           Placeholder="Scan type"/>
            <RadzenDropDown @bind-Value="@selectedValueType"
-                         Data="@Enum.GetValues(typeof(MemoryValueType))"
-                         Style="width: 200px"
-                         Change="@OnValueTypeChanged"
-                         Placeholder="Value type"/>
+                          Data="@Enum.GetValues(typeof(MemoryValueType))"
+                          Style="width: 200px"
+                          Change="@OnValueTypeChanged"
+                          TextProperty="ToString"
+                          ValueProperty="ToString"
+                          AllowClear="true"
+                          Placeholder="Value type"/>
         </RadzenStack>
         
         @if (selectedScanType == ScanType.Pattern)
@@ -81,9 +90,16 @@
         }
         
         <RadzenButton Text="@(isFirstScan ? "First Scan" : "Next Scan")"
-                      Click="@OnScan"
-                      Disabled="@(!canScan)"
-                      ButtonStyle="ButtonStyle.Primary"/>
+                     Click="@OnScan"
+                     Disabled="@(!canScan || isLoading)"
+                     ButtonStyle="ButtonStyle.Primary"
+                     Icon="@(isLoading ? "refresh" : "search")"
+                     class="@(isLoading ? "rz-button-loading" : "")"
+                     Style="min-width: 150px"/>
+        @if (isLoading)
+        {
+            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        }
     </RadzenStack>
     
     <RadzenDataGrid Data="@scanResults" TItem="IntPtr">
@@ -137,6 +153,7 @@
     private int searchValue;
     private bool isFirstScan = true;
     private bool IsAdmin;
+    private bool isLoading;
 
     protected override void OnInitialized()
     {
@@ -283,8 +300,15 @@
 
     private async Task OnScan()
     {
+        if (!canScan) return;
+        
+        isLoading = true;
+        StateHasChanged();
+        
         try
         {
+            _logger.LogInformation($"Starting {(isFirstScan ? "first" : "next")} scan with type {selectedScanType}");
+            
             if (selectedScanType == ScanType.Pattern)
             {
                 var pattern = patternHex.Split(' ')
@@ -357,12 +381,28 @@
             
             currentValues.Clear();
             isFirstScan = false;
-            NotificationService.Notify(NotificationSeverity.Success,
-                $"Scan completed. Found {scanResults.Count} results.");
+            var resultCount = scanResults.Count;
+            NotificationService.Notify(
+                resultCount > 0 ? NotificationSeverity.Success : NotificationSeverity.Info,
+                $"Scan completed",
+                $"Found {resultCount} {(resultCount == 1 ? "result" : "results")}");
+            
+            _logger.LogInformation($"Scan completed. Found {resultCount} results");
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error, "Scan failed", ex.Message);
+            _logger.LogError(ex, "Scan failed");
+            NotificationService.Notify(NotificationSeverity.Error,
+                "Scan failed",
+                $"Error: {ex.Message}. Please try again or select different parameters.");
+            scanResults.Clear();
+            currentValues.Clear();
+            previousValues.Clear();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
         }
     }
 
