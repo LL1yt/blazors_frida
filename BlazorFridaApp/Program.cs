@@ -1,6 +1,7 @@
 using BlazorFridaApp.Components;
 using BlazorFridaApp.Persistence;
 using BlazorFridaApp.MemoryScanner;
+using BlazorFridaApp.Services;
 using Microsoft.EntityFrameworkCore;
 using Radzen;
 using System.Security.Principal;
@@ -43,6 +44,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     
 builder.Services.AddScoped<ProcessMemoryScanner>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddSingleton<IAdminCheckService, AdminCheckService>();
 builder.Services.AddRadzenComponents();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

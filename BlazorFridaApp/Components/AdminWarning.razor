@@ -1,7 +1,8 @@
-@using System.Security.Principal
+@using BlazorFridaApp.Services
+@inject IAdminCheckService AdminCheck
 
 <div class="admin-warning">
-    @if (!IsAdmin)
+    @if (!AdminCheck.IsAdmin)
     {
         <div class="alert alert-danger" role="alert">
             <h4 class="alert-heading">Administrator Rights Required!</h4>
@@ -13,13 +14,7 @@
 </div>
 
 @code {
-    private bool IsAdmin { get; set; }
-
-    protected override void OnInitialized()
-    {
-        IsAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
-            .IsInRole(WindowsBuiltInRole.Administrator);
-    }
+    // Admin check is now handled by AdminCheckService
 }
 
 <style>
