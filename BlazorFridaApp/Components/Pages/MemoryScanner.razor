@@ -1,33 +1,12 @@
 @page "/memory-scanner"
-@page "/memory-scanner"
-@page "/memory-scanner"
-@using System.Diagnostics
 @using System.Security.Principal
-@using BlazorFridaApp.MemoryScanner
-@using BlazorFridaApp.MemoryScanner.Models
-@using BlazorFridaApp.MemoryScanner.Services
-@using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @using BlazorFridaApp.MemoryScanner.Components
-@using BlazorFridaApp.Persistence
-@using Radzen
-@using Radzen.Blazor
-
-@inject IProcessService ProcessService
-@inject IMemoryReaderService MemoryReader
-@inject IMemoryScannerService Scanner
-@inject IValueFreezerService Freezer
-@inject IScanProfileService ProfileService
-@inject ILogger<MemoryScanner> Logger
-@inject NotificationService NotificationService
+@inherits MemoryScannerComponentBase
 @implements IAsyncDisposable
 
-@inject ProcessService ProcessService
-@inject MemoryReaderService MemoryReader
-@inject MemoryScannerService Scanner
-@inject ValueFreezerService Freezer
-@inject ScanProfileService ProfileService
+@inject IProcessService ProcessService
+@inject IScanProfileService ProfileService
 @inject NotificationService NotificationService
-@inject ILogger<MemoryScanner> _logger
 
 <RadzenCard>
     <h2>Memory Scanner</h2>
@@ -65,6 +44,24 @@
             OnValueTypeChanged="@OnValueTypeChanged"
             OnScanClick="@OnScan" />
         
+        <ScanExecutor @ref="scanExecutor"
+            ProcessId="@selectedProcessId"
+            ScanType="@selectedScanType"
+            ValueType="@selectedValueType"
+            PatternHex="@patternHex"
+            Mask="@mask"
+            SearchValue="@searchValue"
+            IsFirstScan="@isFirstScan"
+            IsLoading="@isLoading"
+            OnScanComplete="@OnScanComplete"
+            OnLoadingChanged="@OnLoadingChanged" />
+        
+        <MemoryValueHandler @ref="valueHandler"
+            ValueType="@selectedValueType" />
+            
+        <ValueFreezer @ref="valueFreezer"
+            ValueType="@selectedValueType" />
+        
         <ScanResultsGrid 
             Results="@scanResults"
             ValueType="@selectedValueType"
@@ -81,19 +78,6 @@
     private string patternHex = "";
     private string mask = "";
     private List<IntPtr> scanResults = new();
-    private HashSet<IntPtr> frozenAddresses = new();
-    private Dictionary<IntPtr, int> currentValues = new();
-    private Dictionary<IntPtr, int> previousValues = new();
-    
-    private List<Process> processList = new();
-    private int? selectedProcessId;
-    private string patternHex = "";
-    private string mask = "";
-    private List<IntPtr> scanResults = new();
-    private HashSet<IntPtr> frozenAddresses = new();
-    private Dictionary<IntPtr, int> currentValues = new();
-    private Dictionary<IntPtr, int> previousValues = new();
-    
     private ScanType selectedScanType = ScanType.ExactValue;
     private MemoryValueType selectedValueType = MemoryValueType.Int;
     private int searchValue;
@@ -101,23 +85,19 @@
     private bool IsAdmin;
     private bool isLoading;
 
-    private ScanType _previousScanType;
-    private MemoryValueType _previousValueType;
+    private ScanExecutor scanExecutor;
+    private MemoryValueHandler valueHandler;
+    private ValueFreezer valueFreezer;
+
     private Array scanTypes = Enum.GetValues(typeof(ScanType));
     private Array valueTypes = Enum.GetValues(typeof(MemoryValueType));
 
     protected override void OnInitialized()
     {
-        _logger.LogInformation("Initializing MemoryScanner component");
+        Logger.LogInformation("Initializing MemoryScanner component");
         IsAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
             .IsInRole(WindowsBuiltInRole.Administrator);
-        _logger.LogInformation($"Admin check result: {IsAdmin}");
-        
-        _previousScanType = selectedScanType;
-        _previousValueType = selectedValueType;
-        
-        _logger.LogInformation($"Initial scan type: {selectedScanType}");
-        _logger.LogInformation($"Initial value type: {selectedValueType}");
+        Logger.LogInformation($"Admin check result: {IsAdmin}");
         base.OnInitialized();
     }
 
@@ -125,8 +105,7 @@
     {
         if (!IsAdmin)
         {
-            NotificationService.Notify(NotificationSeverity.Warning,
-                "Administrator rights required",
+            ShowWarning("Administrator rights required",
                 "Please restart the application as administrator to use memory scanning features");
             return;
         }
@@ -138,26 +117,23 @@
     {
         try
         {
-            _logger.LogInformation("Refreshing process list...");
+            Logger.LogInformation("Refreshing process list...");
             processList = ProcessService.GetAccessibleProcesses();
             
             if (!processList.Any())
             {
-                NotificationService.Notify(NotificationSeverity.Warning,
-                    "No accessible processes found",
+                ShowWarning("No accessible processes found",
                     "Make sure you have administrator rights and necessary permissions");
                 return;
             }
             
-            _logger.LogInformation($"Successfully loaded {processList.Count} processes");
+            Logger.LogInformation($"Successfully loaded {processList.Count} processes");
             await LoadLastProcess();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to refresh process list");
-            NotificationService.Notify(NotificationSeverity.Error,
-                "Error loading processes",
-                "Failed to load process list. Please ensure you have administrator rights.");
+            ShowError("Failed to refresh process list",
+                "Failed to load process list. Please ensure you have administrator rights.", ex);
         }
     }
 
@@ -179,17 +155,14 @@
             {
                 await ProfileService.SaveLastProcess(selectedProcessId.Value);
                 scanResults.Clear();
-                currentValues.Clear();
-                previousValues.Clear();
+                valueHandler?.ClearCache();
                 isFirstScan = true;
                 StateHasChanged();
             }
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(NotificationSeverity.Error,
-                "Error selecting process",
-                ex.Message);
+            ShowError("Error selecting process", ex.Message, ex);
         }
     }
 
@@ -197,29 +170,18 @@
     {
         try
         {
-            _logger.LogInformation($"OnScanTypeChanged called");
-            _logger.LogInformation($"Previous scan type: {_previousScanType}");
-            _logger.LogInformation($"New scan type: {newType}");
-            
+            Logger.LogInformation($"Changing scan type from {selectedScanType} to {newType}");
             selectedScanType = newType;
-            isFirstScan = true;
             scanResults.Clear();
-            currentValues.Clear();
-            previousValues.Clear();
-            
+            valueHandler?.ClearCache();
+            isFirstScan = true;
             StateHasChanged();
-            _previousScanType = selectedScanType;
             
-            NotificationService.Notify(NotificationSeverity.Info,
-                "Scan type changed",
-                $"Selected scan type: {selectedScanType}");
+            ShowInfo("Scan type changed", $"Selected scan type: {selectedScanType}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in OnScanTypeChanged");
-            NotificationService.Notify(NotificationSeverity.Error,
-                "Error changing scan type",
-                ex.Message);
+            ShowError("Error changing scan type", ex.Message, ex);
         }
     }
 
@@ -227,29 +189,18 @@
     {
         try
         {
-            _logger.LogInformation($"OnValueTypeChanged called");
-            _logger.LogInformation($"Previous value type: {_previousValueType}");
-            _logger.LogInformation($"New value type: {newType}");
-            
+            Logger.LogInformation($"Changing value type from {selectedValueType} to {newType}");
             selectedValueType = newType;
             scanResults.Clear();
-            currentValues.Clear();
-            previousValues.Clear();
+            valueHandler?.ClearCache();
             isFirstScan = true;
-            
             StateHasChanged();
-            _previousValueType = selectedValueType;
             
-            NotificationService.Notify(NotificationSeverity.Info,
-                "Value type changed",
-                $"Selected value type: {selectedValueType}");
+            ShowInfo("Value type changed", $"Selected value type: {selectedValueType}");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in OnValueTypeChanged");
-            NotificationService.Notify(NotificationSeverity.Error,
-                "Error changing value type",
-                ex.Message);
+            ShowError("Error changing value type", ex.Message, ex);
         }
     }
 
@@ -266,264 +217,37 @@
     private async Task OnScan()
     {
         if (!canScan) return;
-        
-        isLoading = true;
+        await scanExecutor.ExecuteScan(valueHandler.GetCurrentValue);
+    }
+
+    private void OnScanComplete(List<IntPtr> results)
+    {
+        scanResults = results;
+        isFirstScan = false;
         StateHasChanged();
-        
-        try
-        {
-            _logger.LogInformation($"Starting {(isFirstScan ? "first" : "next")} scan with type {selectedScanType}");
-            
-            if (selectedScanType == ScanType.Pattern)
-            {
-                var pattern = patternHex.Split(' ')
-                    .Select(b => Convert.ToByte(b, 16))
-                    .ToArray();
-                
-                scanResults = await Scanner.ScanForPattern(
-                    selectedProcessId!.Value,
-                    pattern,
-                    mask);
-            }
-            else
-            {
-                if (isFirstScan)
-                {
-                    switch (selectedScanType)
-                    {
-                        case ScanType.ExactValue:
-                            scanResults = await Scanner.ScanForValue(
-                                selectedProcessId!.Value,
-                                searchValue,
-                                selectedValueType);
-                            break;
-                            
-                        case ScanType.UnknownInitialValue:
-                            scanResults = await Scanner.GetAllAddresses(
-                                selectedProcessId!.Value,
-                                selectedValueType);
-                            break;
-                    }
-                    
-                    foreach (var address in scanResults)
-                    {
-                        var value = GetCurrentValue(address);
-                        previousValues[address] = value;
-                    }
-                }
-                else
-                {
-                    var newResults = new List<IntPtr>();
-                    
-                    foreach (var address in scanResults)
-                    {
-                        var currentValue = GetCurrentValue(address);
-                        var previousValue = previousValues[address];
-                        
-                        bool keepResult = selectedScanType switch
-                        {
-                            ScanType.ExactValue => currentValue == searchValue,
-                            ScanType.IncreasedValue => currentValue > previousValue,
-                            ScanType.DecreasedValue => currentValue < previousValue,
-                            ScanType.ChangedValue => currentValue != previousValue,
-                            ScanType.UnchangedValue => currentValue == previousValue,
-                            _ => false
-                        };
-                        
-                        if (keepResult)
-                        {
-                            newResults.Add(address);
-                            previousValues[address] = currentValue;
-                        }
-                    }
-                    
-                    scanResults = newResults;
-                }
-            }
-            
-            currentValues.Clear();
-            isFirstScan = false;
-            var resultCount = scanResults.Count;
-            NotificationService.Notify(
-                resultCount > 0 ? NotificationSeverity.Success : NotificationSeverity.Info,
-                $"Scan completed",
-                $"Found {resultCount} {(resultCount == 1 ? "result" : "results")}");
-            
-            _logger.LogInformation($"Scan completed. Found {resultCount} results");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Scan failed");
-            NotificationService.Notify(NotificationSeverity.Error,
-                "Scan failed",
-                $"Error: {ex.Message}. Please try again or select different parameters.");
-            scanResults.Clear();
-            currentValues.Clear();
-            previousValues.Clear();
-        }
-        finally
-        {
-            isLoading = false;
-            StateHasChanged();
-        }
     }
 
-    private int GetCurrentValue(IntPtr address)
+    private void OnLoadingChanged(bool loading)
     {
-        try
-        {
-            if (!currentValues.TryGetValue(address, out var value))
-            {
-                if (selectedValueType == MemoryValueType.String || selectedValueType == MemoryValueType.Array)
-                {
-                    NotificationService.Notify(NotificationSeverity.Warning,
-                        "Unsupported type",
-                        $"Type {selectedValueType} is not supported yet");
-                    return 0;
-                }
-
-                var size = selectedValueType switch
-                {
-                    MemoryValueType.Byte => 1,
-                    MemoryValueType.Short => 2,
-                    MemoryValueType.Int => 4,
-                    MemoryValueType.Float => 4,
-                    MemoryValueType.Long => 8,
-                    MemoryValueType.Double => 8,
-                    _ => throw new ArgumentException($"Unsupported value type: {selectedValueType}")
-                };
-
-                byte[] bytes;
-                try
-                {
-                    bytes = MemoryReader.ReadMemoryBytes(address, size).Result;
-                }
-                catch (Exception ex)
-                {
-                    NotificationService.Notify(NotificationSeverity.Error,
-                        "Memory read error",
-                        $"Failed to read memory at {address:X}: {ex.Message}");
-                    return 0;
-                }
-
-                try
-                {
-                    value = selectedValueType switch
-                    {
-                        MemoryValueType.Byte => bytes[0],
-                        MemoryValueType.Short => BitConverter.ToInt16(bytes),
-                        MemoryValueType.Int => BitConverter.ToInt32(bytes),
-                        MemoryValueType.Float => (int)BitConverter.ToSingle(bytes),
-                        MemoryValueType.Long => (int)BitConverter.ToInt64(bytes),
-                        MemoryValueType.Double => (int)BitConverter.ToDouble(bytes),
-                        _ => throw new ArgumentException($"Unsupported value type: {selectedValueType}")
-                    };
-                    currentValues[address] = value;
-                }
-                catch (Exception ex)
-                {
-                    NotificationService.Notify(NotificationSeverity.Error,
-                        "Value conversion error",
-                        $"Failed to convert bytes to {selectedValueType}: {ex.Message}");
-                    return 0;
-                }
-            }
-            return value;
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error,
-                "Unexpected error",
-                $"Error getting value: {ex.Message}");
-            return 0;
-        }
+        isLoading = loading;
+        StateHasChanged();
     }
 
-    private async Task OnValueChanged((IntPtr address, int value) change)
-    {
-        try
-        {
-            var bytes = selectedValueType switch
-            {
-                MemoryValueType.Byte => new[] { (byte)change.value },
-                MemoryValueType.Short => BitConverter.GetBytes((short)change.value),
-                MemoryValueType.Int => BitConverter.GetBytes(change.value),
-                MemoryValueType.Float => BitConverter.GetBytes((float)change.value),
-                MemoryValueType.Long => BitConverter.GetBytes((long)change.value),
-                MemoryValueType.Double => BitConverter.GetBytes((double)change.value),
-                _ => BitConverter.GetBytes(change.value)
-            };
+    private int GetCurrentValue(IntPtr address) => valueHandler.GetCurrentValue(address);
 
-            await MemoryReader.WriteMemoryBytes(change.address, bytes);
-            currentValues[change.address] = change.value;
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to write value", ex.Message);
-        }
-    }
+    private Task OnValueChanged((IntPtr address, int value) change) => 
+        valueHandler.OnValueChanged(change);
 
-    private async Task ToggleFreeze(IntPtr address)
-    {
-        try
-        {
-            if (frozenAddresses.Contains(address))
-            {
-                await Freezer.UnfreezeValue(address);
-                frozenAddresses.Remove(address);
-            }
-            else
-            {
-                var value = GetCurrentValue(address);
-                var bytes = selectedValueType switch
-                {
-                    MemoryValueType.Byte => new[] { (byte)value },
-                    MemoryValueType.Short => BitConverter.GetBytes((short)value),
-                    MemoryValueType.Int => BitConverter.GetBytes(value),
-                    MemoryValueType.Float => BitConverter.GetBytes((float)value),
-                    MemoryValueType.Long => BitConverter.GetBytes((long)value),
-                    MemoryValueType.Double => BitConverter.GetBytes((double)value),
-                    _ => BitConverter.GetBytes(value)
-                };
-                
-                await Freezer.FreezeValue(address, bytes, selectedValueType.ToString());
-                frozenAddresses.Add(address);
-            }
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(NotificationSeverity.Error, "Failed to toggle freeze", ex.Message);
-        }
-    }
+    private Task ToggleFreeze(IntPtr address) => 
+        valueFreezer.ToggleFreeze(address, GetCurrentValue(address));
 
-    private bool IsFrozen(IntPtr address) => frozenAddresses.Contains(address);
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        try
-        {
-            _logger.LogInformation($"OnAfterRender called, firstRender: {firstRender}");
-            _logger.LogInformation($"Component state - ScanType: {selectedScanType}, ValueType: {selectedValueType}");
-            
-            if (firstRender)
-            {
-                _logger.LogInformation("First render - initializing dropdown data");
-                scanTypes = Enum.GetValues(typeof(ScanType));
-                valueTypes = Enum.GetValues(typeof(MemoryValueType));
-                StateHasChanged();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in OnAfterRender");
-        }
-    }
+    private bool IsFrozen(IntPtr address) => valueFreezer.IsFrozen(address);
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var address in frozenAddresses)
+        if (valueFreezer != null)
         {
-            await Freezer.UnfreezeValue(address);
+            await valueFreezer.DisposeAsync();
         }
     }
 }

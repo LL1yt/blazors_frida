@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>BlazorFridaApp</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
 
   <ItemGroup>
@@ -42,6 +44,13 @@
   <!-- Persistence -->
   <ItemGroup>
     <Compile Include="Persistence\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Static Web Content -->
+  <ItemGroup>
+    <Content Include="wwwroot\**\*" />
+    <Content Include="appsettings.json" />
+    <Content Include="appsettings.Development.json" />
   </ItemGroup>
 
   <!-- SQLite Database -->

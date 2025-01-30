@@ -1,0 +1,144 @@
+@inherits MemoryScannerComponentBase
+
+@inject IMemoryScannerService Scanner
+
+<div>
+    @if (IsLoading)
+    {
+        <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" />
+    }
+</div>
+
+@code {
+    private Dictionary<IntPtr, int> previousValues = new();
+    private List<IntPtr> scanResults = new();
+
+    [Parameter]
+    public int? ProcessId { get; set; }
+
+    [Parameter]
+    public ScanType ScanType { get; set; }
+
+    [Parameter]
+    public MemoryValueType ValueType { get; set; }
+
+    [Parameter]
+    public string PatternHex { get; set; } = "";
+
+    [Parameter]
+    public string Mask { get; set; } = "";
+
+    [Parameter]
+    public int SearchValue { get; set; }
+
+    [Parameter]
+    public bool IsFirstScan { get; set; }
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public EventCallback<List<IntPtr>> OnScanComplete { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnLoadingChanged { get; set; }
+
+    public async Task ExecuteScan(Func<IntPtr, int> getCurrentValue)
+    {
+        if (!ProcessId.HasValue) return;
+
+        try
+        {
+            Logger.LogInformation($"Starting {(IsFirstScan ? "first" : "next")} scan with type {ScanType}");
+            await OnLoadingChanged.InvokeAsync(true);
+
+            if (ScanType == ScanType.Pattern)
+            {
+                var pattern = PatternHex.Split(' ')
+                    .Select(b => Convert.ToByte(b, 16))
+                    .ToArray();
+
+                scanResults = await Scanner.ScanForPattern(
+                    ProcessId.Value,
+                    pattern,
+                    Mask);
+            }
+            else
+            {
+                if (IsFirstScan)
+                {
+                    switch (ScanType)
+                    {
+                        case ScanType.ExactValue:
+                            scanResults = await Scanner.ScanForValue(
+                                ProcessId.Value,
+                                SearchValue,
+                                ValueType);
+                            break;
+
+                        case ScanType.UnknownInitialValue:
+                            scanResults = await Scanner.GetAllAddresses(
+                                ProcessId.Value,
+                                ValueType);
+                            break;
+                    }
+
+                    foreach (var address in scanResults)
+                    {
+                        previousValues[address] = getCurrentValue(address);
+                    }
+                }
+                else
+                {
+                    var newResults = new List<IntPtr>();
+
+                    foreach (var address in scanResults)
+                    {
+                        var currentValue = getCurrentValue(address);
+                        var previousValue = previousValues[address];
+
+                        bool keepResult = ScanType switch
+                        {
+                            ScanType.ExactValue => currentValue == SearchValue,
+                            ScanType.IncreasedValue => currentValue > previousValue,
+                            ScanType.DecreasedValue => currentValue < previousValue,
+                            ScanType.ChangedValue => currentValue != previousValue,
+                            ScanType.UnchangedValue => currentValue == previousValue,
+                            _ => false
+                        };
+
+                        if (keepResult)
+                        {
+                            newResults.Add(address);
+                            previousValues[address] = currentValue;
+                        }
+                    }
+
+                    scanResults = newResults;
+                }
+            }
+
+            var resultCount = scanResults.Count;
+            ShowSuccess("Scan completed", $"Found {resultCount} {(resultCount == 1 ? "result" : "results")}");
+            Logger.LogInformation($"Scan completed. Found {resultCount} results");
+            await OnScanComplete.InvokeAsync(scanResults);
+        }
+        catch (Exception ex)
+        {
+            ShowError("Scan failed", $"Error: {ex.Message}. Please try again or select different parameters.", ex);
+            scanResults.Clear();
+            previousValues.Clear();
+            await OnScanComplete.InvokeAsync(scanResults);
+        }
+        finally
+        {
+            await OnLoadingChanged.InvokeAsync(false);
+        }
+    }
+
+    public void Reset()
+    {
+        scanResults.Clear();
+        previousValues.Clear();
+    }
+}
