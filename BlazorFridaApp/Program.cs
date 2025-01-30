@@ -2,6 +2,7 @@ using BlazorFridaApp.Components;
 using BlazorFridaApp.Persistence;
 using BlazorFridaApp.MemoryScanner;
 using Microsoft.EntityFrameworkCore;
+using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +11,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=gamememory.db"));
     
 builder.Services.AddScoped<ProcessMemoryScanner>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddRadzenComponents();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

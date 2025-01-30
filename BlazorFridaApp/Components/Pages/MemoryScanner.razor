@@ -1,85 +1,108 @@
 @page "/memory-scanner"
 @using BlazorFridaApp.MemoryScanner
 @using BlazorFridaApp.Persistence
+@using Radzen
+@using Radzen.Blazor
 @inject ProcessMemoryScanner Scanner
 @inject AppDbContext DbContext
+@inject NotificationService NotificationService
 
 <PageTitle>Memory Scanner</PageTitle>
 
-<h3>Memory Scanner</h3>
+<RadzenNotification />
 
-<div class="form-group">
-    <label>Select Process:</label>
-    <select @bind="selectedProcessId" class="form-control" @onchange="SaveProcessSelection">
-        <option value="">-- Select Process --</option>
-        @foreach (var proc in processes)
-        {
-            <option value="@proc.Id">@proc.ProcessName (PID: @proc.Id)</option>
-        }
-    </select>
-</div>
+<RadzenCard class="rz-my-4">
+    <RadzenText TextStyle="TextStyle.H3">Memory Scanner</RadzenText>
+    
+    <div class="row">
+        <div class="col-md-4">
+            <RadzenLabel Text="Select Process" />
+            <RadzenDropDown @bind-Value="selectedProcessId"
+                          Data="@processes"
+                          TextProperty="ProcessName"
+                          ValueProperty="Id"
+                          Placeholder="-- Select Process --"
+                          Class="w-100" />
+        </div>
+        
+        <div class="col-md-4">
+            <RadzenLabel Text="Pattern (hex bytes)" />
+            <RadzenTextBox @bind-Value="patternInput"
+                         Placeholder="00 AA FF ??"
+                         Class="w-100" />
+        </div>
+        
+        <div class="col-md-4">
+            <RadzenLabel Text="Mask" />
+            <RadzenTextBox @bind-Value="mask"
+                         Placeholder="xx??xx"
+                         Class="w-100" />
+        </div>
+    </div>
 
-<div class="form-group">
-    <label>Pattern (hex bytes):</label>
-    <input @bind="patternInput" class="form-control" 
-           placeholder="00 AA FF ??" />
-</div>
-
-<div class="form-group">
-    <label>Mask:</label>
-    <input @bind="mask" class="form-control" 
-           placeholder="xx??xx" />
-</div>
-
-<button @onclick="ScanMemory" class="btn btn-primary" 
-        disabled="@isScanning">
-    @if (isScanning) {
-        <span class="spinner-border spinner-border-sm" role="status"></span>
-    }
-    Scan Memory
-</button>
+    <div class="row mt-3">
+        <div class="col">
+            <RadzenButton Click="@ScanMemory"
+                         Text="@(isScanning ? "Scanning..." : "Scan Memory")"
+                         ButtonStyle="ButtonStyle.Primary"
+                         IsBusy="@isScanning"
+                         Disabled="@isScanning"
+                         Class="w-100" />
+        </div>
+    </div>
+</RadzenCard>
 
 @if (scanResults.Any())
 {
-    <h4 class="mt-4">Scan Results</h4>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Address</th>
-                <th>Current Value</th>
-                <th>New Value</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var result in scanResults)
-            {
-                <tr>
-                    <td>0x@(result.Address.ToString("X"))</td>
-                    <td>@BitConverter.ToString(result.CurrentValue)</td>
-                    <td>
-                        <input @bind="result.NewValue" 
-                               class="form-control form-control-sm" 
-                               placeholder="Hex bytes"/>
-                    </td>
-                    <td>
-                        <button @onclick="() => FreezeAddress(result)" 
-                                class="btn btn-sm @(result.IsFrozen ? "btn-success" : "btn-outline-secondary")">
-                            @(result.IsFrozen ? "Frozen" : "Freeze")
-                        </button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <RadzenCard class="rz-my-4">
+        <RadzenText TextStyle="TextStyle.H4">Scan Results</RadzenText>
+        
+        <RadzenDataGrid Data="@scanResults" TItem="ScanResult" AllowPaging="true" PageSize="10">
+            <Columns>
+                <RadzenDataGridColumn TItem="ScanResult" Title="Address" 
+                                    Property="Address" FormatString="0x{0:X}" />
+                                    
+                <RadzenDataGridColumn TItem="ScanResult" Title="Current Value">
+                    <Template Context="result">
+                        @BitConverter.ToString(result.CurrentValue)
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ScanResult" Title="New Value">
+                    <Template Context="result">
+                        <RadzenTextBox @bind-Value="result.NewValue"
+                                     Placeholder="Hex bytes"
+                                     Class="w-100" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ScanResult" Title="Actions">
+                    <Template Context="result">
+                        <RadzenButton Click="@(() => FreezeAddress(result))"
+                                    ButtonStyle="@(result.IsFrozen ? ButtonStyle.Success : ButtonStyle.Light)"
+                                    Text="@(result.IsFrozen ? "Frozen" : "Freeze")"
+                                    Size="ButtonSize.Small" />
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
 }
 
 @code {
-    private int processId;
+    private int selectedProcessId;
     private string patternInput = "";
     private string mask = "";
     private bool isScanning;
     private List<ScanResult> scanResults = new();
+    private System.Diagnostics.Process[] processes = Array.Empty<System.Diagnostics.Process>();
+
+    protected override void OnInitialized()
+    {
+        processes = System.Diagnostics.Process.GetProcesses()
+            .OrderBy(p => p.ProcessName)
+            .ToArray();
+    }
 
     class ScanResult
     {
@@ -91,16 +114,66 @@
 
     private async Task ScanMemory()
     {
+        if (selectedProcessId == 0)
+        {
+            await NotificationService.Show(new NotificationMessage { 
+                Severity = NotificationSeverity.Warning,
+                Summary = "Warning",
+                Detail = "Please select a process first.",
+                Duration = 4000
+            });
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(patternInput))
+        {
+            await NotificationService.Show(new NotificationMessage { 
+                Severity = NotificationSeverity.Warning,
+                Summary = "Warning",
+                Detail = "Please enter a pattern to search for.",
+                Duration = 4000
+            });
+            return;
+        }
+        
         isScanning = true;
         try
         {
             var pattern = ParseHexPattern(patternInput);
-            var addresses = await Scanner.ScanForPattern(processId, pattern, mask);
+            var addresses = await Scanner.ScanForPattern(selectedProcessId, pattern, mask);
             
             scanResults = addresses.Select(a => new ScanResult {
                 Address = a,
                 CurrentValue = ReadAddressValue(a)
             }).ToList();
+
+            if (!scanResults.Any())
+            {
+                await NotificationService.Show(new NotificationMessage { 
+                    Severity = NotificationSeverity.Info,
+                    Summary = "Info",
+                    Detail = "No matches found for the given pattern.",
+                    Duration = 4000
+                });
+            }
+            else
+            {
+                await NotificationService.Show(new NotificationMessage { 
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = $"Found {scanResults.Count} matches.",
+                    Duration = 4000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            await NotificationService.Show(new NotificationMessage { 
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to scan memory: {ex.Message}",
+                Duration = 4000
+            });
         }
         finally
         {
@@ -125,9 +198,39 @@
 
     private async Task FreezeAddress(ScanResult result)
     {
-        var bytes = ParseHexPattern(result.NewValue);
-        await Scanner.WriteMemory(result.Address, bytes);
-        result.IsFrozen = true;
-        result.CurrentValue = bytes;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(result.NewValue))
+            {
+                await NotificationService.Show(new NotificationMessage { 
+                    Severity = NotificationSeverity.Warning,
+                    Summary = "Warning",
+                    Detail = "Please enter a new value first.",
+                    Duration = 4000
+                });
+                return;
+            }
+
+            var bytes = ParseHexPattern(result.NewValue);
+            await Scanner.WriteMemory(result.Address, bytes);
+            result.IsFrozen = true;
+            result.CurrentValue = bytes;
+            
+            await NotificationService.Show(new NotificationMessage { 
+                Severity = NotificationSeverity.Success,
+                Summary = "Success",
+                Detail = $"Value at address 0x{result.Address:X} has been {(result.IsFrozen ? "frozen" : "unfrozen")}.",
+                Duration = 4000
+            });
+        }
+        catch (Exception ex)
+        {
+            await NotificationService.Show(new NotificationMessage { 
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to {(result.IsFrozen ? "freeze" : "unfreeze")} address: {ex.Message}",
+                Duration = 4000
+            });
+        }
     }
 }
