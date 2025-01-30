@@ -5,8 +5,8 @@ namespace BlazorFridaApp.Components.Pages
 {
     public partial class MemoryScanner : MemoryScannerComponentBase, IAsyncDisposable
     {
-        private ScanExecutor scanExecutor;
-        private MemoryValueHandler valueHandler;
-        private ValueFreezer valueFreezer;
+        protected ScanExecutor scanExecutor;
+        protected MemoryValueHandler valueHandler;
+        protected ValueFreezer valueFreezer;
     }
 }
