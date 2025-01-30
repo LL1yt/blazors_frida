@@ -9,6 +9,7 @@ namespace BlazorFridaApp.MemoryScanner
     public class ProcessMemoryScanner : IDisposable
     {
         private readonly AppDbContext _dbContext;
+        private readonly ILogger<ProcessMemoryScanner> _logger;
         public nint ProcessHandle => _processHandle;
         private nint _processHandle;
         private int _currentProcessId;
@@ -45,9 +46,11 @@ namespace BlazorFridaApp.MemoryScanner
             public uint Type;
         }
 
-        public ProcessMemoryScanner(AppDbContext dbContext)
+        public ProcessMemoryScanner(AppDbContext dbContext, ILogger<ProcessMemoryScanner> logger)
         {
             _dbContext = dbContext;
+            _logger = logger;
+            _logger.LogInformation("ProcessMemoryScanner initialized");
         }
 
         public async Task<List<nint>> ScanForPattern(int processId, byte[] pattern, string mask)
@@ -202,12 +205,15 @@ namespace BlazorFridaApp.MemoryScanner
 
         public async Task<byte[]> ReadMemoryBytes(nint address, int length)
         {
-            var buffer = new byte[length];
-            if (!ReadProcessMemory(_processHandle, address, buffer, length, out _))
+            return await Task.Run(() =>
             {
-                throw new Exception($"Failed to read memory at {address:X} (Error: {Marshal.GetLastWin32Error()})");
-            }
-            return buffer;
+                var buffer = new byte[length];
+                if (!ReadProcessMemory(_processHandle, address, buffer, length, out _))
+                {
+                    throw new Exception($"Failed to read memory at {address:X} (Error: {Marshal.GetLastWin32Error()})");
+                }
+                return buffer;
+            });
         }
 
         public void Dispose()
@@ -268,32 +274,35 @@ namespace BlazorFridaApp.MemoryScanner
 
         public async Task WriteMemory(nint address, byte[] value)
         {
-            if (_processHandle == nint.Zero)
-                throw new Exception("No process is currently open");
-
-            const int PROCESS_VM_WRITE = 0x0020;
-            const int PROCESS_VM_OPERATION = 0x0008;
-            
-            // Ensure we have write access
-            if (!WriteProcessMemory(_processHandle, address, value, value.Length, out _))
+            await Task.Run(() =>
             {
-                // If write fails, try to reopen handle with write access
-                var writeHandle = OpenProcess(PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
-                    false, _currentProcessId);
-                
-                if (writeHandle == nint.Zero)
-                    throw new Exception($"Failed to open process for writing (Error: {Marshal.GetLastWin32Error()})");
+                if (_processHandle == nint.Zero)
+                    throw new Exception("No process is currently open");
 
-                try
+                const int PROCESS_VM_WRITE = 0x0020;
+                const int PROCESS_VM_OPERATION = 0x0008;
+                
+                // Ensure we have write access
+                if (!WriteProcessMemory(_processHandle, address, value, value.Length, out _))
                 {
-                    if (!WriteProcessMemory(writeHandle, address, value, value.Length, out _))
-                        throw new Exception($"Write failed (Error: {Marshal.GetLastWin32Error()})");
+                    // If write fails, try to reopen handle with write access
+                    var writeHandle = OpenProcess(PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
+                        false, _currentProcessId);
+                    
+                    if (writeHandle == nint.Zero)
+                        throw new Exception($"Failed to open process for writing (Error: {Marshal.GetLastWin32Error()})");
+
+                    try
+                    {
+                        if (!WriteProcessMemory(writeHandle, address, value, value.Length, out _))
+                            throw new Exception($"Write failed (Error: {Marshal.GetLastWin32Error()})");
+                    }
+                    finally
+                    {
+                        CloseHandle(writeHandle);
+                    }
                 }
-                finally
-                {
-                    CloseHandle(writeHandle);
-                }
-            }
+            });
         }
     }
 }

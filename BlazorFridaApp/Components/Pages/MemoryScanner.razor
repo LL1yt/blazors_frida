@@ -1,344 +1,182 @@
 @page "/memory-scanner"
+@using System.Diagnostics
+@using System.Runtime.InteropServices
 @using BlazorFridaApp.MemoryScanner
 @using BlazorFridaApp.Persistence
 @using Radzen
 @using Radzen.Blazor
-@using Microsoft.EntityFrameworkCore
-@implements IDisposable
-@inject ProcessMemoryScanner Scanner
-@inject AppDbContext DbContext
+@implements IAsyncDisposable
+@inject ProcessMemoryScanner ScannerService
 @inject NotificationService NotificationService
+@inject AppDbContext DbContext
 
-<PageTitle>Memory Scanner</PageTitle>
-
-<RadzenNotification />
-
-<RadzenCard class="rz-my-4">
-    <RadzenText TextStyle="TextStyle.H3">Memory Scanner</RadzenText>
+<RadzenCard>
+    <h2>Memory Scanner</h2>
     
-    <div class="row">
-        <div class="col-md-4">
-            <RadzenLabel Text="Select Process" />
-            <RadzenDropDown @bind-Value="selectedProcessId"
-                          Data="@processes"
-                          TextProperty="ProcessName"
-                          ValueProperty="Id"
-                          Placeholder="-- Select Process --"
-                          Change="@OnProcessChanged"
-                          Class="w-100" />
-        </div>
+    <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
+        <RadzenDropDown @bind-Value="@selectedProcessId"
+                        Data="@processList"
+                        TextProperty="ProcessName"
+                        ValueProperty="Id"
+                        Placeholder="Select process"
+                        Change="@OnProcessSelected"/>
         
-        <div class="col-md-4">
-            <RadzenLabel Text="Pattern (hex bytes)" />
-            <RadzenTextBox @bind-Value="patternInput"
-                         Placeholder="00 AA FF ??"
-                         Class="w-100" />
-        </div>
+        <RadzenTextArea @bind-Value="@patternHex"
+                        Placeholder="Pattern (hex, space-separated)"
+                        Rows="2"/>
+                        
+        <RadzenTextArea @bind-Value="@mask"
+                        Placeholder="Mask (x - match, ? - wildcard)"
+                        Rows="2"/>
         
-        <div class="col-md-4">
-            <RadzenLabel Text="Mask" />
-            <RadzenTextBox @bind-Value="mask"
-                         Placeholder="xx??xx"
-                         Class="w-100" />
-        </div>
-    </div>
-
-    <div class="row mt-3">
-        <div class="col">
-            <RadzenButton Click="@ScanMemory"
-                         Text="@(isScanning ? "Scanning..." : "Scan Memory")"
-                         ButtonStyle="ButtonStyle.Primary"
-                         IsBusy="@isScanning"
-                         Disabled="@isScanning"
-                         Class="w-100" />
-        </div>
-    </div>
+        <RadzenButton Text="Scan" Click="@OnScan" Disabled="@(!canScan)"/>
+    </RadzenStack>
+    
+    <RadzenDataGrid Data="@scanResults" TItem="IntPtr">
+        <Columns>
+            <RadzenDataGridColumn TItem="IntPtr" Title="Address" Property="@nameof(IntPtr)" FormatString="X8"/>
+            <RadzenDataGridColumn TItem="IntPtr" Title="Value">
+                <Template>
+                    @{
+                        var currentValue = GetCurrentValue(context);
+                        <RadzenNumeric TValue="int" Value="@currentValue" 
+                                     Change="@(async (int v) => await OnValueChanged(context, v))"/>
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="IntPtr" Title="Actions">
+                <Template>
+                    <RadzenButton Icon="lock" 
+                                Click="@(() => ToggleFreeze(context))" 
+                                Disabled="@(IsFrozen(context))"/>
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
 </RadzenCard>
 
-@if (scanResults.Any())
-{
-    <RadzenCard class="rz-my-4">
-        <RadzenText TextStyle="TextStyle.H4">Scan Results</RadzenText>
-        
-        <RadzenDataGrid Data="@scanResults" TItem="ScanResult" AllowPaging="true" PageSize="10">
-            <Columns>
-                <RadzenDataGridColumn TItem="ScanResult" Title="Address" 
-                                    Property="Address" FormatString="0x{0:X}" />
-                                    
-                <RadzenDataGridColumn TItem="ScanResult" Title="Original Value">
-                    <Template Context="result">
-                        @BitConverter.ToString(result.OriginalValue)
-                    </Template>
-                </RadzenDataGridColumn>
-
-                <RadzenDataGridColumn TItem="ScanResult" Title="Current Value">
-                    <Template Context="result">
-                        <span style="@(result.IsFrozen ? "color: #28a745;" : "")">
-                            @BitConverter.ToString(result.CurrentValue)
-                        </span>
-                    </Template>
-                </RadzenDataGridColumn>
-                
-                <RadzenDataGridColumn TItem="ScanResult" Title="New Value">
-                    <Template Context="result">
-                        <RadzenTextBox @bind-Value="result.NewValue"
-                                     Placeholder="Hex bytes (e.g., 00 FF AA)"
-                                     Disabled="@result.IsFrozen"
-                                     Class="w-100" />
-                    </Template>
-                </RadzenDataGridColumn>
-                
-                <RadzenDataGridColumn TItem="ScanResult" Title="Actions">
-                    <Template Context="result">
-                        <div class="d-flex gap-2">
-                            <RadzenButton Click="@(() => FreezeAddress(result))"
-                                        ButtonStyle="@(result.IsFrozen ? ButtonStyle.Success : ButtonStyle.Light)"
-                                        Text="@(result.IsFrozen ? "Unfreeze" : "Freeze")"
-                                        Size="ButtonSize.Small" />
-                        </div>
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-    </RadzenCard>
-}
-
 @code {
-    private int selectedProcessId;
-    private string patternInput = "";
+    private List<Process> processList = new();
+    private int? selectedProcessId;
+    private string patternHex = "";
     private string mask = "";
-    private bool isScanning;
-    private List<ScanResult> scanResults = new();
-    private System.Diagnostics.Process[] processes = Array.Empty<System.Diagnostics.Process>();
+    private List<IntPtr> scanResults = new();
+    private HashSet<IntPtr> frozenAddresses = new();
+    private Dictionary<IntPtr, int> currentValues = new();
 
     protected override async Task OnInitializedAsync()
     {
-        processes = System.Diagnostics.Process.GetProcesses()
-            .Where(p => !string.IsNullOrEmpty(p.ProcessName))
-            .OrderBy(p => p.ProcessName)
-            .ToArray();
+        processList = await Task.FromResult(ScannerService.GetProcesses());
+        await LoadLastProcess();
+    }
 
-        // Load last used process
-        var lastProcessId = await Scanner.GetLastProcessId();
-        if (lastProcessId.HasValue && processes.Any(p => p.Id == lastProcessId.Value))
+    private async Task LoadLastProcess()
+    {
+        var lastId = await ScannerService.GetLastProcessId();
+        if (lastId.HasValue)
         {
-            selectedProcessId = lastProcessId.Value;
-            await OnProcessChanged(selectedProcessId);
+            selectedProcessId = lastId.Value;
+            await OnProcessSelected();
         }
     }
 
-    class ScanResult
+    private async Task OnProcessSelected()
     {
-        public nint Address { get; set; }
-        public byte[] CurrentValue { get; set; } = Array.Empty<byte>();
-        public byte[] OriginalValue { get; set; } = Array.Empty<byte>();
-        public string NewValue { get; set; } = "";
-        public bool IsFrozen { get; set; }
-    }
-
-    private async Task OnProcessChanged(object value)
-    {
-        if (value != null && int.TryParse(value.ToString(), out int processId))
+        if (selectedProcessId.HasValue)
         {
-            // Clear previous results
-            scanResults.Clear();
-            
-            try
-            {
-                await Scanner.SaveLastProcess(processId);
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Info,
-                    Summary = "Process Changed",
-                    Detail = $"Selected process: {processes.FirstOrDefault(p => p.Id == processId)?.ProcessName}",
-                    Duration = 4000
-                });
-            }
-            catch (Exception ex)
-            {
-                NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "Error",
-                    Detail = $"Failed to change process: {ex.Message}",
-                    Duration = 4000
-                });
-            }
+            await ScannerService.SaveLastProcess(selectedProcessId.Value);
         }
     }
 
-    private async Task ScanMemory()
+    public async ValueTask DisposeAsync()
     {
-        if (selectedProcessId == 0)
+        foreach (var address in frozenAddresses)
         {
-            NotificationService.Notify(new NotificationMessage { 
-                Severity = NotificationSeverity.Warning,
-                Summary = "Warning",
-                Detail = "Please select a process first.",
-                Duration = 4000
-            });
-            return;
+            await ScannerService.UnfreezeValue(address);
         }
+    }
 
-        if (string.IsNullOrWhiteSpace(patternInput))
-        {
-            NotificationService.Notify(new NotificationMessage { 
-                Severity = NotificationSeverity.Warning,
-                Summary = "Warning",
-                Detail = "Please enter a pattern to search for.",
-                Duration = 4000
-            });
-            return;
-        }
-        
-        isScanning = true;
+    private bool canScan => 
+        selectedProcessId.HasValue && 
+        !string.IsNullOrWhiteSpace(patternHex) && 
+        !string.IsNullOrWhiteSpace(mask);
+
+    private async Task OnScan()
+    {
         try
         {
-            var pattern = ParseHexPattern(patternInput);
-            var addresses = await Scanner.ScanForPattern(selectedProcessId, pattern, mask);
+            var pattern = patternHex.Split(' ')
+                .Select(b => Convert.ToByte(b, 16))
+                .ToArray();
             
-            scanResults = new List<ScanResult>();
-            foreach (var address in addresses)
-            {
-                var value = await ReadAddressValue(address);
-                var lockedAddress = await DbContext.LockedAddresses
-                    .FirstOrDefaultAsync(la => la.Address == (long)address);
+            var addresses = await ScannerService.ScanForPattern(
+                selectedProcessId!.Value, 
+                pattern, 
+                mask);
+            
+            scanResults = addresses;
+            currentValues.Clear();
+            NotificationService.Notify(NotificationSeverity.Success, "Scan completed");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Scan failed", ex.Message);
+        }
+    }
 
-                scanResults.Add(new ScanResult
-                {
-                    Address = address,
-                    CurrentValue = value,
-                    OriginalValue = lockedAddress?.OriginalBytes ?? value,
-                    IsFrozen = lockedAddress?.IsFrozen ?? false,
-                    NewValue = lockedAddress?.CurrentValue != null ?
-                        BitConverter.ToString(lockedAddress.CurrentValue).Replace("-", " ") : ""
-                });
+    private int GetCurrentValue(IntPtr address)
+    {
+        try
+        {
+            if (!currentValues.TryGetValue(address, out var value))
+            {
+                var bytes = ScannerService.ReadMemoryBytes(address, 4).Result;
+                value = BitConverter.ToInt32(bytes);
+                currentValues[address] = value;
             }
+            return value;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
 
-            // Start periodic refresh for frozen values
-            _ = Task.Run(async () =>
-            {
-                while (scanResults.Any(r => r.IsFrozen))
-                {
-                    await Task.Delay(500); // Refresh every 500ms
-                    await InvokeAsync(async () =>
-                    {
-                        foreach (var result in scanResults.Where(r => r.IsFrozen))
-                        {
-                            result.CurrentValue = await ReadAddressValue(result.Address);
-                            StateHasChanged();
-                        }
-                    });
-                }
-            });
+    private async Task OnValueChanged(IntPtr address, int value)
+    {
+        try 
+        {
+            var bytes = BitConverter.GetBytes(value);
+            await ScannerService.WriteMemory(address, bytes);
+            currentValues[address] = value;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to write value", ex.Message);
+        }
+    }
 
-            if (!scanResults.Any())
+    private async Task ToggleFreeze(IntPtr address)
+    {
+        try
+        {
+            if (frozenAddresses.Contains(address))
             {
-                NotificationService.Notify(new NotificationMessage { 
-                    Severity = NotificationSeverity.Info,
-                    Summary = "Info",
-                    Detail = "No matches found for the given pattern.",
-                    Duration = 4000
-                });
+                await ScannerService.UnfreezeValue(address);
+                frozenAddresses.Remove(address);
             }
             else
             {
-                NotificationService.Notify(new NotificationMessage { 
-                    Severity = NotificationSeverity.Success,
-                    Summary = "Success",
-                    Detail = $"Found {scanResults.Count} matches.",
-                    Duration = 4000
-                });
+                var value = GetCurrentValue(address);
+                await ScannerService.FreezeValue(address, BitConverter.GetBytes(value));
+                frozenAddresses.Add(address);
             }
         }
         catch (Exception ex)
         {
-            NotificationService.Notify(new NotificationMessage { 
-                Severity = NotificationSeverity.Error,
-                Summary = "Error",
-                Detail = $"Failed to scan memory: {ex.Message}",
-                Duration = 4000
-            });
-        }
-        finally
-        {
-            isScanning = false;
+            NotificationService.Notify(NotificationSeverity.Error, "Failed to toggle freeze", ex.Message);
         }
     }
 
-    private byte[] ParseHexPattern(string input)
-    {
-        return input.Split(' ')
-            .Where(p => !string.IsNullOrWhiteSpace(p))
-            .Select(p => p == "?" ? (byte)0 : Convert.ToByte(p, 16))
-            .ToArray();
-    }
-
-    private async Task<byte[]> ReadAddressValue(nint address)
-    {
-        try
-        {
-            return await Scanner.ReadMemoryBytes(address, 4);
-        }
-        catch (Exception)
-        {
-            return Array.Empty<byte>();
-        }
-    }
-
-    private async Task FreezeAddress(ScanResult result)
-    {
-        try
-        {
-            if (result.IsFrozen)
-            {
-                await Scanner.UnfreezeValue(result.Address);
-                result.IsFrozen = false;
-                NotificationService.Notify(new NotificationMessage {
-                    Severity = NotificationSeverity.Success,
-                    Summary = "Success",
-                    Detail = $"Value at address 0x{result.Address:X} has been unfrozen.",
-                    Duration = 4000
-                });
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(result.NewValue))
-            {
-                NotificationService.Notify(new NotificationMessage {
-                    Severity = NotificationSeverity.Warning,
-                    Summary = "Warning",
-                    Detail = "Please enter a new value first.",
-                    Duration = 4000
-                });
-                return;
-            }
-
-            var bytes = ParseHexPattern(result.NewValue);
-            await Scanner.FreezeValue(result.Address, bytes);
-            result.IsFrozen = true;
-            result.CurrentValue = bytes;
-            
-            NotificationService.Notify(new NotificationMessage {
-                Severity = NotificationSeverity.Success,
-                Summary = "Success",
-                Detail = $"Value at address 0x{result.Address:X} has been frozen.",
-                Duration = 4000
-            });
-        }
-        catch (Exception ex)
-        {
-            NotificationService.Notify(new NotificationMessage {
-                Severity = NotificationSeverity.Error,
-                Summary = "Error",
-                Detail = $"Failed to {(result.IsFrozen ? "freeze" : "unfreeze")} address: {ex.Message}",
-                Duration = 4000
-            });
-        }
-    }
-
-    public void Dispose()
-    {
-        Scanner.Dispose();
-    }
+    private bool IsFrozen(IntPtr address) => frozenAddresses.Contains(address);
 }
