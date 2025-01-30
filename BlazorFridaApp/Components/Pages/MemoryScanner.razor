@@ -2,6 +2,7 @@
 @using System.Diagnostics
 @using System.Runtime.InteropServices
 @using BlazorFridaApp.MemoryScanner
+@using BlazorFridaApp.MemoryScanner.Models
 @using BlazorFridaApp.Persistence
 @using Radzen
 @using Radzen.Blazor
@@ -21,15 +22,46 @@
                         Placeholder="Select process"
                         Change="@OnProcessSelected"/>
         
-        <RadzenTextArea @bind-Value="@patternHex"
-                        Placeholder="Pattern (hex, space-separated)"
-                        Rows="2"/>
-                        
-        <RadzenTextArea @bind-Value="@mask"
-                        Placeholder="Mask (x - match, ? - wildcard)"
-                        Rows="2"/>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenDropDown @bind-Value="@selectedScanType"
+                          Data="@Enum.GetValues(typeof(ScanType))"
+                          Change="@OnScanTypeChanged"
+                          Style="width: 200px"
+                          Placeholder="Scan type"/>
+           <RadzenDropDown @bind-Value="@selectedValueType"
+                         Data="@Enum.GetValues(typeof(MemoryValueType))"
+                         Style="width: 200px"
+                         Placeholder="Value type"/>
+        </RadzenStack>
         
-        <RadzenButton Text="Scan" Click="@OnScan" Disabled="@(!canScan)"/>
+        @if (selectedScanType == ScanType.Pattern)
+        {
+            <RadzenTextArea @bind-Value="@patternHex"
+                           Placeholder="Pattern (hex, space-separated)"
+                           Rows="2"/>
+                           
+            <RadzenTextArea @bind-Value="@mask"
+                           Placeholder="Mask (x - match, ? - wildcard)"
+                           Rows="2"/>
+        }
+        else
+        {
+            <RadzenNumeric @bind-Value="@searchValue"
+                          Placeholder="Search value"
+                          Style="width: 100%"/>
+                          
+            @if (selectedScanType == ScanType.UnknownInitialValue)
+            {
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0">
+                    Perform first scan to initialize, then change value in game and perform next scan
+                </RadzenText>
+            }
+        }
+        
+        <RadzenButton Text="@(isFirstScan ? "First Scan" : "Next Scan")"
+                      Click="@OnScan"
+                      Disabled="@(!canScan)"
+                      ButtonStyle="ButtonStyle.Primary"/>
     </RadzenStack>
     
     <RadzenDataGrid Data="@scanResults" TItem="IntPtr">
@@ -39,8 +71,21 @@
                 <Template>
                     @{
                         var currentValue = GetCurrentValue(context);
-                        <RadzenNumeric TValue="int" Value="@currentValue" 
-                                     Change="@(async (int v) => await OnValueChanged(context, v))"/>
+                        if (selectedValueType == MemoryValueType.Float || selectedValueType == MemoryValueType.Double)
+                        {
+                            <RadzenNumeric TValue="double" Value="@currentValue" Format="0.00"
+                                         Change="@(async (double v) => await OnValueChanged(context, (int)v))"/>
+                        }
+                        else
+                        {
+                            <div class="d-flex align-items-center">
+                                <RadzenNumeric TValue="int" Value="@currentValue"
+                                             Change="@(async (int v) => await OnValueChanged(context, v))"/>
+                                <RadzenText TextStyle="TextStyle.Body2" class="ms-2">
+                                    @FormatValue(currentValue)
+                                </RadzenText>
+                            </div>
+                        }
                     }
                 </Template>
             </RadzenDataGridColumn>
@@ -63,6 +108,12 @@
     private List<IntPtr> scanResults = new();
     private HashSet<IntPtr> frozenAddresses = new();
     private Dictionary<IntPtr, int> currentValues = new();
+    private Dictionary<IntPtr, int> previousValues = new();
+    
+    private ScanType selectedScanType = ScanType.ExactValue;
+    private MemoryValueType selectedValueType = MemoryValueType.Int;
+    private int searchValue;
+    private bool isFirstScan = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -88,6 +139,14 @@
         }
     }
 
+    private async Task OnScanTypeChanged()
+    {
+        isFirstScan = true;
+        scanResults.Clear();
+        currentValues.Clear();
+        previousValues.Clear();
+    }
+
     public async ValueTask DisposeAsync()
     {
         foreach (var address in frozenAddresses)
@@ -96,27 +155,90 @@
         }
     }
 
-    private bool canScan => 
-        selectedProcessId.HasValue && 
-        !string.IsNullOrWhiteSpace(patternHex) && 
-        !string.IsNullOrWhiteSpace(mask);
+    private bool canScan =>
+        selectedProcessId.HasValue &&
+        (selectedScanType == ScanType.Pattern ?
+            !string.IsNullOrWhiteSpace(patternHex) && !string.IsNullOrWhiteSpace(mask) :
+            selectedScanType == ScanType.UnknownInitialValue || searchValue != 0);
 
     private async Task OnScan()
     {
         try
         {
-            var pattern = patternHex.Split(' ')
-                .Select(b => Convert.ToByte(b, 16))
-                .ToArray();
+            if (selectedScanType == ScanType.Pattern)
+            {
+                var pattern = patternHex.Split(' ')
+                    .Select(b => Convert.ToByte(b, 16))
+                    .ToArray();
+                
+                scanResults = await ScannerService.ScanForPattern(
+                    selectedProcessId!.Value,
+                    pattern,
+                    mask);
+            }
+            else
+            {
+                if (isFirstScan)
+                {
+                    // First scan
+                    switch (selectedScanType)
+                    {
+                        case ScanType.ExactValue:
+                            scanResults = await ScannerService.ScanForValue(
+                                selectedProcessId!.Value,
+                                searchValue,
+                                selectedValueType);
+                            break;
+                            
+                        case ScanType.UnknownInitialValue:
+                            scanResults = await ScannerService.GetAllAddresses(
+                                selectedProcessId!.Value,
+                                selectedValueType);
+                            break;
+                    }
+                    
+                    // Store current values for comparison in next scan
+                    foreach (var address in scanResults)
+                    {
+                        var value = GetCurrentValue(address);
+                        previousValues[address] = value;
+                    }
+                }
+                else
+                {
+                    // Next scan
+                    var newResults = new List<IntPtr>();
+                    
+                    foreach (var address in scanResults)
+                    {
+                        var currentValue = GetCurrentValue(address);
+                        var previousValue = previousValues[address];
+                        
+                        bool keepResult = selectedScanType switch
+                        {
+                            ScanType.ExactValue => currentValue == searchValue,
+                            ScanType.IncreasedValue => currentValue > previousValue,
+                            ScanType.DecreasedValue => currentValue < previousValue,
+                            ScanType.ChangedValue => currentValue != previousValue,
+                            ScanType.UnchangedValue => currentValue == previousValue,
+                            _ => false
+                        };
+                        
+                        if (keepResult)
+                        {
+                            newResults.Add(address);
+                            previousValues[address] = currentValue;
+                        }
+                    }
+                    
+                    scanResults = newResults;
+                }
+            }
             
-            var addresses = await ScannerService.ScanForPattern(
-                selectedProcessId!.Value, 
-                pattern, 
-                mask);
-            
-            scanResults = addresses;
             currentValues.Clear();
-            NotificationService.Notify(NotificationSeverity.Success, "Scan completed");
+            isFirstScan = false;
+            NotificationService.Notify(NotificationSeverity.Success,
+                $"Scan completed. Found {scanResults.Count} results.");
         }
         catch (Exception ex)
         {
@@ -130,8 +252,28 @@
         {
             if (!currentValues.TryGetValue(address, out var value))
             {
-                var bytes = ScannerService.ReadMemoryBytes(address, 4).Result;
-                value = BitConverter.ToInt32(bytes);
+                var size = selectedValueType switch
+                {
+                    MemoryValueType.Byte => 1,
+                    MemoryValueType.Short => 2,
+                    MemoryValueType.Int => 4,
+                    MemoryValueType.Float => 4,
+                    MemoryValueType.Long => 8,
+                    MemoryValueType.Double => 8,
+                    _ => 4
+                };
+
+                var bytes = ScannerService.ReadMemoryBytes(address, size).Result;
+                value = selectedValueType switch
+                {
+                    MemoryValueType.Byte => bytes[0],
+                    MemoryValueType.Short => BitConverter.ToInt16(bytes),
+                    MemoryValueType.Int => BitConverter.ToInt32(bytes),
+                    MemoryValueType.Float => (int)BitConverter.ToSingle(bytes),
+                    MemoryValueType.Long => (int)BitConverter.ToInt64(bytes),
+                    MemoryValueType.Double => (int)BitConverter.ToDouble(bytes),
+                    _ => BitConverter.ToInt32(bytes)
+                };
                 currentValues[address] = value;
             }
             return value;
@@ -142,11 +284,35 @@
         }
     }
 
+    private string FormatValue(int value)
+    {
+        return selectedValueType switch
+        {
+            MemoryValueType.Float => ((float)value).ToString("F2"),
+            MemoryValueType.Double => ((double)value).ToString("F2"),
+            MemoryValueType.Byte => $"0x{value:X2}",
+            MemoryValueType.Short => value.ToString(),
+            MemoryValueType.Int => value.ToString(),
+            MemoryValueType.Long => value.ToString(),
+            _ => value.ToString()
+        };
+    }
+
     private async Task OnValueChanged(IntPtr address, int value)
     {
-        try 
+        try
         {
-            var bytes = BitConverter.GetBytes(value);
+            var bytes = selectedValueType switch
+            {
+                MemoryValueType.Byte => new[] { (byte)value },
+                MemoryValueType.Short => BitConverter.GetBytes((short)value),
+                MemoryValueType.Int => BitConverter.GetBytes(value),
+                MemoryValueType.Float => BitConverter.GetBytes((float)value),
+                MemoryValueType.Long => BitConverter.GetBytes((long)value),
+                MemoryValueType.Double => BitConverter.GetBytes((double)value),
+                _ => BitConverter.GetBytes(value)
+            };
+
             await ScannerService.WriteMemory(address, bytes);
             currentValues[address] = value;
         }
@@ -168,7 +334,18 @@
             else
             {
                 var value = GetCurrentValue(address);
-                await ScannerService.FreezeValue(address, BitConverter.GetBytes(value));
+                var bytes = selectedValueType switch
+                {
+                    MemoryValueType.Byte => new[] { (byte)value },
+                    MemoryValueType.Short => BitConverter.GetBytes((short)value),
+                    MemoryValueType.Int => BitConverter.GetBytes(value),
+                    MemoryValueType.Float => BitConverter.GetBytes((float)value),
+                    MemoryValueType.Long => BitConverter.GetBytes((long)value),
+                    MemoryValueType.Double => BitConverter.GetBytes((double)value),
+                    _ => BitConverter.GetBytes(value)
+                };
+                
+                await ScannerService.FreezeValue(address, bytes, selectedValueType.ToString());
                 frozenAddresses.Add(address);
             }
         }

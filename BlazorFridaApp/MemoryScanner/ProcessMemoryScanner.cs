@@ -68,7 +68,11 @@ namespace BlazorFridaApp.MemoryScanner
             _currentProcessId = processId;
             
             if (_processHandle == nint.Zero)
-                throw new Exception($"Failed to open process (Error: {Marshal.GetLastWin32Error()})");
+            {
+                var errorCode = Marshal.GetLastWin32Error();
+                _logger.LogError("Failed to open process {ProcessId}. Error code: {ErrorCode}", processId, errorCode);
+                throw new Exception($"Failed to open process (Error: {errorCode})");
+            }
 
             var matches = new List<nint>();
             var mbi = new MEMORY_BASIC_INFORMATION();
@@ -133,9 +137,10 @@ namespace BlazorFridaApp.MemoryScanner
 
             await _dbContext.ScanProfiles.AddAsync(profile);
             await _dbContext.SaveChangesAsync();
+            _logger.LogInformation("Saved scan results for process {ProcessId} with {MatchCount} matches", processId, addresses.Count);
         }
 
-        public async Task FreezeValue(nint address, byte[] value)
+        public async Task FreezeValue(nint address, byte[] value, string valueType)
         {
             if (_freezeTimers.TryGetValue(address, out var existingTimer))
             {
@@ -160,7 +165,7 @@ namespace BlazorFridaApp.MemoryScanner
                 {
                     ProcessName = Process.GetProcessById(_currentProcessId).ProcessName,
                     Address = (long)address,
-                    ValueType = "byte[]",
+                    ValueType = valueType,
                     OriginalBytes = await ReadMemoryBytes(address, value.Length),
                     CurrentValue = value,
                     IsFrozen = true,
@@ -171,6 +176,7 @@ namespace BlazorFridaApp.MemoryScanner
             else
             {
                 lockedAddress.CurrentValue = value;
+                lockedAddress.ValueType = valueType;
                 lockedAddress.IsFrozen = true;
                 lockedAddress.LastAccessed = DateTime.UtcNow;
             }
@@ -303,6 +309,81 @@ namespace BlazorFridaApp.MemoryScanner
                     }
                 }
             });
+        }
+
+        public async Task<List<nint>> ScanForValue(int processId, int value, MemoryValueType valueType)
+        {
+            var bytes = valueType switch
+            {
+                MemoryValueType.Int => BitConverter.GetBytes(value),
+                MemoryValueType.Float => BitConverter.GetBytes((float)value),
+                MemoryValueType.Double => BitConverter.GetBytes((double)value),
+                MemoryValueType.Short => BitConverter.GetBytes((short)value),
+                MemoryValueType.Long => BitConverter.GetBytes((long)value),
+                MemoryValueType.Byte => new[] { (byte)value },
+                _ => throw new ArgumentException($"Unsupported value type: {valueType}")
+            };
+
+            var mask = new string('x', bytes.Length);
+            return await ScanForPattern(processId, bytes, mask);
+        }
+
+        public async Task<List<nint>> GetAllAddresses(int processId, MemoryValueType valueType)
+        {
+            const int PROCESS_VM_READ = 0x0010;
+            const int PROCESS_QUERY_INFORMATION = 0x0400;
+            
+            if (_processHandle != nint.Zero)
+            {
+                CloseHandle(_processHandle);
+            }
+            
+            _processHandle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION,
+                false, processId);
+            _currentProcessId = processId;
+            
+            if (_processHandle == nint.Zero)
+            {
+                var errorCode = Marshal.GetLastWin32Error();
+                _logger.LogError("Failed to open process {ProcessId}. Error code: {ErrorCode}", processId, errorCode);
+                throw new Exception($"Failed to open process (Error: {errorCode})");
+            }
+
+            var matches = new List<nint>();
+            var mbi = new MEMORY_BASIC_INFORMATION();
+            nint address = 0;
+
+            int valueSize = valueType switch
+            {
+                MemoryValueType.Byte => 1,
+                MemoryValueType.Short => 2,
+                MemoryValueType.Int => 4,
+                MemoryValueType.Float => 4,
+                MemoryValueType.Long => 8,
+                MemoryValueType.Double => 8,
+                _ => throw new ArgumentException($"Unsupported value type: {valueType}")
+            };
+
+            while (VirtualQueryEx(_processHandle, address, out mbi, Marshal.SizeOf<MEMORY_BASIC_INFORMATION>()))
+            {
+                if (mbi.State == 0x1000 && (mbi.Protect & 0xF0) != 0x01)
+                {
+                    var buffer = new byte[(int)mbi.RegionSize];
+                    if (ReadProcessMemory(_processHandle, mbi.BaseAddress, buffer, buffer.Length, out var bytesRead))
+                    {
+                        for (int i = 0; i <= bytesRead - valueSize; i += valueSize)
+                        {
+                            matches.Add(mbi.BaseAddress + i);
+                        }
+                    }
+                }
+                
+                address = mbi.BaseAddress + mbi.RegionSize;
+                if (address < mbi.BaseAddress)
+                    break;
+            }
+
+            return matches;
         }
     }
 }
