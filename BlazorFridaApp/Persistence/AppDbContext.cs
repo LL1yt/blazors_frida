@@ -5,42 +5,68 @@ namespace BlazorFridaApp.Persistence
 {
     public class AppDbContext : DbContext
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+        {
+        }
 
-        public DbSet<ApplicationSetting> ApplicationSettings { get; set; }
-        public DbSet<LockedAddress> LockedAddresses { get; set; }
-        public DbSet<ScanProfile> ScanProfiles { get; set; }
+        public DbSet<ApplicationSetting> ApplicationSettings { get; set; } = null!;
+        public DbSet<LockedAddress> LockedAddresses { get; set; } = null!;
+        public DbSet<ProcessSettings> ProcessSettings { get; set; } = null!;
+        public DbSet<ScanProfile> ScanProfiles { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<ApplicationSetting>(e => {
-                e.Property(a => a.Key).HasMaxLength(256);
-                e.HasIndex(a => a.Key).IsUnique();
-            });
-            
-            modelBuilder.Entity<LockedAddress>(e => {
-                e.Property(l => l.ProcessName).HasMaxLength(256);
-                e.HasIndex(l => new { l.ProcessName, l.Address });
-            });
+            base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<ScanProfile>(e => {
-                e.Property(s => s.Name).HasMaxLength(256);
-                e.Property(s => s.ProcessName).HasMaxLength(256);
-                e.HasIndex(s => s.Name).IsUnique();
-            });
-        }
-
-        public override async Task<int> SaveChangesAsync(
-            CancellationToken cancellationToken = new())
-        {
-            foreach (var entry in ChangeTracker.Entries<ApplicationSetting>())
+            modelBuilder.Entity<ApplicationSetting>(entity =>
             {
-                if (entry.State == EntityState.Added || entry.State == EntityState.Modified)
-                {
-                    entry.Entity.LastModified = DateTime.UtcNow;
-                }
-            }
-            return await base.SaveChangesAsync(cancellationToken);
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Key).IsUnique();
+                entity.Property(e => e.Key).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Value).IsRequired();
+            });
+
+            modelBuilder.Entity<ProcessSettings>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.ProcessName).IsUnique();
+                entity.Property(e => e.ProcessName).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+
+                // Configure relationships
+                entity.HasMany(e => e.LockedAddresses)
+                    .WithOne(e => e.ProcessSettings)
+                    .HasForeignKey(e => e.ProcessSettingsId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(e => e.ScanProfiles)
+                    .WithOne(e => e.ProcessSettings)
+                    .HasForeignKey(e => e.ProcessSettingsId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<LockedAddress>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.ProcessSettingsId, e.Address }).IsUnique();
+                entity.Property(e => e.ProcessName).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.ValueType).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.OriginalBytes).IsRequired();
+                entity.Property(e => e.CurrentValue).IsRequired();
+            });
+
+            modelBuilder.Entity<ScanProfile>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.ProcessName).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.Pattern).IsRequired();
+                entity.Property(e => e.Mask).IsRequired().HasMaxLength(255);
+                entity.Property(e => e.Offsets).IsRequired();
+
+                // Create a compound index on ProcessName and Name
+                entity.HasIndex(e => new { e.ProcessSettingsId, e.Name }).IsUnique();
+            });
         }
     }
 }

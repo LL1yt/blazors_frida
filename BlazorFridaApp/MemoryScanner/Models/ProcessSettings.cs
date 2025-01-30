@@ -3,8 +3,10 @@ namespace BlazorFridaApp.MemoryScanner.Models
     public class ProcessSettings
     {
         public int Id { get; set; }
-        public int LastProcessId { get; set; }
-        public string LastProcessName { get; set; } = string.Empty;
-        public DateTime LastModified { get; set; } = DateTime.UtcNow;
+        public string ProcessName { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+        public DateTime LastAccessed { get; set; }
+        public List<LockedAddress> LockedAddresses { get; set; } = new();
+        public List<ScanProfile> ScanProfiles { get; set; } = new();
     }
 }

@@ -1,0 +1,88 @@
+@using BlazorFridaApp.MemoryScanner.Models
+@using Radzen
+@using Radzen.Blazor
+
+<RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+    <ErrorBoundary>
+        <ChildContent>
+            <RadzenDropDown TValue="ScanType"
+                          Value="@ScanType"
+                          ValueChanged="@OnScanTypeChanged"
+                          Data="@ScanTypes"
+                          AllowClear="true"
+                          Style="width: 200px"
+                          Placeholder="Scan type"/>
+        </ChildContent>
+        <ErrorContent>
+            <div class="alert alert-danger">@context.Message</div>
+        </ErrorContent>
+    </ErrorBoundary>
+    
+    <ErrorBoundary>
+        <ChildContent>
+            <RadzenDropDown TValue="MemoryValueType"
+                          Value="@ValueType"
+                          ValueChanged="@OnValueTypeChanged"
+                          Data="@ValueTypes"
+                          Style="width: 200px"
+                          AllowClear="true"
+                          Placeholder="Value type"/>
+        </ChildContent>
+        <ErrorContent>
+            <div class="alert alert-danger">@context.Message</div>
+        </ErrorContent>
+    </ErrorBoundary>
+</RadzenStack>
+
+@if (ScanType == ScanType.Pattern)
+{
+    <RadzenTextArea @bind-Value="@PatternHex"
+                   Placeholder="Pattern (hex, space-separated)"
+                   Rows="2"/>
+                   
+    <RadzenTextArea @bind-Value="@Mask"
+                   Placeholder="Mask (x - match, ? - wildcard)"
+                   Rows="2"/>
+}
+else
+{
+    <RadzenNumeric @bind-Value="@SearchValue"
+                  Placeholder="Search value"
+                  Style="width: 100%"/>
+                  
+    @if (ScanType == ScanType.UnknownInitialValue)
+    {
+        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0">
+            Perform first scan to initialize, then change value in game and perform next scan
+        </RadzenText>
+    }
+}
+
+<RadzenButton Text="@(IsFirstScan ? "First Scan" : "Next Scan")"
+             Click="@OnScanClick"
+             Disabled="@(!CanScan || IsLoading)"
+             ButtonStyle="ButtonStyle.Primary"
+             Icon="@(IsLoading ? "refresh" : "search")"
+             class="@(IsLoading ? "rz-button-loading" : "")"
+             Style="min-width: 150px"/>
+
+@if (IsLoading)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+
+@code {
+    [Parameter] public ScanType ScanType { get; set; }
+    [Parameter] public MemoryValueType ValueType { get; set; }
+    [Parameter] public Array ScanTypes { get; set; }
+    [Parameter] public Array ValueTypes { get; set; }
+    [Parameter] public string PatternHex { get; set; }
+    [Parameter] public string Mask { get; set; }
+    [Parameter] public int SearchValue { get; set; }
+    [Parameter] public bool IsFirstScan { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public bool CanScan { get; set; }
+    [Parameter] public EventCallback<ScanType> OnScanTypeChanged { get; set; }
+    [Parameter] public EventCallback<MemoryValueType> OnValueTypeChanged { get; set; }
+    [Parameter] public EventCallback OnScanClick { get; set; }
+}

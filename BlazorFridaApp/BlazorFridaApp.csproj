@@ -1,31 +1,53 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.1">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Radzen.Blazor" Version="5.9.6" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.1" />
+    <PackageReference Include="Radzen.Blazor" Version="4.24.3" />
   </ItemGroup>
 
+  <!-- Global Usings -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.1" />
-    <PackageReference Include="Python.Runtime" Version="2.7.9" />
+    <Compile Include="GlobalUsings.cs" />
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <DefineConstants>WINDOWS</DefineConstants>
-  </PropertyGroup>
+  <!-- Memory Scanner -->
+  <ItemGroup>
+    <Compile Include="MemoryScanner\**\*.cs" />
+    <Content Include="MemoryScanner\**\*.razor" />
+  </ItemGroup>
+
+  <!-- Services -->
+  <ItemGroup>
+    <Compile Include="Services\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Components -->
+  <ItemGroup>
+    <Compile Include="Components\**\*.cs" />
+    <Content Include="Components\**\*.razor" />
+  </ItemGroup>
+
+  <!-- Persistence -->
+  <ItemGroup>
+    <Compile Include="Persistence\**\*.cs" />
+  </ItemGroup>
+
+  <!-- SQLite Database -->
+  <ItemGroup>
+    <None Update="gamememory.db">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

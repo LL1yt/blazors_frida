@@ -1,17 +1,22 @@
 @page "/memory-scanner"
 @using System.Diagnostics
-@using System.Runtime.InteropServices
 @using System.Security.Principal
 @using BlazorFridaApp.MemoryScanner
 @using BlazorFridaApp.MemoryScanner.Models
+@using BlazorFridaApp.MemoryScanner.Native
+@using BlazorFridaApp.MemoryScanner.Services
+@using BlazorFridaApp.MemoryScanner.Components
 @using BlazorFridaApp.Persistence
 @using Radzen
 @using Radzen.Blazor
-@using Microsoft.Extensions.Logging
 @implements IAsyncDisposable
-@inject ProcessMemoryScanner ScannerService
+
+@inject ProcessService ProcessService
+@inject MemoryReaderService MemoryReader
+@inject MemoryScannerService Scanner
+@inject ValueFreezerService Freezer
+@inject ScanProfileService ProfileService
 @inject NotificationService NotificationService
-@inject AppDbContext DbContext
 @inject ILogger<MemoryScanner> _logger
 
 <RadzenCard>
@@ -29,164 +34,35 @@
     }
     
     <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
-        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
-            <RadzenDropDown @bind-Value="@selectedProcessId"
-                           Data="@processList"
-                           TextProperty="ProcessName"
-                           ValueProperty="Id"
-                           Placeholder="Select process"
-                           Change="@OnProcessSelected"
-                           AllowClear="true"
-                           AllowFiltering="true"
-                           FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                           Style="width: 80%"/>
-            <RadzenButton Icon="refresh"
-                         Click="@RefreshProcessList"
-                         ButtonStyle="ButtonStyle.Light"
-                         Title="Refresh process list"/>
-        </RadzenStack>
+        <ProcessSelector 
+            ProcessList="@processList"
+            SelectedProcessId="@selectedProcessId"
+            OnProcessSelected="@OnProcessSelected"
+            OnRefreshClick="@RefreshProcessList" />
+
+        <ScanControls 
+            ScanType="@selectedScanType"
+            ValueType="@selectedValueType"
+            ScanTypes="@scanTypes"
+            ValueTypes="@valueTypes"
+            PatternHex="@patternHex"
+            Mask="@mask"
+            SearchValue="@searchValue"
+            IsFirstScan="@isFirstScan"
+            IsLoading="@isLoading"
+            CanScan="@canScan"
+            OnScanTypeChanged="@OnScanTypeChanged"
+            OnValueTypeChanged="@OnValueTypeChanged"
+            OnScanClick="@OnScan" />
         
-        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-            @{
-                var scanTypes = Enum.GetValues(typeof(ScanType));
-                _logger.LogInformation($"Available scan types: {string.Join(", ", scanTypes.Cast<ScanType>())}");
-                _logger.LogInformation($"Current selected scan type: {selectedScanType}");
-                _logger.LogInformation($"Scan types array type: {scanTypes.GetType().FullName}");
-                _logger.LogInformation($"Scan types array length: {scanTypes.Length}");
-                foreach (ScanType type in scanTypes)
-                {
-                    _logger.LogInformation($"Scan type value: {type}, Raw value: {(int)type}");
-                }
-            }
-            <ErrorBoundary>
-                <ChildContent>
-                    <RadzenDropDown TValue="ScanType"
-                                  Value="@selectedScanType"
-                                  ValueChanged="@(args => {
-                                      _logger.LogInformation($"Scan type ValueChanged triggered");
-                                      _logger.LogInformation($"New value: {args}, Type: {(args != null ? args.GetType().FullName : "null")}");
-                                      _logger.LogInformation($"Current selectedScanType before change: {selectedScanType}");
-                                      selectedScanType = args;
-                                      OnScanTypeChanged();
-                                  })"
-                                  Data="@scanTypes"
-                                  AllowClear="true"
-                                  Style="width: 200px"
-                                  Placeholder="Scan type"/>
-                </ChildContent>
-                <ErrorContent>
-                    <div class="alert alert-danger">@context.Message</div>
-                </ErrorContent>
-            </ErrorBoundary>
-            
-            @{
-                var valueTypes = Enum.GetValues(typeof(MemoryValueType));
-                _logger.LogInformation($"Available value types: {string.Join(", ", valueTypes.Cast<MemoryValueType>())}");
-                _logger.LogInformation($"Current selected value type: {selectedValueType}");
-                _logger.LogInformation($"Value types array type: {valueTypes.GetType().FullName}");
-                _logger.LogInformation($"Value types array length: {valueTypes.Length}");
-                foreach (MemoryValueType type in valueTypes)
-                {
-                    _logger.LogInformation($"Value type value: {type}, Raw value: {(int)type}");
-                }
-                _logger.LogInformation($"Dropdown rendering state - selectedValueType: {selectedValueType}, IsEnum: {selectedValueType.GetType().IsEnum}");
-            }
-            <ErrorBoundary>
-                <ChildContent>
-                    @{
-                        _logger.LogInformation($"Rendering value type dropdown with data: {string.Join(", ", valueTypes.Cast<MemoryValueType>())}");
-                    }
-                    <RadzenDropDown TValue="MemoryValueType"
-                                  Value="@selectedValueType"
-                                  ValueChanged="@(args => {
-                                      _logger.LogInformation($"Value type ValueChanged triggered");
-                                      _logger.LogInformation($"New value: {args}, Type: {(args != null ? args.GetType().FullName : "null")}");
-                                      _logger.LogInformation($"Current selectedValueType before change: {selectedValueType}");
-                                      selectedValueType = args;
-                                      OnValueTypeChanged();
-                                  })"
-                                  Data="@valueTypes"
-                                  Style="width: 200px"
-                                  AllowClear="true"
-                                  Placeholder="Value type"/>
-                </ChildContent>
-                <ErrorContent>
-                    <div class="alert alert-danger">@context.Message</div>
-                </ErrorContent>
-            </ErrorBoundary>
-        </RadzenStack>
-        
-        @if (selectedScanType == ScanType.Pattern)
-        {
-            <RadzenTextArea @bind-Value="@patternHex"
-                           Placeholder="Pattern (hex, space-separated)"
-                           Rows="2"/>
-                           
-            <RadzenTextArea @bind-Value="@mask"
-                           Placeholder="Mask (x - match, ? - wildcard)"
-                           Rows="2"/>
-        }
-        else
-        {
-            <RadzenNumeric @bind-Value="@searchValue"
-                          Placeholder="Search value"
-                          Style="width: 100%"/>
-                          
-            @if (selectedScanType == ScanType.UnknownInitialValue)
-            {
-                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0">
-                    Perform first scan to initialize, then change value in game and perform next scan
-                </RadzenText>
-            }
-        }
-        
-        <RadzenButton Text="@(isFirstScan ? "First Scan" : "Next Scan")"
-                     Click="@OnScan"
-                     Disabled="@(!canScan || isLoading)"
-                     ButtonStyle="ButtonStyle.Primary"
-                     Icon="@(isLoading ? "refresh" : "search")"
-                     class="@(isLoading ? "rz-button-loading" : "")"
-                     Style="min-width: 150px"/>
-        @if (isLoading)
-        {
-            <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
-        }
+        <ScanResultsGrid 
+            Results="@scanResults"
+            ValueType="@selectedValueType"
+            GetCurrentValue="@GetCurrentValue"
+            IsFrozen="@IsFrozen"
+            OnValueChanged="@OnValueChanged"
+            OnFreezeToggle="@ToggleFreeze" />
     </RadzenStack>
-    
-    <RadzenDataGrid Data="@scanResults" TItem="IntPtr">
-        <Columns>
-            <RadzenDataGridColumn TItem="IntPtr" Title="Address" Property="@nameof(IntPtr)" FormatString="X8"/>
-            <RadzenDataGridColumn TItem="IntPtr" Title="Value">
-                <Template>
-                    @{
-                        var currentValue = GetCurrentValue(context);
-                        if (selectedValueType == MemoryValueType.Float || selectedValueType == MemoryValueType.Double)
-                        {
-                            <RadzenNumeric TValue="double" Value="@currentValue" Format="0.00"
-                                         Change="@(async (double v) => await OnValueChanged(context, (int)v))"/>
-                        }
-                        else
-                        {
-                            <div class="d-flex align-items-center">
-                                <RadzenNumeric TValue="int" Value="@currentValue"
-                                             Change="@(async (int v) => await OnValueChanged(context, v))"/>
-                                <RadzenText TextStyle="TextStyle.Body2" class="ms-2">
-                                    @FormatValue(currentValue)
-                                </RadzenText>
-                            </div>
-                        }
-                    }
-                </Template>
-            </RadzenDataGridColumn>
-            <RadzenDataGridColumn TItem="IntPtr" Title="Actions">
-                <Template>
-                    <RadzenButton Icon="lock" 
-                                Click="@(() => ToggleFreeze(context))" 
-                                Disabled="@(IsFrozen(context))"/>
-                </Template>
-            </RadzenDataGridColumn>
-        </Columns>
-    </RadzenDataGrid>
 </RadzenCard>
 
 @code {
@@ -208,6 +84,8 @@
 
     private ScanType _previousScanType;
     private MemoryValueType _previousValueType;
+    private Array scanTypes;
+    private Array valueTypes;
 
     protected override void OnInitialized()
     {
@@ -216,38 +94,12 @@
             .IsInRole(WindowsBuiltInRole.Administrator);
         _logger.LogInformation($"Admin check result: {IsAdmin}");
         
-        // Initialize tracking variables
         _previousScanType = selectedScanType;
         _previousValueType = selectedValueType;
         
         _logger.LogInformation($"Initial scan type: {selectedScanType}");
         _logger.LogInformation($"Initial value type: {selectedValueType}");
         base.OnInitialized();
-    }
-
-    protected override void OnParametersSet()
-    {
-        try
-        {
-            _logger.LogInformation("OnParametersSet called");
-            _logger.LogInformation($"Current scan type: {selectedScanType}, Type: {selectedScanType.GetType().FullName}");
-            _logger.LogInformation($"Current value type: {selectedValueType}, Type: {selectedValueType.GetType().FullName}");
-            
-            var scanTypes = Enum.GetValues(typeof(ScanType));
-            var valueTypes = Enum.GetValues(typeof(MemoryValueType));
-            
-            _logger.LogInformation($"Available scan types: {string.Join(", ", scanTypes.Cast<ScanType>())}");
-            _logger.LogInformation($"Available value types: {string.Join(", ", valueTypes.Cast<MemoryValueType>())}");
-            
-            _logger.LogInformation($"Is selectedScanType valid enum value: {Enum.IsDefined(typeof(ScanType), selectedScanType)}");
-            _logger.LogInformation($"Is selectedValueType valid enum value: {Enum.IsDefined(typeof(MemoryValueType), selectedValueType)}");
-            
-            base.OnParametersSet();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in OnParametersSet");
-        }
     }
 
     protected override async Task OnInitializedAsync()
@@ -268,7 +120,7 @@
         try
         {
             _logger.LogInformation("Refreshing process list...");
-            processList = ScannerService.GetProcesses();
+            processList = ProcessService.GetAccessibleProcesses();
             
             if (!processList.Any())
             {
@@ -292,7 +144,7 @@
 
     private async Task LoadLastProcess()
     {
-        var lastId = await ScannerService.GetLastProcessId();
+        var lastId = await ProfileService.GetLastProcessId();
         if (lastId.HasValue)
         {
             selectedProcessId = lastId.Value;
@@ -306,8 +158,7 @@
         {
             if (selectedProcessId.HasValue)
             {
-                await ScannerService.SaveLastProcess(selectedProcessId.Value);
-                // Сбрасываем результаты при смене процесса
+                await ProfileService.SaveLastProcess(selectedProcessId.Value);
                 scanResults.Clear();
                 currentValues.Clear();
                 previousValues.Clear();
@@ -323,23 +174,19 @@
         }
     }
 
-
-    private async Task OnScanTypeChanged()
+    private async Task OnScanTypeChanged(ScanType newType)
     {
         try
         {
             _logger.LogInformation($"OnScanTypeChanged called");
             _logger.LogInformation($"Previous scan type: {_previousScanType}");
-            _logger.LogInformation($"New scan type: {selectedScanType}");
-            _logger.LogInformation($"Has value actually changed: {!selectedScanType.Equals(_previousScanType)}");
+            _logger.LogInformation($"New scan type: {newType}");
             
+            selectedScanType = newType;
             isFirstScan = true;
             scanResults.Clear();
             currentValues.Clear();
             previousValues.Clear();
-            
-            _logger.LogInformation("Cleared scan results and value caches");
-            _logger.LogInformation($"isFirstScan set to: {isFirstScan}");
             
             StateHasChanged();
             _previousScanType = selectedScanType;
@@ -357,22 +204,19 @@
         }
     }
 
-    private void OnValueTypeChanged()
+    private void OnValueTypeChanged(MemoryValueType newType)
     {
         try
         {
             _logger.LogInformation($"OnValueTypeChanged called");
             _logger.LogInformation($"Previous value type: {_previousValueType}");
-            _logger.LogInformation($"New value type: {selectedValueType}");
-            _logger.LogInformation($"Has value actually changed: {!selectedValueType.Equals(_previousValueType)}");
+            _logger.LogInformation($"New value type: {newType}");
             
+            selectedValueType = newType;
             scanResults.Clear();
             currentValues.Clear();
             previousValues.Clear();
             isFirstScan = true;
-            
-            _logger.LogInformation("Cleared scan results and value caches");
-            _logger.LogInformation($"isFirstScan set to: {isFirstScan}");
             
             StateHasChanged();
             _previousValueType = selectedValueType;
@@ -390,19 +234,11 @@
         }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        foreach (var address in frozenAddresses)
-        {
-            await ScannerService.UnfreezeValue(address);
-        }
-    }
-
     private bool canScan =>
         IsAdmin &&
         selectedProcessId.HasValue &&
-        selectedValueType != MemoryValueType.String && // Строки пока не поддерживаются
-        selectedValueType != MemoryValueType.Array &&  // Массивы пока не поддерживаются
+        selectedValueType != MemoryValueType.String && // Strings not supported yet
+        selectedValueType != MemoryValueType.Array &&  // Arrays not supported yet
         (selectedScanType == ScanType.Pattern ?
             !string.IsNullOrWhiteSpace(patternHex) && !string.IsNullOrWhiteSpace(mask) :
             selectedScanType == ScanType.UnknownInitialValue ||
@@ -425,7 +261,7 @@
                     .Select(b => Convert.ToByte(b, 16))
                     .ToArray();
                 
-                scanResults = await ScannerService.ScanForPattern(
+                scanResults = await Scanner.ScanForPattern(
                     selectedProcessId!.Value,
                     pattern,
                     mask);
@@ -434,24 +270,22 @@
             {
                 if (isFirstScan)
                 {
-                    // First scan
                     switch (selectedScanType)
                     {
                         case ScanType.ExactValue:
-                            scanResults = await ScannerService.ScanForValue(
+                            scanResults = await Scanner.ScanForValue(
                                 selectedProcessId!.Value,
                                 searchValue,
                                 selectedValueType);
                             break;
                             
                         case ScanType.UnknownInitialValue:
-                            scanResults = await ScannerService.GetAllAddresses(
+                            scanResults = await Scanner.GetAllAddresses(
                                 selectedProcessId!.Value,
                                 selectedValueType);
                             break;
                     }
                     
-                    // Store current values for comparison in next scan
                     foreach (var address in scanResults)
                     {
                         var value = GetCurrentValue(address);
@@ -460,7 +294,6 @@
                 }
                 else
                 {
-                    // Next scan
                     var newResults = new List<IntPtr>();
                     
                     foreach (var address in scanResults)
@@ -544,7 +377,7 @@
                 byte[] bytes;
                 try
                 {
-                    bytes = ScannerService.ReadMemoryBytes(address, size).Result;
+                    bytes = MemoryReader.ReadMemoryBytes(address, size).Result;
                 }
                 catch (Exception ex)
                 {
@@ -587,37 +420,23 @@
         }
     }
 
-    private string FormatValue(int value)
-    {
-        return selectedValueType switch
-        {
-            MemoryValueType.Float => ((float)value).ToString("F2"),
-            MemoryValueType.Double => ((double)value).ToString("F2"),
-            MemoryValueType.Byte => $"0x{value:X2}",
-            MemoryValueType.Short => value.ToString(),
-            MemoryValueType.Int => value.ToString(),
-            MemoryValueType.Long => value.ToString(),
-            _ => value.ToString()
-        };
-    }
-
-    private async Task OnValueChanged(IntPtr address, int value)
+    private async Task OnValueChanged((IntPtr address, int value) change)
     {
         try
         {
             var bytes = selectedValueType switch
             {
-                MemoryValueType.Byte => new[] { (byte)value },
-                MemoryValueType.Short => BitConverter.GetBytes((short)value),
-                MemoryValueType.Int => BitConverter.GetBytes(value),
-                MemoryValueType.Float => BitConverter.GetBytes((float)value),
-                MemoryValueType.Long => BitConverter.GetBytes((long)value),
-                MemoryValueType.Double => BitConverter.GetBytes((double)value),
-                _ => BitConverter.GetBytes(value)
+                MemoryValueType.Byte => new[] { (byte)change.value },
+                MemoryValueType.Short => BitConverter.GetBytes((short)change.value),
+                MemoryValueType.Int => BitConverter.GetBytes(change.value),
+                MemoryValueType.Float => BitConverter.GetBytes((float)change.value),
+                MemoryValueType.Long => BitConverter.GetBytes((long)change.value),
+                MemoryValueType.Double => BitConverter.GetBytes((double)change.value),
+                _ => BitConverter.GetBytes(change.value)
             };
 
-            await ScannerService.WriteMemory(address, bytes);
-            currentValues[address] = value;
+            await MemoryReader.WriteMemoryBytes(change.address, bytes);
+            currentValues[change.address] = change.value;
         }
         catch (Exception ex)
         {
@@ -631,7 +450,7 @@
         {
             if (frozenAddresses.Contains(address))
             {
-                await ScannerService.UnfreezeValue(address);
+                await Freezer.UnfreezeValue(address);
                 frozenAddresses.Remove(address);
             }
             else
@@ -648,7 +467,7 @@
                     _ => BitConverter.GetBytes(value)
                 };
                 
-                await ScannerService.FreezeValue(address, bytes, selectedValueType.ToString());
+                await Freezer.FreezeValue(address, bytes, selectedValueType.ToString());
                 frozenAddresses.Add(address);
             }
         }
@@ -666,8 +485,6 @@
         {
             _logger.LogInformation($"OnAfterRender called, firstRender: {firstRender}");
             _logger.LogInformation($"Component state - ScanType: {selectedScanType}, ValueType: {selectedValueType}");
-            _logger.LogInformation($"Selected values valid - ScanType: {Enum.IsDefined(typeof(ScanType), selectedScanType)}, ValueType: {Enum.IsDefined(typeof(MemoryValueType), selectedValueType)}");
-            _logger.LogInformation($"Dropdown data - ScanTypes: {(scanTypes?.Length ?? 0)}, ValueTypes: {(valueTypes?.Length ?? 0)}");
             
             if (firstRender)
             {
@@ -683,6 +500,11 @@
         }
     }
 
-    private Array scanTypes;
-    private Array valueTypes;
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var address in frozenAddresses)
+        {
+            await Freezer.UnfreezeValue(address);
+        }
+    }
 }

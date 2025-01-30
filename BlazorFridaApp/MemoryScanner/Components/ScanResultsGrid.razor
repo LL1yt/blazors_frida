@@ -1,0 +1,61 @@
+@using BlazorFridaApp.MemoryScanner.Models
+@using Radzen
+@using Radzen.Blazor
+
+<RadzenDataGrid Data="@Results" TItem="IntPtr">
+    <Columns>
+        <RadzenDataGridColumn TItem="IntPtr" Title="Address" Property="@nameof(IntPtr)" FormatString="X8"/>
+        <RadzenDataGridColumn TItem="IntPtr" Title="Value">
+            <Template>
+                @{
+                    var currentValue = GetCurrentValue(context);
+                    if (ValueType == MemoryValueType.Float || ValueType == MemoryValueType.Double)
+                    {
+                        <RadzenNumeric TValue="double" Value="@currentValue" Format="0.00"
+                                     Change="@(async (double v) => await OnValueChanged.InvokeAsync((context, (int)v)))"/>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center">
+                            <RadzenNumeric TValue="int" Value="@currentValue"
+                                         Change="@(async (int v) => await OnValueChanged.InvokeAsync((context, v)))"/>
+                            <RadzenText TextStyle="TextStyle.Body2" class="ms-2">
+                                @FormatValue(currentValue)
+                            </RadzenText>
+                        </div>
+                    }
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="IntPtr" Title="Actions">
+            <Template>
+                <RadzenButton Icon="lock" 
+                            Click="@(() => OnFreezeToggle.InvokeAsync(context))" 
+                            Disabled="@(IsFrozen(context))"/>
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    [Parameter] public List<IntPtr> Results { get; set; }
+    [Parameter] public MemoryValueType ValueType { get; set; }
+    [Parameter] public Func<IntPtr, int> GetCurrentValue { get; set; }
+    [Parameter] public Func<IntPtr, bool> IsFrozen { get; set; }
+    [Parameter] public EventCallback<(IntPtr address, int value)> OnValueChanged { get; set; }
+    [Parameter] public EventCallback<IntPtr> OnFreezeToggle { get; set; }
+
+    private string FormatValue(int value)
+    {
+        return ValueType switch
+        {
+            MemoryValueType.Float => ((float)value).ToString("F2"),
+            MemoryValueType.Double => ((double)value).ToString("F2"),
+            MemoryValueType.Byte => $"0x{value:X2}",
+            MemoryValueType.Short => value.ToString(),
+            MemoryValueType.Int => value.ToString(),
+            MemoryValueType.Long => value.ToString(),
+            _ => value.ToString()
+        };
+    }
+}
