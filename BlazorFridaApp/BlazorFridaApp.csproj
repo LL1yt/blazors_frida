@@ -27,5 +27,6 @@
 
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <DefineConstants>WINDOWS</DefineConstants>
   </PropertyGroup>
 </Project>

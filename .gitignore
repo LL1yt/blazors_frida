@@ -28,6 +28,3 @@ venv/
 
 *.db-shm
 *.db-wal
-*.sqlite3
-*.sqlite
-*.db
