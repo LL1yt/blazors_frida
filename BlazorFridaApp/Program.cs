@@ -11,9 +11,27 @@ using System.Diagnostics;
 #if WINDOWS
 bool isAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
     .IsInRole(WindowsBuiltInRole.Administrator);
+
 if (!isAdmin)
 {
-    Console.WriteLine("Application requires administrator privileges to access process memory.");
+    try
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            UseShellExecute = true,
+            WorkingDirectory = Environment.CurrentDirectory,
+            FileName = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty,
+            Verb = "runas"
+        };
+
+        Process.Start(startInfo);
+        return; // Exit current process
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Failed to restart with admin rights: {ex.Message}");
+        return;
+    }
 }
 #endif
 
