@@ -244,72 +244,50 @@ namespace BlazorFridaApp.MemoryScanner
 
         public List<Process> GetProcesses()
         {
-            try
+            _logger.LogInformation("Getting list of processes...");
+            
+            const int PROCESS_QUERY_INFORMATION = 0x0400;
+            const int PROCESS_VM_READ = 0x0010;
+
+            var processes = new List<Process>();
+            var allProcesses = Process.GetProcesses();
+            
+            _logger.LogInformation($"Found {allProcesses.Length} total processes");
+
+            foreach (var p in allProcesses)
             {
-                _logger.LogInformation("Getting list of processes...");
-                var processes = Process.GetProcesses()
-                    .Where(p => !string.IsNullOrEmpty(p.ProcessName) && p.Id != 0)
-                    .ToList();
+                if (string.IsNullOrEmpty(p.ProcessName) || p.Id == 0)
+                    continue;
 
-                _logger.LogInformation($"Found {processes.Count} processes");
-
-                // Проверяем права доступа и модули процесса
-                processes = processes.Where(p =>
+                try
                 {
-                    try
+                    if (p.HasExited)
                     {
-                        const int PROCESS_QUERY_INFORMATION = 0x0400;
-                        const int PROCESS_VM_READ = 0x0010;
-                        
-                        // Проверяем права на чтение и запись
-                        var handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-                            false, p.Id);
-                            
-                        if (handle == nint.Zero)
-                        {
-                            _logger.LogWarning($"No access to process {p.ProcessName} ({p.Id}). Error: {Marshal.GetLastWin32Error()}");
-                            return false;
-                        }
-
-                        try
-                        {
-                            // Проверяем, что процесс все еще активен
-                            if (p.HasExited)
-                            {
-                                _logger.LogWarning($"Process {p.ProcessName} ({p.Id}) has exited");
-                                return false;
-                            }
-
-                            // Проверяем наличие основного модуля
-                            var mainModule = p.MainModule;
-                            if (mainModule == null)
-                            {
-                                _logger.LogWarning($"Cannot access main module of process {p.ProcessName} ({p.Id})");
-                                return false;
-                            }
-
-                            return true;
-                        }
-                        finally
-                        {
-                            CloseHandle(handle);
-                        }
+                        _logger.LogDebug($"Process {p.ProcessName} ({p.Id}) has exited");
+                        continue;
                     }
-                    catch (Exception ex)
+
+                    var handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, p.Id);
+                    if (handle == nint.Zero)
                     {
-                        _logger.LogWarning(ex, $"Error accessing process {p.ProcessName} ({p.Id})");
-                        return false;
+                        var error = Marshal.GetLastWin32Error();
+                        _logger.LogDebug($"Cannot open process {p.ProcessName} ({p.Id}). Error: {error}");
+                        continue;
                     }
-                }).OrderBy(p => p.ProcessName).ToList();
 
-                _logger.LogInformation($"After filtering: {processes.Count} accessible processes");
-                return processes;
+                    CloseHandle(handle);
+                    processes.Add(p);
+                    _logger.LogDebug($"Successfully added process {p.ProcessName} ({p.Id})");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, $"Error accessing process {p.ProcessName} ({p.Id})");
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting processes list");
-                throw;
-            }
+
+            var orderedProcesses = processes.OrderBy(p => p.ProcessName).ToList();
+            _logger.LogInformation($"Found {orderedProcesses.Count} accessible processes");
+            return orderedProcesses;
         }
 
         public async Task SaveLastProcess(int processId)

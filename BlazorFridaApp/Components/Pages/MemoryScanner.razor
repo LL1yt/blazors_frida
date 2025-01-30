@@ -7,10 +7,12 @@
 @using BlazorFridaApp.Persistence
 @using Radzen
 @using Radzen.Blazor
+@using Microsoft.Extensions.Logging
 @implements IAsyncDisposable
 @inject ProcessMemoryScanner ScannerService
 @inject NotificationService NotificationService
 @inject AppDbContext DbContext
+@inject ILogger<MemoryScanner> _logger
 
 <RadzenCard>
     <h2>Memory Scanner</h2>
@@ -27,12 +29,19 @@
     }
     
     <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
-        <RadzenDropDown @bind-Value="@selectedProcessId"
-                        Data="@processList"
-                        TextProperty="ProcessName"
-                        ValueProperty="Id"
-                        Placeholder="Select process"
-                        Change="@OnProcessSelected"/>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
+            <RadzenDropDown @bind-Value="@selectedProcessId"
+                          Data="@processList"
+                          TextProperty="ProcessName"
+                          ValueProperty="Id"
+                          Placeholder="Select process"
+                          Change="@OnProcessSelected"
+                          Style="width: 80%"/>
+            <RadzenButton Icon="refresh"
+                         Click="@RefreshProcessList"
+                         ButtonStyle="ButtonStyle.Light"
+                         Title="Refresh process list"/>
+        </RadzenStack>
         
         <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
             <RadzenDropDown @bind-Value="@selectedScanType"
@@ -146,22 +155,33 @@
             return;
         }
 
+        await RefreshProcessList();
+    }
+
+    private async Task RefreshProcessList()
+    {
         try
         {
-            processList = await Task.FromResult(ScannerService.GetProcesses());
+            _logger.LogInformation("Refreshing process list...");
+            processList = ScannerService.GetProcesses();
+            
             if (!processList.Any())
             {
                 NotificationService.Notify(NotificationSeverity.Warning,
-                    "No processes found",
-                    "Make sure you have necessary permissions to access processes");
+                    "No accessible processes found",
+                    "Make sure you have administrator rights and necessary permissions");
+                return;
             }
+            
+            _logger.LogInformation($"Successfully loaded {processList.Count} processes");
             await LoadLastProcess();
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to refresh process list");
             NotificationService.Notify(NotificationSeverity.Error,
                 "Error loading processes",
-                ex.Message);
+                "Failed to load process list. Please ensure you have administrator rights.");
         }
     }
 
