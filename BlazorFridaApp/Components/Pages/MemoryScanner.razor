@@ -1,6 +1,7 @@
 @page "/memory-scanner"
 @using System.Diagnostics
 @using System.Runtime.InteropServices
+@using System.Security.Principal
 @using BlazorFridaApp.MemoryScanner
 @using BlazorFridaApp.MemoryScanner.Models
 @using BlazorFridaApp.Persistence
@@ -13,6 +14,17 @@
 
 <RadzenCard>
     <h2>Memory Scanner</h2>
+    
+    @if (!IsAdmin)
+    {
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">Administrator Rights Required!</h4>
+            <p>Memory scanning features are disabled because the application is not running with administrator privileges.</p>
+            <hr>
+            <p class="mb-0">Please restart the application as administrator to use memory scanning features.</p>
+        </div>
+        return;
+    }
     
     <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
         <RadzenDropDown @bind-Value="@selectedProcessId"
@@ -31,6 +43,7 @@
            <RadzenDropDown @bind-Value="@selectedValueType"
                          Data="@Enum.GetValues(typeof(MemoryValueType))"
                          Style="width: 200px"
+                         Change="@OnValueTypeChanged"
                          Placeholder="Value type"/>
         </RadzenStack>
         
@@ -114,11 +127,42 @@
     private MemoryValueType selectedValueType = MemoryValueType.Int;
     private int searchValue;
     private bool isFirstScan = true;
+    private bool IsAdmin;
+
+    protected override void OnInitialized()
+    {
+        IsAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
+            .IsInRole(WindowsBuiltInRole.Administrator);
+        base.OnInitialized();
+    }
 
     protected override async Task OnInitializedAsync()
     {
-        processList = await Task.FromResult(ScannerService.GetProcesses());
-        await LoadLastProcess();
+        if (!IsAdmin)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning,
+                "Administrator rights required",
+                "Please restart the application as administrator to use memory scanning features");
+            return;
+        }
+
+        try
+        {
+            processList = await Task.FromResult(ScannerService.GetProcesses());
+            if (!processList.Any())
+            {
+                NotificationService.Notify(NotificationSeverity.Warning,
+                    "No processes found",
+                    "Make sure you have necessary permissions to access processes");
+            }
+            await LoadLastProcess();
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error,
+                "Error loading processes",
+                ex.Message);
+        }
     }
 
     private async Task LoadLastProcess()
@@ -133,18 +177,70 @@
 
     private async Task OnProcessSelected()
     {
-        if (selectedProcessId.HasValue)
+        try
         {
-            await ScannerService.SaveLastProcess(selectedProcessId.Value);
+            if (selectedProcessId.HasValue)
+            {
+                await ScannerService.SaveLastProcess(selectedProcessId.Value);
+                // Сбрасываем результаты при смене процесса
+                scanResults.Clear();
+                currentValues.Clear();
+                previousValues.Clear();
+                isFirstScan = true;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error,
+                "Error selecting process",
+                ex.Message);
         }
     }
 
     private async Task OnScanTypeChanged()
     {
-        isFirstScan = true;
-        scanResults.Clear();
-        currentValues.Clear();
-        previousValues.Clear();
+        try
+        {
+            isFirstScan = true;
+            scanResults.Clear();
+            currentValues.Clear();
+            previousValues.Clear();
+            StateHasChanged();
+            
+            NotificationService.Notify(NotificationSeverity.Info,
+                "Scan type changed",
+                $"Selected scan type: {selectedScanType}");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error,
+                "Error changing scan type",
+                ex.Message);
+        }
+    }
+
+    private void OnValueTypeChanged()
+    {
+        try
+        {
+            // Сбрасываем результаты при смене типа данных
+            scanResults.Clear();
+            currentValues.Clear();
+            previousValues.Clear();
+            isFirstScan = true;
+            StateHasChanged();
+            
+            NotificationService.Notify(NotificationSeverity.Info,
+                "Value type changed",
+                $"Selected value type: {selectedValueType}");
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error,
+                "Error changing value type",
+                ex.Message);
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -156,10 +252,14 @@
     }
 
     private bool canScan =>
+        IsAdmin &&
         selectedProcessId.HasValue &&
+        selectedValueType != MemoryValueType.String && // Строки пока не поддерживаются
+        selectedValueType != MemoryValueType.Array &&  // Массивы пока не поддерживаются
         (selectedScanType == ScanType.Pattern ?
             !string.IsNullOrWhiteSpace(patternHex) && !string.IsNullOrWhiteSpace(mask) :
-            selectedScanType == ScanType.UnknownInitialValue || searchValue != 0);
+            selectedScanType == ScanType.UnknownInitialValue ||
+            (searchValue != 0 && selectedValueType != default(MemoryValueType)));
 
     private async Task OnScan()
     {
@@ -252,6 +352,14 @@
         {
             if (!currentValues.TryGetValue(address, out var value))
             {
+                if (selectedValueType == MemoryValueType.String || selectedValueType == MemoryValueType.Array)
+                {
+                    NotificationService.Notify(NotificationSeverity.Warning,
+                        "Unsupported type",
+                        $"Type {selectedValueType} is not supported yet");
+                    return 0;
+                }
+
                 var size = selectedValueType switch
                 {
                     MemoryValueType.Byte => 1,
@@ -260,26 +368,51 @@
                     MemoryValueType.Float => 4,
                     MemoryValueType.Long => 8,
                     MemoryValueType.Double => 8,
-                    _ => 4
+                    _ => throw new ArgumentException($"Unsupported value type: {selectedValueType}")
                 };
 
-                var bytes = ScannerService.ReadMemoryBytes(address, size).Result;
-                value = selectedValueType switch
+                byte[] bytes;
+                try
                 {
-                    MemoryValueType.Byte => bytes[0],
-                    MemoryValueType.Short => BitConverter.ToInt16(bytes),
-                    MemoryValueType.Int => BitConverter.ToInt32(bytes),
-                    MemoryValueType.Float => (int)BitConverter.ToSingle(bytes),
-                    MemoryValueType.Long => (int)BitConverter.ToInt64(bytes),
-                    MemoryValueType.Double => (int)BitConverter.ToDouble(bytes),
-                    _ => BitConverter.ToInt32(bytes)
-                };
-                currentValues[address] = value;
+                    bytes = ScannerService.ReadMemoryBytes(address, size).Result;
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.Notify(NotificationSeverity.Error,
+                        "Memory read error",
+                        $"Failed to read memory at {address:X}: {ex.Message}");
+                    return 0;
+                }
+
+                try
+                {
+                    value = selectedValueType switch
+                    {
+                        MemoryValueType.Byte => bytes[0],
+                        MemoryValueType.Short => BitConverter.ToInt16(bytes),
+                        MemoryValueType.Int => BitConverter.ToInt32(bytes),
+                        MemoryValueType.Float => (int)BitConverter.ToSingle(bytes),
+                        MemoryValueType.Long => (int)BitConverter.ToInt64(bytes),
+                        MemoryValueType.Double => (int)BitConverter.ToDouble(bytes),
+                        _ => throw new ArgumentException($"Unsupported value type: {selectedValueType}")
+                    };
+                    currentValues[address] = value;
+                }
+                catch (Exception ex)
+                {
+                    NotificationService.Notify(NotificationSeverity.Error,
+                        "Value conversion error",
+                        $"Failed to convert bytes to {selectedValueType}: {ex.Message}");
+                    return 0;
+                }
             }
             return value;
         }
-        catch
+        catch (Exception ex)
         {
+            NotificationService.Notify(NotificationSeverity.Error,
+                "Unexpected error",
+                $"Error getting value: {ex.Message}");
             return 0;
         }
     }

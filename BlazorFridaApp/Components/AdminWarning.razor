@@ -1,0 +1,30 @@
+@using System.Security.Principal
+
+<div class="admin-warning">
+    @if (!IsAdmin)
+    {
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">Administrator Rights Required!</h4>
+            <p>This application requires administrator privileges to access process memory.</p>
+            <hr>
+            <p class="mb-0">Please restart the application as administrator to use all features.</p>
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsAdmin { get; set; }
+
+    protected override void OnInitialized()
+    {
+        IsAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
+            .IsInRole(WindowsBuiltInRole.Administrator);
+    }
+}
+
+<style>
+    .admin-warning {
+        margin: 1rem;
+        padding: 1rem;
+    }
+</style>
