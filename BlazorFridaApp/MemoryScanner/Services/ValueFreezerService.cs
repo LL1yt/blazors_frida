@@ -27,70 +27,147 @@ namespace BlazorFridaApp.MemoryScanner.Services
 
         public async Task FreezeValue(nint address, byte[] value, string valueType)
         {
-            if (_freezeTimers.TryGetValue(address, out var existingTimer))
+            if (address == nint.Zero)
+                throw new ArgumentException("Invalid memory address", nameof(address));
+            if (value == null || value.Length == 0)
+                throw new ArgumentException("Value cannot be null or empty", nameof(value));
+            if (string.IsNullOrEmpty(valueType))
+                throw new ArgumentException("Value type cannot be null or empty", nameof(valueType));
+
+            try
             {
-                existingTimer.Dispose();
-                _freezeTimers.Remove(address);
-            }
+                _logger.LogInformation("Freezing value at address {Address:X}, type {ValueType}", address, valueType);
 
-            var timer = new Timer(async _ =>
-            {
-                await _memoryReader.WriteMemoryBytes(address, value);
-            }, null, 0, 100); // Update every 100ms for more responsive freezing
-
-            _freezeTimers[address] = timer;
-
-            // Update or create locked address record
-            var lockedAddress = await _dbContext.LockedAddresses
-                .FirstOrDefaultAsync(la => la.Address == (long)address);
-
-            if (lockedAddress == null)
-            {
-                lockedAddress = new LockedAddress
+                // Stop existing timer if any
+                if (_freezeTimers.TryGetValue(address, out var existingTimer))
                 {
-                    ProcessName = Process.GetProcessById(_memoryReader.ProcessHandle.ToInt32()).ProcessName,
-                    Address = (long)address,
-                    ValueType = valueType,
-                    OriginalBytes = await _memoryReader.ReadMemoryBytes(address, value.Length),
-                    CurrentValue = value,
-                    IsFrozen = true,
-                    LastAccessed = DateTime.UtcNow
-                };
-                await _dbContext.LockedAddresses.AddAsync(lockedAddress);
-            }
-            else
-            {
-                lockedAddress.CurrentValue = value;
-                lockedAddress.ValueType = valueType;
-                lockedAddress.IsFrozen = true;
-                lockedAddress.LastAccessed = DateTime.UtcNow;
-            }
+                    _logger.LogDebug("Stopping existing freeze timer for address {Address:X}", address);
+                    existingTimer.Dispose();
+                    _freezeTimers.Remove(address);
+                }
 
-            await _dbContext.SaveChangesAsync();
+                // Create new timer for value freezing
+                var timer = new Timer(async _ =>
+                {
+                    try
+                    {
+                        await _memoryReader.WriteMemoryBytes(address, value);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error during freeze timer callback for address {Address:X}", address);
+                    }
+                }, null, 0, 100); // Update every 100ms for more responsive freezing
+
+                _freezeTimers[address] = timer;
+                _logger.LogDebug("Started new freeze timer for address {Address:X}", address);
+
+                try
+                {
+                    // Update or create locked address record
+                    var lockedAddress = await _dbContext.LockedAddresses
+                        .FirstOrDefaultAsync(la => la.Address == (long)address);
+
+                    if (lockedAddress == null)
+                    {
+                        _logger.LogDebug("Creating new locked address record for {Address:X}", address);
+                        var process = Process.GetProcessById(_memoryReader.ProcessHandle.ToInt32());
+                        var originalBytes = await _memoryReader.ReadMemoryBytes(address, value.Length);
+
+                        lockedAddress = new LockedAddress
+                        {
+                            ProcessName = process.ProcessName,
+                            Address = (long)address,
+                            ValueType = valueType,
+                            OriginalBytes = originalBytes,
+                            CurrentValue = value,
+                            IsFrozen = true,
+                            LastAccessed = DateTime.UtcNow
+                        };
+                        await _dbContext.LockedAddresses.AddAsync(lockedAddress);
+                        _logger.LogInformation("Created new locked address record for {Address:X}", address);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Updating existing locked address record for {Address:X}", address);
+                        lockedAddress.CurrentValue = value;
+                        lockedAddress.ValueType = valueType;
+                        lockedAddress.IsFrozen = true;
+                        lockedAddress.LastAccessed = DateTime.UtcNow;
+                    }
+
+                    await _dbContext.SaveChangesAsync();
+                    _logger.LogInformation("Successfully saved locked address record for {Address:X}", address);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Database error while freezing value at {Address:X}", address);
+                    timer.Dispose();
+                    _freezeTimers.Remove(address);
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to freeze value at address {Address:X}", address);
+                throw;
+            }
         }
 
         public async Task UnfreezeValue(nint address)
         {
-            if (_freezeTimers.TryGetValue(address, out var timer))
+            if (address == nint.Zero)
+                throw new ArgumentException("Invalid memory address", nameof(address));
+
+            try
             {
-                timer.Dispose();
-                _freezeTimers.Remove(address);
+                _logger.LogInformation("Unfreezing value at address {Address:X}", address);
 
-                var lockedAddress = await _dbContext.LockedAddresses
-                    .FirstOrDefaultAsync(la => la.Address == (long)address);
-
-                if (lockedAddress != null)
+                if (_freezeTimers.TryGetValue(address, out var timer))
                 {
-                    // Restore original value if available
-                    if (lockedAddress.OriginalBytes.Length > 0)
-                    {
-                        await _memoryReader.WriteMemoryBytes(address, lockedAddress.OriginalBytes);
-                    }
+                    _logger.LogDebug("Stopping freeze timer for address {Address:X}", address);
+                    timer.Dispose();
+                    _freezeTimers.Remove(address);
 
-                    lockedAddress.IsFrozen = false;
-                    lockedAddress.LastAccessed = DateTime.UtcNow;
-                    await _dbContext.SaveChangesAsync();
+                    try
+                    {
+                        var lockedAddress = await _dbContext.LockedAddresses
+                            .FirstOrDefaultAsync(la => la.Address == (long)address);
+
+                        if (lockedAddress != null)
+                        {
+                            // Restore original value if available
+                            if (lockedAddress.OriginalBytes.Length > 0)
+                            {
+                                _logger.LogDebug("Restoring original value at address {Address:X}", address);
+                                await _memoryReader.WriteMemoryBytes(address, lockedAddress.OriginalBytes);
+                            }
+
+                            lockedAddress.IsFrozen = false;
+                            lockedAddress.LastAccessed = DateTime.UtcNow;
+                            await _dbContext.SaveChangesAsync();
+                            _logger.LogInformation("Successfully unfroze value at address {Address:X}", address);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("No locked address record found for {Address:X}", address);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Database error while unfreezing value at {Address:X}", address);
+                        throw;
+                    }
                 }
+                else
+                {
+                    _logger.LogWarning("No freeze timer found for address {Address:X}", address);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to unfreeze value at address {Address:X}", address);
+                throw;
             }
         }
 
