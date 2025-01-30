@@ -7,32 +7,13 @@ using Radzen;
 using System.Security.Principal;
 using System.Diagnostics;
 
-// Проверяем права администратора
+// Check if running as administrator (for service status)
 #if WINDOWS
 bool isAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
     .IsInRole(WindowsBuiltInRole.Administrator);
-
 if (!isAdmin)
 {
-    // Restart the application with admin rights
-    var startInfo = new ProcessStartInfo
-    {
-        UseShellExecute = true,
-        WorkingDirectory = Environment.CurrentDirectory,
-        FileName = Process.GetCurrentProcess().MainModule?.FileName ?? string.Empty,
-        Verb = "runas" // This requests elevation
-    };
-
-    try
-    {
-        Process.Start(startInfo);
-        return; // Exit current process
-    }
-    catch (System.ComponentModel.Win32Exception)
-    {
-        Console.WriteLine("User declined elevation. The application requires administrator privileges to access process memory.");
-        return;
-    }
+    Console.WriteLine("Application requires administrator privileges to access process memory.");
 }
 #endif
 
