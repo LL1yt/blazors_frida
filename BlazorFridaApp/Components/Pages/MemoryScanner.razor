@@ -47,22 +47,73 @@
         </RadzenStack>
         
         <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-            <RadzenDropDown @bind-Value="@selectedScanType"
-                           Data="@Enum.GetValues(typeof(ScanType))"
-                           Change="@OnScanTypeChanged"
-                           TextProperty="ToString"
-                           ValueProperty="ToString"
-                           AllowClear="true"
-                           Style="width: 200px"
-                           Placeholder="Scan type"/>
-           <RadzenDropDown @bind-Value="@selectedValueType"
-                          Data="@Enum.GetValues(typeof(MemoryValueType))"
-                          Style="width: 200px"
-                          Change="@OnValueTypeChanged"
-                          TextProperty="ToString"
-                          ValueProperty="ToString"
-                          AllowClear="true"
-                          Placeholder="Value type"/>
+            @{
+                var scanTypes = Enum.GetValues(typeof(ScanType));
+                _logger.LogInformation($"Available scan types: {string.Join(", ", scanTypes.Cast<ScanType>())}");
+                _logger.LogInformation($"Current selected scan type: {selectedScanType}");
+                _logger.LogInformation($"Scan types array type: {scanTypes.GetType().FullName}");
+                _logger.LogInformation($"Scan types array length: {scanTypes.Length}");
+                foreach (ScanType type in scanTypes)
+                {
+                    _logger.LogInformation($"Scan type value: {type}, Raw value: {(int)type}");
+                }
+            }
+            <ErrorBoundary>
+                <ChildContent>
+                    <RadzenDropDown TValue="ScanType"
+                                  Value="@selectedScanType"
+                                  ValueChanged="@(args => {
+                                      _logger.LogInformation($"Scan type ValueChanged triggered");
+                                      _logger.LogInformation($"New value: {args}, Type: {(args != null ? args.GetType().FullName : "null")}");
+                                      _logger.LogInformation($"Current selectedScanType before change: {selectedScanType}");
+                                      selectedScanType = args;
+                                      OnScanTypeChanged();
+                                  })"
+                                  Data="@scanTypes"
+                                  AllowClear="true"
+                                  Style="width: 200px"
+                                  Placeholder="Scan type"/>
+                </ChildContent>
+                <ErrorContent>
+                    <div class="alert alert-danger">@context.Message</div>
+                </ErrorContent>
+            </ErrorBoundary>
+            
+            @{
+                var valueTypes = Enum.GetValues(typeof(MemoryValueType));
+                _logger.LogInformation($"Available value types: {string.Join(", ", valueTypes.Cast<MemoryValueType>())}");
+                _logger.LogInformation($"Current selected value type: {selectedValueType}");
+                _logger.LogInformation($"Value types array type: {valueTypes.GetType().FullName}");
+                _logger.LogInformation($"Value types array length: {valueTypes.Length}");
+                foreach (MemoryValueType type in valueTypes)
+                {
+                    _logger.LogInformation($"Value type value: {type}, Raw value: {(int)type}");
+                }
+                _logger.LogInformation($"Dropdown rendering state - selectedValueType: {selectedValueType}, IsEnum: {selectedValueType.GetType().IsEnum}");
+            }
+            <ErrorBoundary>
+                <ChildContent>
+                    @{
+                        _logger.LogInformation($"Rendering value type dropdown with data: {string.Join(", ", valueTypes.Cast<MemoryValueType>())}");
+                    }
+                    <RadzenDropDown TValue="MemoryValueType"
+                                  Value="@selectedValueType"
+                                  ValueChanged="@(args => {
+                                      _logger.LogInformation($"Value type ValueChanged triggered");
+                                      _logger.LogInformation($"New value: {args}, Type: {(args != null ? args.GetType().FullName : "null")}");
+                                      _logger.LogInformation($"Current selectedValueType before change: {selectedValueType}");
+                                      selectedValueType = args;
+                                      OnValueTypeChanged();
+                                  })"
+                                  Data="@valueTypes"
+                                  Style="width: 200px"
+                                  AllowClear="true"
+                                  Placeholder="Value type"/>
+                </ChildContent>
+                <ErrorContent>
+                    <div class="alert alert-danger">@context.Message</div>
+                </ErrorContent>
+            </ErrorBoundary>
         </RadzenStack>
         
         @if (selectedScanType == ScanType.Pattern)
@@ -155,11 +206,48 @@
     private bool IsAdmin;
     private bool isLoading;
 
+    private ScanType _previousScanType;
+    private MemoryValueType _previousValueType;
+
     protected override void OnInitialized()
     {
+        _logger.LogInformation("Initializing MemoryScanner component");
         IsAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
             .IsInRole(WindowsBuiltInRole.Administrator);
+        _logger.LogInformation($"Admin check result: {IsAdmin}");
+        
+        // Initialize tracking variables
+        _previousScanType = selectedScanType;
+        _previousValueType = selectedValueType;
+        
+        _logger.LogInformation($"Initial scan type: {selectedScanType}");
+        _logger.LogInformation($"Initial value type: {selectedValueType}");
         base.OnInitialized();
+    }
+
+    protected override void OnParametersSet()
+    {
+        try
+        {
+            _logger.LogInformation("OnParametersSet called");
+            _logger.LogInformation($"Current scan type: {selectedScanType}, Type: {selectedScanType.GetType().FullName}");
+            _logger.LogInformation($"Current value type: {selectedValueType}, Type: {selectedValueType.GetType().FullName}");
+            
+            var scanTypes = Enum.GetValues(typeof(ScanType));
+            var valueTypes = Enum.GetValues(typeof(MemoryValueType));
+            
+            _logger.LogInformation($"Available scan types: {string.Join(", ", scanTypes.Cast<ScanType>())}");
+            _logger.LogInformation($"Available value types: {string.Join(", ", valueTypes.Cast<MemoryValueType>())}");
+            
+            _logger.LogInformation($"Is selectedScanType valid enum value: {Enum.IsDefined(typeof(ScanType), selectedScanType)}");
+            _logger.LogInformation($"Is selectedValueType valid enum value: {Enum.IsDefined(typeof(MemoryValueType), selectedValueType)}");
+            
+            base.OnParametersSet();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in OnParametersSet");
+        }
     }
 
     protected override async Task OnInitializedAsync()
@@ -235,15 +323,26 @@
         }
     }
 
+
     private async Task OnScanTypeChanged()
     {
         try
         {
+            _logger.LogInformation($"OnScanTypeChanged called");
+            _logger.LogInformation($"Previous scan type: {_previousScanType}");
+            _logger.LogInformation($"New scan type: {selectedScanType}");
+            _logger.LogInformation($"Has value actually changed: {!selectedScanType.Equals(_previousScanType)}");
+            
             isFirstScan = true;
             scanResults.Clear();
             currentValues.Clear();
             previousValues.Clear();
+            
+            _logger.LogInformation("Cleared scan results and value caches");
+            _logger.LogInformation($"isFirstScan set to: {isFirstScan}");
+            
             StateHasChanged();
+            _previousScanType = selectedScanType;
             
             NotificationService.Notify(NotificationSeverity.Info,
                 "Scan type changed",
@@ -251,6 +350,7 @@
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error in OnScanTypeChanged");
             NotificationService.Notify(NotificationSeverity.Error,
                 "Error changing scan type",
                 ex.Message);
@@ -261,12 +361,21 @@
     {
         try
         {
-            // Сбрасываем результаты при смене типа данных
+            _logger.LogInformation($"OnValueTypeChanged called");
+            _logger.LogInformation($"Previous value type: {_previousValueType}");
+            _logger.LogInformation($"New value type: {selectedValueType}");
+            _logger.LogInformation($"Has value actually changed: {!selectedValueType.Equals(_previousValueType)}");
+            
             scanResults.Clear();
             currentValues.Clear();
             previousValues.Clear();
             isFirstScan = true;
+            
+            _logger.LogInformation("Cleared scan results and value caches");
+            _logger.LogInformation($"isFirstScan set to: {isFirstScan}");
+            
             StateHasChanged();
+            _previousValueType = selectedValueType;
             
             NotificationService.Notify(NotificationSeverity.Info,
                 "Value type changed",
@@ -274,6 +383,7 @@
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error in OnValueTypeChanged");
             NotificationService.Notify(NotificationSeverity.Error,
                 "Error changing value type",
                 ex.Message);
@@ -549,4 +659,30 @@
     }
 
     private bool IsFrozen(IntPtr address) => frozenAddresses.Contains(address);
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        try
+        {
+            _logger.LogInformation($"OnAfterRender called, firstRender: {firstRender}");
+            _logger.LogInformation($"Component state - ScanType: {selectedScanType}, ValueType: {selectedValueType}");
+            _logger.LogInformation($"Selected values valid - ScanType: {Enum.IsDefined(typeof(ScanType), selectedScanType)}, ValueType: {Enum.IsDefined(typeof(MemoryValueType), selectedValueType)}");
+            _logger.LogInformation($"Dropdown data - ScanTypes: {(scanTypes?.Length ?? 0)}, ValueTypes: {(valueTypes?.Length ?? 0)}");
+            
+            if (firstRender)
+            {
+                _logger.LogInformation("First render - initializing dropdown data");
+                scanTypes = Enum.GetValues(typeof(ScanType));
+                valueTypes = Enum.GetValues(typeof(MemoryValueType));
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in OnAfterRender");
+        }
+    }
+
+    private Array scanTypes;
+    private Array valueTypes;
 }
