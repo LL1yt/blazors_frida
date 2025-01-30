@@ -91,3 +91,9 @@ finally
 {
     Log.CloseAndFlush();
 }
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application startup failed");
+    throw;
+}
