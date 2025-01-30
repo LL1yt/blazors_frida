@@ -6,12 +6,14 @@ using BlazorFridaApp.Persistence;
 
 namespace BlazorFridaApp.MemoryScanner
 {
-    public class ProcessMemoryScanner
+    public class ProcessMemoryScanner : IDisposable
     {
         private readonly AppDbContext _dbContext;
         public nint ProcessHandle => _processHandle;
         private nint _processHandle;
-        private Timer? _freezeTimer;
+        private int _currentProcessId;
+        private readonly Dictionary<nint, Timer> _freezeTimers = new();
+        private bool _disposed;
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern nint OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
@@ -24,6 +26,25 @@ namespace BlazorFridaApp.MemoryScanner
         private static extern bool WriteProcessMemory(nint hProcess, nint lpBaseAddress,
             byte[] lpBuffer, int nSize, out int lpNumberOfBytesWritten);
 
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool VirtualQueryEx(nint hProcess, nint lpAddress,
+            out MEMORY_BASIC_INFORMATION lpBuffer, int dwLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(nint hObject);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MEMORY_BASIC_INFORMATION
+        {
+            public nint BaseAddress;
+            public nint AllocationBase;
+            public uint AllocationProtect;
+            public nint RegionSize;
+            public uint State;
+            public uint Protect;
+            public uint Type;
+        }
+
         public ProcessMemoryScanner(AppDbContext dbContext)
         {
             _dbContext = dbContext;
@@ -34,32 +55,47 @@ namespace BlazorFridaApp.MemoryScanner
             const int PROCESS_VM_READ = 0x0010;
             const int PROCESS_QUERY_INFORMATION = 0x0400;
             
-            _processHandle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, 
+            if (_processHandle != nint.Zero)
+            {
+                CloseHandle(_processHandle);
+            }
+            
+            _processHandle = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION,
                 false, processId);
+            _currentProcessId = processId;
             
             if (_processHandle == nint.Zero)
                 throw new Exception($"Failed to open process (Error: {Marshal.GetLastWin32Error()})");
 
             var matches = new List<nint>();
-            nint currentAddress = 0;
-            const int bufferSize = 4096;
-            var buffer = new byte[bufferSize];
+            var mbi = new MEMORY_BASIC_INFORMATION();
+            nint address = 0;
 
-            while (true)
+            while (VirtualQueryEx(_processHandle, address, out mbi, Marshal.SizeOf<MEMORY_BASIC_INFORMATION>()))
             {
-                if (!ReadProcessMemory(_processHandle, currentAddress, buffer, 
-                    bufferSize, out var bytesRead) || bytesRead == 0)
-                    break;
-
-                for (int i = 0; i < bytesRead - pattern.Length; i++)
+                // Check if memory region is committed and readable
+                if (mbi.State == 0x1000 && // MEM_COMMIT
+                    (mbi.Protect & 0xF0) != 0x01) // Not PAGE_NOACCESS
                 {
-                    if (PatternMatch(buffer, i, pattern, mask))
+                    var buffer = new byte[(int)mbi.RegionSize];
+                    if (ReadProcessMemory(_processHandle, mbi.BaseAddress, buffer, buffer.Length, out var bytesRead))
                     {
-                        matches.Add(currentAddress + i);
+                        for (int i = 0; i < bytesRead - pattern.Length; i++)
+                        {
+                            if (PatternMatch(buffer, i, pattern, mask))
+                            {
+                                matches.Add(mbi.BaseAddress + i);
+                            }
+                        }
                     }
                 }
-
-                currentAddress += (nint)bytesRead;
+                
+                // Move to next region
+                address = mbi.BaseAddress + mbi.RegionSize;
+                
+                // Check if we've wrapped around memory space
+                if (address < mbi.BaseAddress)
+                    break;
             }
 
             await SaveScanResults(processId, pattern, mask, matches);
@@ -96,13 +132,102 @@ namespace BlazorFridaApp.MemoryScanner
             await _dbContext.SaveChangesAsync();
         }
 
-        public void FreezeValue(nint address, byte[] value)
+        public async Task FreezeValue(nint address, byte[] value)
         {
-            _freezeTimer?.Dispose();
-            _freezeTimer = new Timer(async _ => 
+            if (_freezeTimers.TryGetValue(address, out var existingTimer))
+            {
+                existingTimer.Dispose();
+                _freezeTimers.Remove(address);
+            }
+
+            var timer = new Timer(async _ =>
             {
                 await WriteMemory(address, value);
-            }, null, 0, 1000);
+            }, null, 0, 100); // Update every 100ms for more responsive freezing
+
+            _freezeTimers[address] = timer;
+
+            // Update or create locked address record
+            var lockedAddress = await _dbContext.LockedAddresses
+                .FirstOrDefaultAsync(la => la.Address == (long)address);
+
+            if (lockedAddress == null)
+            {
+                lockedAddress = new LockedAddress
+                {
+                    ProcessName = Process.GetProcessById(_currentProcessId).ProcessName,
+                    Address = (long)address,
+                    ValueType = "byte[]",
+                    OriginalBytes = await ReadMemoryBytes(address, value.Length),
+                    CurrentValue = value,
+                    IsFrozen = true,
+                    LastAccessed = DateTime.UtcNow
+                };
+                await _dbContext.LockedAddresses.AddAsync(lockedAddress);
+            }
+            else
+            {
+                lockedAddress.CurrentValue = value;
+                lockedAddress.IsFrozen = true;
+                lockedAddress.LastAccessed = DateTime.UtcNow;
+            }
+
+            await _dbContext.SaveChangesAsync();
+        }
+
+        public async Task UnfreezeValue(nint address)
+        {
+            if (_freezeTimers.TryGetValue(address, out var timer))
+            {
+                timer.Dispose();
+                _freezeTimers.Remove(address);
+
+                var lockedAddress = await _dbContext.LockedAddresses
+                    .FirstOrDefaultAsync(la => la.Address == (long)address);
+
+                if (lockedAddress != null)
+                {
+                    // Restore original value if available
+                    if (lockedAddress.OriginalBytes.Length > 0)
+                    {
+                        await WriteMemory(address, lockedAddress.OriginalBytes);
+                    }
+
+                    lockedAddress.IsFrozen = false;
+                    lockedAddress.LastAccessed = DateTime.UtcNow;
+                    await _dbContext.SaveChangesAsync();
+                }
+            }
+        }
+
+        public async Task<byte[]> ReadMemoryBytes(nint address, int length)
+        {
+            var buffer = new byte[length];
+            if (!ReadProcessMemory(_processHandle, address, buffer, length, out _))
+            {
+                throw new Exception($"Failed to read memory at {address:X} (Error: {Marshal.GetLastWin32Error()})");
+            }
+            return buffer;
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                foreach (var timer in _freezeTimers.Values)
+                {
+                    timer.Dispose();
+                }
+                _freezeTimers.Clear();
+
+                if (_processHandle != nint.Zero)
+                {
+                    CloseHandle(_processHandle);
+                    _processHandle = nint.Zero;
+                }
+
+                _disposed = true;
+            }
         }
 
         public List<Process> GetProcesses()
@@ -143,31 +268,32 @@ namespace BlazorFridaApp.MemoryScanner
 
         public async Task WriteMemory(nint address, byte[] value)
         {
+            if (_processHandle == nint.Zero)
+                throw new Exception("No process is currently open");
+
             const int PROCESS_VM_WRITE = 0x0020;
             const int PROCESS_VM_OPERATION = 0x0008;
             
-            var handle = OpenProcess(PROCESS_VM_WRITE | PROCESS_VM_OPERATION, 
-                false, Process.GetCurrentProcess().Id);
-            
-            if (handle == nint.Zero)
-                throw new Exception($"Failed to open process for writing (Error: {Marshal.GetLastWin32Error()})");
-
-            var success = WriteProcessMemory(handle, address, value, value.Length, out _);
-            if (!success)
-                throw new Exception($"Write failed (Error: {Marshal.GetLastWin32Error()})");
-
-            await _dbContext.LockedAddresses.AddAsync(new LockedAddress
+            // Ensure we have write access
+            if (!WriteProcessMemory(_processHandle, address, value, value.Length, out _))
             {
-                ProcessName = Process.GetCurrentProcess().ProcessName,
-                Address = (long)address,
-                ValueType = "byte[]",
-                OriginalBytes = Array.Empty<byte>(),
-                CurrentValue = value,
-                IsFrozen = true,
-                LastAccessed = DateTime.UtcNow
-            });
-            
-            await _dbContext.SaveChangesAsync();
+                // If write fails, try to reopen handle with write access
+                var writeHandle = OpenProcess(PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
+                    false, _currentProcessId);
+                
+                if (writeHandle == nint.Zero)
+                    throw new Exception($"Failed to open process for writing (Error: {Marshal.GetLastWin32Error()})");
+
+                try
+                {
+                    if (!WriteProcessMemory(writeHandle, address, value, value.Length, out _))
+                        throw new Exception($"Write failed (Error: {Marshal.GetLastWin32Error()})");
+                }
+                finally
+                {
+                    CloseHandle(writeHandle);
+                }
+            }
         }
     }
 }
