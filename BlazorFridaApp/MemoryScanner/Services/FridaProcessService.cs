@@ -32,10 +32,12 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 {
                     // Import our Frida script
                     dynamic sys = Py.Import("sys");
-                    string scriptPath = Path.GetDirectoryName(typeof(FridaProcessService).Assembly.Location)!;
+                    string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MemoryScanner", "Native");
+                    _logger.LogInformation($"Adding Python path: {scriptPath}");
                     sys.path.append(scriptPath);
 
                     dynamic fridaModule = Py.Import("frida_memory");
+                    _logger.LogInformation("Successfully imported frida_memory module");
                     _fridaScanner = fridaModule.FridaMemoryScanner();
                 }
             }

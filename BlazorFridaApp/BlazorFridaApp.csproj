@@ -63,4 +63,14 @@
     </None>
   </ItemGroup>
 
+  <!-- Python Files -->
+  <ItemGroup>
+    <Content Include="MemoryScanner\Native\**\*.py">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="MemoryScanner\Native\requirements.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
