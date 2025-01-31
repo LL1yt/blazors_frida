@@ -1,5 +1,4 @@
 @page "/memory-scanner"
-@using System.Security.Principal
 @using BlazorFridaApp.MemoryScanner.Components
 @inherits MemoryScannerComponentBase
 @implements IAsyncDisposable
@@ -8,17 +7,6 @@
 @inject IScanProfileService ProfileService
 <RadzenCard>
     <h2>Memory Scanner</h2>
-    
-    @if (!IsAdmin)
-    {
-        <div class="alert alert-warning" role="alert">
-            <h4 class="alert-heading">Administrator Rights Required!</h4>
-            <p>Memory scanning features are disabled because the application is not running with administrator privileges.</p>
-            <hr>
-            <p class="mb-0">Please restart the application as administrator to use memory scanning features.</p>
-        </div>
-        return;
-    }
     
     <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
         <ProcessSelector 
@@ -80,30 +68,13 @@
     private MemoryValueType selectedValueType = MemoryValueType.Int;
     private int SearchValue { get; set; }
     private bool isFirstScan = true;
-    private bool IsAdmin;
     private bool isLoading;
 
     private Array scanTypes = Enum.GetValues(typeof(ScanType));
     private Array valueTypes = Enum.GetValues(typeof(MemoryValueType));
 
-    protected override void OnInitialized()
-    {
-        Logger.LogInformation("Initializing MemoryScanner component");
-        IsAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent())
-            .IsInRole(WindowsBuiltInRole.Administrator);
-        Logger.LogInformation($"Admin check result: {IsAdmin}");
-        base.OnInitialized();
-    }
-
     protected override async Task OnInitializedAsync()
     {
-        if (!IsAdmin)
-        {
-            ShowWarning("Administrator rights required",
-                "Please restart the application as administrator to use memory scanning features");
-            return;
-        }
-
         await RefreshProcessList();
     }
 
@@ -116,8 +87,8 @@
             
             if (!processList.Any())
             {
-                ShowWarning("No accessible processes found",
-                    "Make sure you have administrator rights and necessary permissions");
+                ShowWarning("No processes found",
+                    "No accessible processes were found");
                 return;
             }
             
@@ -127,7 +98,7 @@
         catch (Exception ex)
         {
             ShowError("Failed to refresh process list",
-                "Failed to load process list. Please ensure you have administrator rights.", ex);
+                "Failed to load process list", ex);
         }
     }
 
@@ -199,7 +170,6 @@
     }
 
     private bool canScan =>
-        IsAdmin &&
         selectedProcessId.HasValue &&
         selectedValueType != MemoryValueType.String && // Strings not supported yet
         selectedValueType != MemoryValueType.Array &&  // Arrays not supported yet
