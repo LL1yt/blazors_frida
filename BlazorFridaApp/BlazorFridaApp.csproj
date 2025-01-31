@@ -15,7 +15,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.1" />
-    <PackageReference Include="pythonnet" Version="3.1.0-preview2024-09-06" />
+    <PackageReference Include="pythonnet" Version="3.0.5" />
     <PackageReference Include="Radzen.Blazor" Version=" 5.9.6" />
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
