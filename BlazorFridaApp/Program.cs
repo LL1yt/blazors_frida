@@ -46,6 +46,7 @@ try
     // Add memory scanner services
     builder.Services.AddScoped<IProcessService, FridaProcessService>(); // Changed to FridaProcessService
     builder.Services.AddScoped<IMemoryReaderService, FridaMemoryService>(); // Using FridaMemoryService
+    builder.Services.AddScoped<IMemoryScannerService, FridaMemoryScannerService>(); // Add memory scanner service
     builder.Services.AddScoped<IValueFreezerService, ValueFreezerService>();
     builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
 
