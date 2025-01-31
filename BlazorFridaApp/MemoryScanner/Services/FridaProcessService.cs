@@ -24,7 +24,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 // Initialize Python runtime if not already initialized
                 if (!PythonEngine.IsInitialized)
                 {
-                    Runtime.PythonDLL = @"python311.dll"; // Make sure this matches your Python version
+                    Runtime.PythonDLL = @"python313.dll"; // Make sure this matches your Python version
                     PythonEngine.Initialize();
                 }
 
