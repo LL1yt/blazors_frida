@@ -30,67 +30,64 @@ try
     // Add Serilog to the application
     builder.Host.UseSerilog();
 
-// Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    // Add services to the container.
+    builder.Services.AddRazorComponents()
+        .AddInteractiveServerComponents();
 
-// Add assets service
-builder.Services.AddScoped<AssetsService>();
+    // Add assets service
+    builder.Services.AddScoped<AssetsService>();
 
-builder.Services.AddRadzenComponents();
+    builder.Services.AddRadzenComponents();
 
-// Add database context
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=gamememory.db"));
+    // Add database context
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite("Data Source=gamememory.db"));
 
-// Add admin check service
-builder.Services.AddScoped<AdminCheckService>();
+    // Add memory scanner services
+    builder.Services.AddScoped<IProcessService, FridaProcessService>(); // Changed to FridaProcessService
+    builder.Services.AddScoped<IMemoryReaderService, FridaMemoryService>(); // Using FridaMemoryService
+    builder.Services.AddScoped<IMemoryScannerService, MemoryScannerService>();
+    builder.Services.AddScoped<IValueFreezerService, ValueFreezerService>();
+    builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
 
-// Add memory scanner services
-builder.Services.AddScoped<IProcessService, ProcessService>();
-builder.Services.AddScoped<IMemoryReaderService, MemoryReaderService>();
-builder.Services.AddScoped<IMemoryScannerService, MemoryScannerService>();
-builder.Services.AddScoped<IValueFreezerService, ValueFreezerService>();
-builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
+    // Add the main ProcessMemoryScanner that orchestrates all services
+    builder.Services.AddScoped<ProcessMemoryScanner>();
 
-// Add the main ProcessMemoryScanner that orchestrates all services
-builder.Services.AddScoped<ProcessMemoryScanner>();
+    var app = builder.Build();
 
-var app = builder.Build();
+    // Configure the HTTP request pipeline.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseExceptionHandler("/Error", createScopeForErrors: true);
+        app.UseHsts();
+    }
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
-}
+    app.UseHttpsRedirection();
+    app.UseStaticFiles();
+    app.UseAntiforgery();
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-app.UseAntiforgery();
+    app.MapRazorComponents<App>()
+        .AddInteractiveServerRenderMode();
 
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    // Global exception handler
+    AppDomain.CurrentDomain.UnhandledException += (sender, error) =>
+    {
+        Log.Fatal(error.ExceptionObject as Exception, "Unhandled application error");
+    };
 
-// Global exception handler
-AppDomain.CurrentDomain.UnhandledException += (sender, error) =>
-{
-    Log.Fatal(error.ExceptionObject as Exception, "Unhandled application error");
-};
-
-try
-{
-    Log.Information("Starting web application");
-    app.Run();
-}
-catch (Exception ex)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-}
-finally
-{
-    Log.CloseAndFlush();
-}
+    try
+    {
+        Log.Information("Starting web application");
+        app.Run();
+    }
+    catch (Exception ex)
+    {
+        Log.Fatal(ex, "Application terminated unexpectedly");
+    }
+    finally
+    {
+        Log.CloseAndFlush();
+    }
 }
 catch (Exception ex)
 {
