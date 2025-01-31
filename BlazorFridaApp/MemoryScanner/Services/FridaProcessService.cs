@@ -24,7 +24,22 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 // Initialize Python runtime if not already initialized
                 if (!PythonEngine.IsInitialized)
                 {
-                    Runtime.PythonDLL = @"python313.dll"; // Using Python 3.11 for better compatibility with Python.NET
+                    // Get Python home from environment
+                    var pythonHome = Environment.GetEnvironmentVariable("PYTHONHOME");
+                    if (string.IsNullOrEmpty(pythonHome))
+                    {
+                        _logger.LogWarning("PYTHONHOME environment variable not set");
+                        pythonHome = @"C:\Python313"; // Default Python 3.11 installation path
+                    }
+                    
+                    Runtime.PythonDLL = Path.Combine(pythonHome, "python311.dll");
+                    _logger.LogInformation($"Using Python DLL: {Runtime.PythonDLL}");
+                    
+                    if (!File.Exists(Runtime.PythonDLL))
+                    {
+                        throw new FileNotFoundException($"Python DLL not found at {Runtime.PythonDLL}");
+                    }
+                    
                     PythonEngine.Initialize();
                 }
 
@@ -36,9 +51,27 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     _logger.LogInformation($"Adding Python path: {scriptPath}");
                     sys.path.append(scriptPath);
 
-                    dynamic fridaModule = Py.Import("frida_memory");
-                    _logger.LogInformation("Successfully imported frida_memory module");
-                    _fridaScanner = fridaModule.FridaMemoryScanner();
+                    try
+                    {
+                        // First try to import frida to check if it's available
+                        dynamic frida = Py.Import("frida");
+                        _logger.LogInformation("Successfully imported frida module");
+                        
+                        // Now import our custom module
+                        dynamic fridaModule = Py.Import("frida_memory");
+                        _logger.LogInformation("Successfully imported frida_memory module");
+                        _fridaScanner = fridaModule.FridaMemoryScanner();
+                    }
+                    catch (PythonException pex)
+                    {
+                        Console.Error.WriteLine($"Python error during module import: {pex.Message}");
+                        if (pex.Message.Contains("No module named"))
+                        {
+                            Console.Error.WriteLine($"Python path: {sys.path.ToString()}");
+                            Console.Error.WriteLine("Please ensure frida is installed: pip install frida frida-tools");
+                        }
+                        throw;
+                    }
                 }
             }
             catch (Exception ex)

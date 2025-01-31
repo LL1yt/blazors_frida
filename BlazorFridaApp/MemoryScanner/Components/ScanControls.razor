@@ -53,9 +53,10 @@
 }
 else
 {
-    <RadzenNumeric @bind-Value="@SearchValue"
-                  Placeholder="Search value"
-                  Style="width: 100%"/>
+    <RadzenNumeric Value="@SearchValue"
+                   ValueChanged="@(async (int val) => await SearchValueChanged.InvokeAsync(val))"
+                   Placeholder="Search value"
+                   Style="width: 100%"/>
                   
     @if (ScanType == ScanType.UnknownInitialValue)
     {
@@ -86,6 +87,7 @@ else
     [Parameter] public required string PatternHex { get; set; }
     [Parameter] public required string Mask { get; set; }
     [Parameter] public int SearchValue { get; set; }
+    [Parameter] public EventCallback<int> SearchValueChanged { get; set; }
     [Parameter] public bool IsFirstScan { get; set; }
     [Parameter] public bool IsLoading { get; set; }
     [Parameter] public bool CanScan { get; set; }

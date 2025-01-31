@@ -112,7 +112,7 @@ class FridaMemoryScanner:
     def get_process_list(self):
         try:
             processes = []
-            for process in frida.enumerate_processes():
+            for process in frida.get_device_manager().enumerate_processes():
                 processes.append({"name": process.name, "pid": process.pid})
             return json.dumps(processes)
         except Exception as e:
