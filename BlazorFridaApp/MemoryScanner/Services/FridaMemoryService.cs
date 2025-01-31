@@ -112,6 +112,9 @@ namespace BlazorFridaApp.MemoryScanner.Services
             {
                 using (Py.GIL())
                 {
+                    if (_fridaScanner == null)
+                        throw new InvalidOperationException("Frida scanner not initialized");
+
                     bool success = _fridaScanner.write_memory(address.ToString(), value);
                     if (!success)
                     {

@@ -34,7 +34,7 @@
             ValueTypes="@valueTypes"
             PatternHex="@patternHex"
             Mask="@mask"
-            SearchValue="@searchValue"
+            @bind-SearchValue="@SearchValue"
             IsFirstScan="@isFirstScan"
             IsLoading="@isLoading"
             CanScan="@canScan"
@@ -48,7 +48,7 @@
             ValueType="@selectedValueType"
             PatternHex="@patternHex"
             Mask="@mask"
-            SearchValue="@searchValue"
+            SearchValue="@SearchValue"
             IsFirstScan="@isFirstScan"
             IsLoading="@isLoading"
             OnScanComplete="@OnScanComplete"
@@ -78,7 +78,7 @@
     private List<IntPtr> scanResults = new();
     private ScanType selectedScanType = ScanType.ExactValue;
     private MemoryValueType selectedValueType = MemoryValueType.Int;
-    private int searchValue;
+    private int SearchValue { get; set; }
     private bool isFirstScan = true;
     private bool IsAdmin;
     private bool isLoading;
@@ -206,7 +206,7 @@
         (selectedScanType == ScanType.Pattern ?
             !string.IsNullOrWhiteSpace(patternHex) && !string.IsNullOrWhiteSpace(mask) :
             selectedScanType == ScanType.UnknownInitialValue ||
-            (searchValue != 0 && selectedValueType != default(MemoryValueType)));
+            (SearchValue != 0 && selectedValueType != default(MemoryValueType)));
 
     private async Task OnScan()
     {
