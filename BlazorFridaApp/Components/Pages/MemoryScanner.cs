@@ -8,5 +8,8 @@ namespace BlazorFridaApp.Components.Pages
         protected ScanExecutor scanExecutor;
         protected MemoryValueHandler valueHandler;
         protected ValueFreezer valueFreezer;
+
+        [Inject]
+        public new NotificationService NotificationService { get; set; }
     }
 }

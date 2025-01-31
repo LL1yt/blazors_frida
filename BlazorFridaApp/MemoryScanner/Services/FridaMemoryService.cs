@@ -60,6 +60,9 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     _processName = process.ProcessName;
 
                     // Attach to process using Frida
+                    if (_fridaScanner == null)
+                        throw new InvalidOperationException("Frida scanner not initialized");
+                        
                     bool success = _fridaScanner.attach_to_process(_processName);
                     if (!success)
                     {
@@ -83,6 +86,9 @@ namespace BlazorFridaApp.MemoryScanner.Services
             {
                 using (Py.GIL())
                 {
+                    if (_fridaScanner == null)
+                        throw new InvalidOperationException("Frida scanner not initialized");
+                        
                     var result = _fridaScanner.read_memory(address.ToString(), length);
                     if (result == null)
                     {

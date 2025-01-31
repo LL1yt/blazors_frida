@@ -1,6 +1,6 @@
 @inherits MemoryScannerComponentBase
 
-@inject IMemoryScannerService Scanner
+@inject IMemoryScannerService MemoryScanner
 
 <div>
     @if (IsLoading)
@@ -58,7 +58,7 @@
                     .Select(b => Convert.ToByte(b, 16))
                     .ToArray();
 
-                scanResults = await Scanner.ScanForPattern(
+                scanResults = await MemoryScanner.ScanForPattern(
                     ProcessId.Value,
                     pattern,
                     Mask);
@@ -70,14 +70,14 @@
                     switch (ScanType)
                     {
                         case ScanType.ExactValue:
-                            scanResults = await Scanner.ScanForValue(
+                            scanResults = await MemoryScanner.ScanForValue(
                                 ProcessId.Value,
                                 SearchValue,
                                 ValueType);
                             break;
 
                         case ScanType.UnknownInitialValue:
-                            scanResults = await Scanner.GetAllAddresses(
+                            scanResults = await MemoryScanner.GetAllAddresses(
                                 ProcessId.Value,
                                 ValueType);
                             break;

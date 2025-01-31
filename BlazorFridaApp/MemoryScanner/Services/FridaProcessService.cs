@@ -53,6 +53,9 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 using (Py.GIL())
                 {
                     // Get process list from Frida
+                    if (_fridaScanner == null)
+                        throw new InvalidOperationException("Frida scanner not initialized");
+                        
                     string jsonProcesses = _fridaScanner.get_process_list();
                     
                     // Parse JSON result
