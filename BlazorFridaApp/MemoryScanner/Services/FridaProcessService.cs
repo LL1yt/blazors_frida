@@ -111,11 +111,25 @@ namespace BlazorFridaApp.MemoryScanner.Services
                                     processes.Add(process);
                                 }
                             }
-                            catch (ArgumentException)
+                            catch (ArgumentException aex)
                             {
-                                // Process no longer exists, skip it.
+                                _logger.LogWarning("Процесс с PID {pid} недоступен: {message}", data.Pid, aex.Message);
                                 continue;
                             }
+                            catch (System.ComponentModel.Win32Exception wex)
+                            {
+                                _logger.LogWarning("Доступ запрещён для процесса с PID {pid}: {message}", data.Pid, wex.Message);
+                                continue;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Неожиданная ошибка при получении процесса с PID {pid}", data.Pid);
+                                continue;
+                            }
+                        }
+                        if (processes.Count == 0)
+                        {
+                            _logger.LogWarning("Нет доступных процессов. Попробуйте запустить приложение с повышенными привилегиями.");
                         }
                         _logger.LogInformation("Доступных процессов: {accessibleCount}", processes.Count);
                         if (processes.Count == 0)
