@@ -5,52 +5,53 @@
 
 @inject IProcessService ProcessService
 @inject IScanProfileService ProfileService
+
 <RadzenCard>
     <h2>Memory Scanner</h2>
     
     <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
         <ProcessSelector 
-            ProcessList="@processList"
-            SelectedProcessId="@selectedProcessId"
+            ProcessList="@_state.ProcessList"
+            SelectedProcessId="@_state.SelectedProcessId"
             OnProcessSelected="@OnProcessSelected"
             OnRefreshClick="@RefreshProcessList" />
 
         <ScanControls 
-            ScanType="@selectedScanType"
-            ValueType="@selectedValueType"
-            ScanTypes="@scanTypes"
-            ValueTypes="@valueTypes"
-            PatternHex="@patternHex"
-            Mask="@mask"
-            @bind-SearchValue="@SearchValue"
-            IsFirstScan="@isFirstScan"
-            IsLoading="@isLoading"
-            CanScan="@canScan"
+            ScanType="@_state.SelectedScanType"
+            ValueType="@_state.SelectedValueType"
+            ScanTypes="@_state.ScanTypes"
+            ValueTypes="@_state.ValueTypes"
+            PatternHex="@_state.PatternHex"
+            Mask="@_state.Mask"
+            @bind-SearchValue="@_state.SearchValue"
+            IsFirstScan="@_state.IsFirstScan"
+            IsLoading="@_state.IsLoading"
+            CanScan="@_state.CanScan"
             OnScanTypeChanged="@OnScanTypeChanged"
             OnValueTypeChanged="@OnValueTypeChanged"
             OnScanClick="@OnScan" />
         
         <ScanExecutor @ref="scanExecutor"
-            ProcessId="@selectedProcessId"
-            ScanType="@selectedScanType"
-            ValueType="@selectedValueType"
-            PatternHex="@patternHex"
-            Mask="@mask"
-            SearchValue="@SearchValue"
-            IsFirstScan="@isFirstScan"
-            IsLoading="@isLoading"
+            ProcessId="@_state.SelectedProcessId"
+            ScanType="@_state.SelectedScanType"
+            ValueType="@_state.SelectedValueType"
+            PatternHex="@_state.PatternHex"
+            Mask="@_state.Mask"
+            SearchValue="@_state.SearchValue"
+            IsFirstScan="@_state.IsFirstScan"
+            IsLoading="@_state.IsLoading"
             OnScanComplete="@OnScanComplete"
             OnLoadingChanged="@OnLoadingChanged" />
         
         <MemoryValueHandler @ref="valueHandler"
-            ValueType="@selectedValueType" />
+            ValueType="@_state.SelectedValueType" />
             
         <ValueFreezer @ref="valueFreezer"
-            ValueType="@selectedValueType" />
+            ValueType="@_state.SelectedValueType" />
         
         <ScanResultsGrid 
-            Results="@scanResults"
-            ValueType="@selectedValueType"
+            Results="@_state.ScanResults"
+            ValueType="@_state.SelectedValueType"
             GetCurrentValue="@GetCurrentValue"
             IsFrozen="@IsFrozen"
             OnValueChanged="@OnValueChanged"
@@ -59,19 +60,7 @@
 </RadzenCard>
 
 @code {
-    private List<Process> processList = new();
-    private int? selectedProcessId;
-    private string patternHex = "";
-    private string mask = "";
-    private List<IntPtr> scanResults = new();
-    private ScanType selectedScanType = ScanType.ExactValue;
-    private MemoryValueType selectedValueType = MemoryValueType.Int;
-    private int SearchValue { get; set; }
-    private bool isFirstScan = true;
-    private bool isLoading;
-
-    private Array scanTypes = Enum.GetValues(typeof(ScanType));
-    private Array valueTypes = Enum.GetValues(typeof(MemoryValueType));
+    private MemoryScannerState _state = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,120 +69,43 @@
 
     private async Task RefreshProcessList()
     {
-        try
-        {
-            Logger.LogInformation("Refreshing process list...");
-            processList = ProcessService.GetAccessibleProcesses().ToList();
-            
-            if (!processList.Any())
-            {
-                ShowWarning("No processes found",
-                    "No accessible processes were found");
-                return;
-            }
-            
-            Logger.LogInformation($"Successfully loaded {processList.Count} processes");
-            await LoadLastProcess();
-        }
-        catch (Exception ex)
-        {
-            ShowError("Failed to refresh process list",
-                "Failed to load process list", ex);
-        }
-    }
-
-    private async Task LoadLastProcess()
-    {
-        var lastId = await ProfileService.GetLastProcessId();
-        if (lastId.HasValue)
-        {
-            selectedProcessId = lastId.Value;
-            await OnProcessSelected();
-        }
+        await ScannerService.RefreshProcessList(_state);
+        StateHasChanged();
     }
 
     private async Task OnProcessSelected()
     {
-        try
-        {
-            if (selectedProcessId.HasValue)
-            {
-                await ProfileService.SaveLastProcess(selectedProcessId.Value);
-                scanResults.Clear();
-                valueHandler?.ClearCache();
-                isFirstScan = true;
-                StateHasChanged();
-            }
-        }
-        catch (Exception ex)
-        {
-            ShowError("Error selecting process", ex.Message, ex);
-        }
+        await ScannerService.OnProcessSelected(_state);
+        StateHasChanged();
     }
 
     private async Task OnScanTypeChanged(ScanType newType)
     {
-        try
-        {
-            Logger.LogInformation($"Changing scan type from {selectedScanType} to {newType}");
-            selectedScanType = newType;
-            scanResults.Clear();
-            valueHandler?.ClearCache();
-            isFirstScan = true;
-            StateHasChanged();
-            
-            ShowInfo("Scan type changed", $"Selected scan type: {selectedScanType}");
-        }
-        catch (Exception ex)
-        {
-            ShowError("Error changing scan type", ex.Message, ex);
-        }
+        await ScannerService.OnScanTypeChanged(_state, newType);
+        StateHasChanged();
     }
 
     private void OnValueTypeChanged(MemoryValueType newType)
     {
-        try
-        {
-            Logger.LogInformation($"Changing value type from {selectedValueType} to {newType}");
-            selectedValueType = newType;
-            scanResults.Clear();
-            valueHandler?.ClearCache();
-            isFirstScan = true;
-            StateHasChanged();
-            
-            ShowInfo("Value type changed", $"Selected value type: {selectedValueType}");
-        }
-        catch (Exception ex)
-        {
-            ShowError("Error changing value type", ex.Message, ex);
-        }
+        ScannerService.OnValueTypeChanged(_state, newType);
+        StateHasChanged();
     }
-
-    private bool canScan =>
-        selectedProcessId.HasValue &&
-        selectedValueType != MemoryValueType.String && // Strings not supported yet
-        selectedValueType != MemoryValueType.Array &&  // Arrays not supported yet
-        (selectedScanType == ScanType.Pattern ?
-            !string.IsNullOrWhiteSpace(patternHex) && !string.IsNullOrWhiteSpace(mask) :
-            selectedScanType == ScanType.UnknownInitialValue ||
-            (SearchValue != 0 && selectedValueType != default(MemoryValueType)));
 
     private async Task OnScan()
     {
-        if (!canScan) return;
+        if (!_state.CanScan) return;
         await scanExecutor.ExecuteScan(valueHandler.GetCurrentValue);
     }
 
     private void OnScanComplete(List<IntPtr> results)
     {
-        scanResults = results;
-        isFirstScan = false;
+        _state.OnScanComplete(results);
         StateHasChanged();
     }
 
     private void OnLoadingChanged(bool loading)
     {
-        isLoading = loading;
+        _state.IsLoading = loading;
         StateHasChanged();
     }
 

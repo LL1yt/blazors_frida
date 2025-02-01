@@ -4,6 +4,7 @@ using BlazorFridaApp.MemoryScanner.Services;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.Persistence;
 using BlazorFridaApp.Services;
+using BlazorFridaApp.Components.Pages;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.EntityFrameworkCore;
@@ -37,11 +38,12 @@ try
     // Add assets service
     builder.Services.AddScoped<AssetsService>();
 
+    // Add Radzen services
     builder.Services.AddRadzenComponents();
+    builder.Services.AddScoped<DialogService>();
 
-    // Add database context
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite("Data Source=gamememory.db"));
+    // Add notification service
+    builder.Services.AddScoped<INotificationService, AppNotificationService>();
 
     // Add memory scanner services
     builder.Services.AddSingleton<IPythonRuntimeService, PythonRuntimeService>(); // Python runtime singleton
@@ -54,6 +56,13 @@ try
 
     // Add the main ProcessMemoryScanner that orchestrates all services
     builder.Services.AddScoped<ProcessMemoryScanner>();
+
+    // Add the MemoryScanner page service
+    builder.Services.AddScoped<MemoryScannerService>();
+
+    // Add database context
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite("Data Source=gamememory.db"));
 
     var app = builder.Build();
 

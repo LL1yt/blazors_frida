@@ -1,15 +1,16 @@
 using Microsoft.AspNetCore.Components;
 using BlazorFridaApp.MemoryScanner.Components;
+using BlazorFridaApp.Services;
 
 namespace BlazorFridaApp.Components.Pages
 {
     public partial class MemoryScanner : MemoryScannerComponentBase, IAsyncDisposable
     {
-        public required ScanExecutor scanExecutor;
-        public required MemoryValueHandler valueHandler;
-        public required ValueFreezer valueFreezer;
+        [Inject] private MemoryScannerService ScannerService { get; set; } = default!;
+        [Inject] private INotificationService NotificationService { get; set; } = default!;
 
-        [Inject]
-        public required new NotificationService NotificationService { get; set; }
+        private ScanExecutor scanExecutor = default!;
+        private MemoryValueHandler valueHandler = default!;
+        private ValueFreezer valueFreezer = default!;
     }
 }
