@@ -104,7 +104,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                             try
                             {
                                 var process = Process.GetProcessById(info.Pid);
-                                if (process != null && !string.IsNullOrEmpty(process.ProcessName))
+                                if (process != null && !string.IsNullOrEmpty(process.ProcessName) && !process.ProcessName.Equals("Idle", StringComparison.OrdinalIgnoreCase))
                                 {
                                     processes.Add(process);
                                 }
