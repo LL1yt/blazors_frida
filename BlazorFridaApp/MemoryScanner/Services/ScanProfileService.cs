@@ -18,6 +18,20 @@ namespace BlazorFridaApp.MemoryScanner.Services
             _logger = logger;
         }
 
+        public ScanProfile GetCurrentProfile()
+        {
+            return new ScanProfile
+            {
+                Name = "Default Profile",
+                ProcessName = "Unknown",
+                Pattern = new byte[0],
+                Mask = "",
+                Offsets = new int[0],
+                Created = DateTime.UtcNow,
+                    LastUsed = DateTime.UtcNow
+                };
+            }
+
         public async Task SaveScanResults(int processId, byte[] pattern, string mask, List<nint> addresses)
         {
             if (processId <= 0)

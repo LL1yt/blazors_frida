@@ -37,7 +37,7 @@ namespace BlazorFridaApp.MemoryScanner
             try
             {
                 _logger.LogInformation("Getting accessible processes");
-                return _processService.GetAccessibleProcesses();
+                return _processService.GetAccessibleProcesses().ToList();
             }
             catch (Exception ex)
             {

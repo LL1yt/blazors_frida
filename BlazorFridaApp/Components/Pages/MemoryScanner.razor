@@ -83,7 +83,7 @@
         try
         {
             Logger.LogInformation("Refreshing process list...");
-            processList = ProcessService.GetAccessibleProcesses();
+            processList = ProcessService.GetAccessibleProcesses().ToList();
             
             if (!processList.Any())
             {
