@@ -7,8 +7,7 @@
     <ErrorBoundary>
         <ChildContent>
             <RadzenDropDown TValue="ScanType"
-                          Value="@ScanType"
-                          ValueChanged="@OnScanTypeChanged"
+                          @bind-Value="@ScanType"
                           Data="@ScanTypes"
                           AllowClear="true"
                           Style="width: 200px"
@@ -25,8 +24,7 @@
     <ErrorBoundary>
         <ChildContent>
             <RadzenDropDown TValue="MemoryValueType"
-                          Value="@ValueType"
-                          ValueChanged="@OnValueTypeChanged"
+                          @bind-Value="@ValueType"
                           Data="@ValueTypes"
                           Style="width: 200px"
                           AllowClear="true"

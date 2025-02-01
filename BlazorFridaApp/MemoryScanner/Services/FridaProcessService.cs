@@ -92,10 +92,19 @@ namespace BlazorFridaApp.MemoryScanner.Services
                         throw new InvalidOperationException("Frida scanner not initialized");
                         
                     string jsonProcesses = _fridaScanner.get_process_list();
+                    _logger.LogInformation("Получен JSON списка процессов: {json}", jsonProcesses);
                     
                     // Parse JSON result
                     var processes = new List<Process>();
                     var processInfos = JsonSerializer.Deserialize<List<ProcessInfo>>(jsonProcesses);
+                    if (processInfos != null)
+                    {
+                        _logger.LogInformation("Количество процессов из frida: {count}", processInfos.Count);
+                        if (processInfos.Count == 0)
+                        {
+                            _logger.LogWarning("WRN No processes found: No accessible processes were found.");
+                        }
+                    }
 
                     if (processInfos != null)
                     {
