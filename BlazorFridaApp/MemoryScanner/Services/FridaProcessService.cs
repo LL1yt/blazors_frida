@@ -6,6 +6,7 @@ using Python.Runtime;
 
 namespace BlazorFridaApp.MemoryScanner.Services
 {
+    // This service implements the IProcessService interface by returning a list of System.Diagnostics.Process.
     public class FridaProcessService : IProcessService
     {
         private readonly ILogger<FridaProcessService> _logger;
@@ -24,7 +25,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 // Initialize Python runtime if not already initialized
                 if (!PythonEngine.IsInitialized)
                 {
-                    // Get Python home from environment
+                    // Get Python home from environment.
                     var pythonHome = Environment.GetEnvironmentVariable("PYTHONHOME");
                     if (string.IsNullOrEmpty(pythonHome))
                     {
@@ -45,7 +46,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
 
                 using (Py.GIL())
                 {
-                    // Import our Frida script
+                    // Import our Frida script.
                     dynamic sys = Py.Import("sys");
                     string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MemoryScanner", "Native");
                     _logger.LogInformation($"Adding Python path: {scriptPath}");
@@ -53,11 +54,11 @@ namespace BlazorFridaApp.MemoryScanner.Services
 
                     try
                     {
-                        // First try to import frida to check if it's available
+                        // First, try to import frida to check if it's available.
                         dynamic frida = Py.Import("frida");
                         _logger.LogInformation("Successfully imported frida module");
                         
-                        // Now import our custom module
+                        // Now import our custom module.
                         dynamic fridaModule = Py.Import("frida_memory");
                         _logger.LogInformation("Successfully imported frida_memory module");
                         _fridaScanner = fridaModule.FridaMemoryScanner();
@@ -81,38 +82,30 @@ namespace BlazorFridaApp.MemoryScanner.Services
             }
         }
 
+        // Implementing interface method: returns a list of accessible System.Diagnostics.Process.
         public List<Process> GetAccessibleProcesses()
         {
             try
             {
                 using (Py.GIL())
                 {
-                    // Get process list from Frida
                     if (_fridaScanner == null)
                         throw new InvalidOperationException("Frida scanner not initialized");
                         
                     string jsonProcesses = _fridaScanner.get_process_list();
                     _logger.LogInformation("Получен JSON списка процессов: {json}", jsonProcesses);
                     
-                    // Parse JSON result
                     var processes = new List<Process>();
-                    var processInfos = JsonSerializer.Deserialize<List<ProcessInfo>>(jsonProcesses);
-                    if (processInfos != null)
+                    // Deserialize JSON into a list of ProcessData objects.
+                    var processDatas = JsonSerializer.Deserialize<List<ProcessData>>(jsonProcesses);
+                    if (processDatas != null)
                     {
-                        _logger.LogInformation("Количество процессов из frida: {count}", processInfos.Count);
-                        if (processInfos.Count == 0)
-                        {
-                            _logger.LogWarning("WRN No processes found: No accessible processes were found.");
-                        }
-                    }
-
-                    if (processInfos != null)
-                    {
-                        foreach (var info in processInfos)
+                        _logger.LogInformation("Количество процессов из frida: {count}", processDatas.Count);
+                        foreach (var data in processDatas)
                         {
                             try
                             {
-                                var process = Process.GetProcessById(info.Pid);
+                                var process = Process.GetProcessById(data.Pid);
                                 if (process != null && !string.IsNullOrEmpty(process.ProcessName) && !process.ProcessName.Equals("Idle", StringComparison.OrdinalIgnoreCase))
                                 {
                                     processes.Add(process);
@@ -120,12 +113,17 @@ namespace BlazorFridaApp.MemoryScanner.Services
                             }
                             catch (ArgumentException)
                             {
-                                // Process no longer exists, skip it
+                                // Process no longer exists, skip it.
                                 continue;
                             }
                         }
+                        _logger.LogInformation("Доступных процессов: {accessibleCount}", processes.Count);
+                        if (processes.Count == 0)
+                        {
+                            _logger.LogWarning("WRN No processes found: No accessible processes were found.");
+                        }
                     }
-
+                    
                     return processes;
                 }
             }
@@ -136,7 +134,8 @@ namespace BlazorFridaApp.MemoryScanner.Services
             }
         }
 
-        private class ProcessInfo
+        // Internal class used for JSON deserialization.
+        private class ProcessData
         {
             public string Name { get; set; } = "";
             public int Pid { get; set; }
