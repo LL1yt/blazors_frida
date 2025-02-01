@@ -29,10 +29,10 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     if (string.IsNullOrEmpty(pythonHome))
                     {
                         _logger.LogWarning("PYTHONHOME environment variable not set");
-                        pythonHome = @"C:\Python313"; // Default Python 3.11 installation path
+                        pythonHome = @"C:\Users\n0n4a\AppData\Local\Programs\Python\Python313"; // Default Python 3.13 installation path
                     }
                     
-                    Runtime.PythonDLL = Path.Combine(pythonHome, "python311.dll");
+                    Runtime.PythonDLL = Path.Combine(pythonHome, "python313.dll");
                     _logger.LogInformation($"Using Python DLL: {Runtime.PythonDLL}");
                     
                     if (!File.Exists(Runtime.PythonDLL))
