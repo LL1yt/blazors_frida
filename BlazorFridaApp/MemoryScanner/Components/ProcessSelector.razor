@@ -3,18 +3,19 @@
 @using Radzen.Blazor
 
 <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
-    <RadzenDropDown @bind-Value="@SelectedProcessId"
+    <RadzenDropDown TValue="int?"
+                   @bind-Value="@SelectedProcessId"
                    Data="@ProcessList"
                    TextProperty="ProcessName"
                    ValueProperty="Id"
                    Placeholder="Select process"
-                   Change="@OnProcessSelected"
+                   Change="@(args => OnProcessSelected.InvokeAsync())"
                    AllowClear="true"
                    AllowFiltering="true"
                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                    Style="width: 80%"/>
     <RadzenButton Icon="refresh"
-                 Click="@OnRefreshClick"
+                 Click="@(() => OnRefreshClick.InvokeAsync())"
                  ButtonStyle="ButtonStyle.Light"
                  Title="Refresh process list"/>
 </RadzenStack>
