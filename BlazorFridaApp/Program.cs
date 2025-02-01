@@ -44,9 +44,11 @@ try
         options.UseSqlite("Data Source=gamememory.db"));
 
     // Add memory scanner services
-    builder.Services.AddScoped<IProcessService, FridaProcessService>(); // Changed to FridaProcessService
-    builder.Services.AddScoped<IMemoryReaderService, FridaMemoryService>(); // Using FridaMemoryService
-    builder.Services.AddScoped<IMemoryScannerService, FridaMemoryScannerService>(); // Add memory scanner service
+    builder.Services.AddSingleton<IPythonRuntimeService, PythonRuntimeService>(); // Python runtime singleton
+    builder.Services.AddScoped<IFridaInteropService, FridaInteropService>(); // Frida interop service
+    builder.Services.AddScoped<IProcessService, FridaProcessService>();
+    builder.Services.AddScoped<IMemoryReaderService, FridaMemoryService>();
+    builder.Services.AddScoped<IMemoryScannerService, FridaMemoryScannerService>();
     builder.Services.AddScoped<IValueFreezerService, ValueFreezerService>();
     builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
 

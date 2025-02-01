@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
-using Python.Runtime;
 using Microsoft.Extensions.Logging;
 
 namespace BlazorFridaApp.MemoryScanner.Services
@@ -8,75 +7,39 @@ namespace BlazorFridaApp.MemoryScanner.Services
     public class FridaMemoryService : IMemoryReaderService
     {
         private readonly ILogger<FridaMemoryService> _logger;
-        private dynamic? _fridaScanner;
+        private readonly IFridaInteropService _fridaInterop;
         private bool _disposed;
         private string _processName = string.Empty;
 
         public nint ProcessHandle { get; private set; }
 
-        public FridaMemoryService(ILogger<FridaMemoryService> logger)
+        public FridaMemoryService(
+            ILogger<FridaMemoryService> logger,
+            IFridaInteropService fridaInterop)
         {
             _logger = logger;
-            InitializePython();
-        }
-
-        private void InitializePython()
-        {
-            try
-            {
-                // Initialize Python runtime
-                if (!PythonEngine.IsInitialized)
-                {
-                    Runtime.PythonDLL = @"python313.dll"; // Make sure this matches your Python version
-                    PythonEngine.Initialize();
-                }
-
-                using (Py.GIL())
-                {
-                    // Import our Frida script
-                    dynamic sys = Py.Import("sys");
-                    string scriptPath = Path.GetDirectoryName(typeof(FridaMemoryService).Assembly.Location)!;
-                    sys.path.append(scriptPath);
-
-                    dynamic fridaModule = Py.Import("frida_module");
-                    _fridaScanner = fridaModule.FridaMemoryScanner();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to initialize Python runtime");
-                throw;
-            }
+            _fridaInterop = fridaInterop;
+            _fridaInterop.Initialize();
         }
 
         public void OpenProcess(int processId)
         {
             try
             {
-                using (Py.GIL())
+                var process = System.Diagnostics.Process.GetProcessById(processId);
+                _processName = process.ProcessName;
+
+                if (!_fridaInterop.AttachToProcess(_processName))
                 {
-                    // Get process name from ID
-                    var process = System.Diagnostics.Process.GetProcessById(processId);
-                    _processName = process.ProcessName;
-
-                    // Attach to process using Frida
-                    if (_fridaScanner == null)
-                        throw new InvalidOperationException("Frida scanner not initialized");
-                        
-                    bool success = _fridaScanner.attach_to_process(_processName);
-                    if (!success)
-                    {
-                        throw new Exception($"Failed to attach to process {_processName}");
-                    }
-
-                    // Store process handle (just for compatibility, not actually used)
-                    ProcessHandle = process.Handle;
+                    throw new MemoryOperationException($"Failed to attach to process {_processName}");
                 }
+
+                ProcessHandle = process.Handle;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not MemoryOperationException)
             {
                 _logger.LogError(ex, $"Failed to open process {processId}");
-                throw;
+                throw new MemoryOperationException($"Failed to open process {processId}", ex);
             }
         }
 
@@ -84,25 +47,17 @@ namespace BlazorFridaApp.MemoryScanner.Services
         {
             try
             {
-                using (Py.GIL())
+                var result = _fridaInterop.ReadMemory(address.ToString(), length);
+                if (result == null)
                 {
-                    if (_fridaScanner == null)
-                        throw new InvalidOperationException("Frida scanner not initialized");
-                        
-                    var result = _fridaScanner.read_memory(address.ToString(), length);
-                    if (result == null)
-                    {
-                        throw new Exception($"Failed to read memory at address {address}");
-                    }
-
-                    // Convert Python list to byte array
-                    return result.As<byte[]>();
+                    throw new MemoryOperationException($"Failed to read memory at address {address}");
                 }
+                return result;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not MemoryOperationException)
             {
                 _logger.LogError(ex, $"Failed to read memory at address {address}");
-                throw;
+                throw new MemoryOperationException($"Failed to read memory at address {address}", ex);
             }
         }
 
@@ -110,22 +65,15 @@ namespace BlazorFridaApp.MemoryScanner.Services
         {
             try
             {
-                using (Py.GIL())
+                if (!_fridaInterop.WriteMemory(address.ToString(), value))
                 {
-                    if (_fridaScanner == null)
-                        throw new InvalidOperationException("Frida scanner not initialized");
-
-                    bool success = _fridaScanner.write_memory(address.ToString(), value);
-                    if (!success)
-                    {
-                        throw new Exception($"Failed to write memory at address {address}");
-                    }
+                    throw new MemoryOperationException($"Failed to write memory at address {address}");
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not MemoryOperationException)
             {
                 _logger.LogError(ex, $"Failed to write memory at address {address}");
-                throw;
+                throw new MemoryOperationException($"Failed to write memory at address {address}", ex);
             }
         }
 
@@ -135,20 +83,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             {
                 if (disposing)
                 {
-                    try
-                    {
-                        using (Py.GIL())
-                        {
-                            if (_fridaScanner != null)
-                            {
-                                _fridaScanner.detach();
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error during Frida cleanup");
-                    }
+                    _fridaInterop.Dispose();
                 }
                 _disposed = true;
             }
@@ -164,5 +99,11 @@ namespace BlazorFridaApp.MemoryScanner.Services
         {
             Dispose(false);
         }
+    }
+
+    public class MemoryOperationException : Exception
+    {
+        public MemoryOperationException(string message) : base(message) { }
+        public MemoryOperationException(string message, Exception innerException) : base(message, innerException) { }
     }
 }
