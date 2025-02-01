@@ -12,7 +12,12 @@ namespace BlazorFridaApp.MemoryScanner.Services
         public async Task<Process> GetTargetProcessAsync()
         {
             // For demonstration purposes, return the first accessible process.
-            return await Task.FromResult(GetAccessibleProcesses().FirstOrDefault());
+            var target = GetAccessibleProcesses().FirstOrDefault();
+            if (target == null)
+            {
+                throw new InvalidOperationException("No accessible process found.");
+            }
+            return await Task.FromResult(target);
         }
 
         public IEnumerable<Process> GetAccessibleProcesses()
@@ -21,7 +26,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             {
                 return Process.GetProcesses();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Log the exception as needed.
                 return new List<Process>();

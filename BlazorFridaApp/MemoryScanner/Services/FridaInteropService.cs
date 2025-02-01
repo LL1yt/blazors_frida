@@ -49,7 +49,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
         public bool AttachToProcess(string processName)
         {
             EnsureInitialized();
-            return _pythonRuntime.ExecuteWithGIL(() => _fridaScanner.attach_to_process(processName));
+            return _pythonRuntime.ExecuteWithGIL(() => _fridaScanner!.attach_to_process(processName));
         }
 
         public byte[]? ReadMemory(string address, int length)
@@ -57,7 +57,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             EnsureInitialized();
             return _pythonRuntime.ExecuteWithGIL(() =>
             {
-                var result = _fridaScanner.read_memory(address, length);
+                var result = _fridaScanner!.read_memory(address, length);
                 return result?.As<byte[]>();
             });
         }
@@ -65,7 +65,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
         public bool WriteMemory(string address, byte[] value)
         {
             EnsureInitialized();
-            return _pythonRuntime.ExecuteWithGIL(() => _fridaScanner.write_memory(address, value));
+            return _pythonRuntime.ExecuteWithGIL(() => _fridaScanner!.write_memory(address, value));
         }
 
         public void Detach()
