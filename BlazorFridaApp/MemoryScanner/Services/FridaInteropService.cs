@@ -38,9 +38,16 @@ namespace BlazorFridaApp.MemoryScanner.Services
             {
                 _fridaScanner = _pythonRuntime.ExecuteWithGIL(() =>
                 {
+                    LoggerExtensions.LogInformation(_logger, "Starting Python initialization");
+                    
                     dynamic sys = Py.Import("sys");
+                    LoggerExtensions.LogDebug(_logger, "Successfully imported sys module");
+                    
                     string assemblyPath = Path.GetDirectoryName(typeof(FridaInteropService).Assembly.Location)!;
                     string nativePath = Path.Combine(assemblyPath, "MemoryScanner", "Native");
+                    
+                    LoggerExtensions.LogDebug(_logger, "Assembly path: {Path}", assemblyPath);
+                    LoggerExtensions.LogDebug(_logger, "Native modules path: {Path}", nativePath);
                     
                     if (!Directory.Exists(nativePath))
                     {
@@ -48,23 +55,42 @@ namespace BlazorFridaApp.MemoryScanner.Services
                         throw new FridaInteropException($"Python modules directory not found: {nativePath}");
                     }
                     
-                    LoggerExtensions.LogInformation(_logger, "Adding Python module path: {Path}", nativePath);
+                    // Check if required Python files exist
+                    var requiredFiles = new[] { "frida_module.py", "scanner.py", "reader.py", "writer.py" };
+                    foreach (var file in requiredFiles)
+                    {
+                        var filePath = Path.Combine(nativePath, file);
+                        if (!File.Exists(filePath))
+                        {
+                            LoggerExtensions.LogError(_logger, "Required Python file not found: {File}", filePath);
+                            throw new FridaInteropException($"Required Python file not found: {filePath}");
+                        }
+                        LoggerExtensions.LogDebug(_logger, "Found required file: {File}", filePath);
+                    }
                     
-                    // Set the Python path directly
+                    LoggerExtensions.LogInformation(_logger, "Adding Python module path: {Path}", nativePath);
                     sys.path.insert(0, nativePath);
 
-                    // Log the current Python path for debugging
+                    // Log Python environment details
+                    LoggerExtensions.LogDebug(_logger, "Python version: {Version}", sys.version);
+                    LoggerExtensions.LogDebug(_logger, "Python executable: {Executable}", sys.executable);
                     LoggerExtensions.LogInformation(_logger, "Python sys.path: {Path}", string.Join(", ", sys.path.ToString()));
 
                     dynamic fridaModule;
                     try
                     {
+                        LoggerExtensions.LogDebug(_logger, "Attempting to import frida_module");
                         fridaModule = Py.Import("frida_module");
                         LoggerExtensions.LogInformation(_logger, "Successfully imported frida_module");
+                        
+                        // Verify frida_module attributes
+                        var attributes = fridaModule.GetAttr("__dict__").Keys();
+                        LoggerExtensions.LogDebug(_logger, "frida_module attributes: {Attributes}", string.Join(", ", attributes));
                     }
                     catch (PythonException pex)
                     {
                         LoggerExtensions.LogError(_logger, pex, "Failed to import frida_module. Python Error: {Message}", pex.Message);
+                        LoggerExtensions.LogDebug(_logger, "Python traceback: {Traceback}", pex.StackTrace);
                         throw new FridaInteropException($"Failed to import frida_module: {pex.Message}", pex);
                     }
                     return fridaModule.FridaMemoryScanner();

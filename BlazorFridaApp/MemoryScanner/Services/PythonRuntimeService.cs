@@ -31,16 +31,64 @@ namespace BlazorFridaApp.MemoryScanner.Services
 
                 try
                 {
+                    LoggerExtensions.LogInformation(_logger, "Starting Python runtime initialization");
+                    
                     if (!PythonEngine.IsInitialized)
                     {
-                        Runtime.PythonDLL = @"python313.dll";
+                        LoggerExtensions.LogDebug(_logger, "Python runtime not initialized, starting initialization");
+                        
+                        // Log Python DLL path
+                        var pythonDll = @"python313.dll";
+                        LoggerExtensions.LogDebug(_logger, "Using Python DLL: {DllPath}", pythonDll);
+                        Runtime.PythonDLL = pythonDll;
+                        
+                        // Check if DLL exists
+                        var dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, pythonDll);
+                        if (!File.Exists(dllPath))
+                        {
+                            LoggerExtensions.LogWarning(_logger, "Python DLL not found in application directory: {Path}", dllPath);
+                            // Log system PATH for debugging
+                            LoggerExtensions.LogDebug(_logger, "System PATH: {Path}", Environment.GetEnvironmentVariable("PATH"));
+                        }
+                        else
+                        {
+                            LoggerExtensions.LogDebug(_logger, "Python DLL found: {Path}", dllPath);
+                        }
+                        
+                        LoggerExtensions.LogDebug(_logger, "Initializing Python engine");
                         PythonEngine.Initialize();
+                        LoggerExtensions.LogInformation(_logger, "Python engine initialized successfully");
+                        
+                        // Log Python version and platform info
+                        using (Py.GIL())
+                        {
+                            try
+                            {
+                                dynamic sys = Py.Import("sys");
+                                LoggerExtensions.LogInformation(_logger, "Python version: {Version}", sys.version);
+                                LoggerExtensions.LogDebug(_logger, "Python platform: {Platform}", sys.platform);
+                            }
+                            catch (Exception ex)
+                            {
+                                LoggerExtensions.LogWarning(_logger, ex, "Failed to get Python version info");
+                            }
+                        }
                     }
+                    else
+                    {
+                        LoggerExtensions.LogDebug(_logger, "Python runtime already initialized");
+                    }
+                    
                     _isInitialized = true;
+                    LoggerExtensions.LogInformation(_logger, "Python runtime initialization completed");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to initialize Python runtime");
+                    LoggerExtensions.LogError(_logger, ex, "Failed to initialize Python runtime");
+                    if (ex is DllNotFoundException dllEx)
+                    {
+                        LoggerExtensions.LogError(_logger, "Python DLL not found: {Message}", dllEx.Message);
+                    }
                     throw new PythonRuntimeException("Failed to initialize Python runtime", ex);
                 }
             }
@@ -74,7 +122,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error shutting down Python runtime");
+                    LoggerExtensions.LogError(_logger, ex, "Error shutting down Python runtime");
                 }
             }
         }
