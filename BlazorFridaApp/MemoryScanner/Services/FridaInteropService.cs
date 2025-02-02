@@ -84,7 +84,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                         LoggerExtensions.LogInformation(_logger, "Successfully imported frida_module");
                         
                         // Verify frida_module attributes
-                        var attributes = fridaModule.GetAttr("__dict__").Keys();
+                        var attributes = fridaModule.GetAttr("__dict__").keys();
                         LoggerExtensions.LogDebug(_logger, "frida_module attributes: {Attributes}", string.Join(", ", attributes));
                     }
                     catch (PythonException pex)
