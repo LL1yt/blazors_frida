@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using BlazorFridaApp.MemoryScanner.Base;
+using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 
@@ -19,7 +19,7 @@ namespace BlazorFridaApp.MemoryScanner.Operations
             _profileService = profileService;
         }
 
-        public List<Process> GetProcesses()
+        public List<ProcessInfo> GetProcesses()
         {
             return ExecuteWithLogging(
                 () => Task.FromResult(_processService.GetAccessibleProcesses().ToList()),

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using System.Diagnostics;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 
@@ -17,7 +16,7 @@ namespace BlazorFridaApp.MemoryScanner.Services.Extensions
 
     public static class MemoryScannerServiceExtensions
     {
-        public static async Task<IEnumerable<string>> ScanAsync(this IMemoryScannerService service, Process process, string searchPattern, int scanType, ScanProfile profile)
+        public static async Task<IEnumerable<string>> ScanAsync(this IMemoryScannerService service, ProcessInfo process, string searchPattern, int scanType, ScanProfile profile)
         {
             // Dummy implementation; replace with actual scanning logic.
             return await Task.FromResult(new List<string>());

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using BlazorFridaApp.MemoryScanner.Base;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Operations;
@@ -24,25 +23,25 @@ namespace BlazorFridaApp.MemoryScanner
             ILoggerFactory loggerFactory)
         {
             _processOps = new ProcessOperations(
-                processService, 
-                profileService, 
+                processService,
+                profileService,
                 loggerFactory.CreateLogger<ProcessOperations>());
                 
             _scanOps = new MemoryScanOperations(
-                scanner, 
-                profileService, 
+                scanner,
+                profileService,
                 loggerFactory.CreateLogger<MemoryScanOperations>());
                 
             _memoryOps = new MemoryAccessOperations(
-                memoryReader, 
+                memoryReader,
                 loggerFactory.CreateLogger<MemoryAccessOperations>());
                 
             _freezeOps = new ValueFreezeOperations(
-                freezer, 
+                freezer,
                 loggerFactory.CreateLogger<ValueFreezeOperations>());
         }
 
-        public List<Process> GetProcesses() => _processOps.GetProcesses();
+        public List<ProcessInfo> GetProcesses() => _processOps.GetProcesses();
 
         public Task<List<nint>> ScanForPattern(int processId, byte[] pattern, string mask) =>
             _scanOps.ScanForPattern(processId, pattern, mask);
