@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Radzen;
+using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.MemoryScanner.Components
 {
@@ -7,7 +8,7 @@ namespace BlazorFridaApp.MemoryScanner.Components
     {
         [Inject] protected ILogger<MemoryScannerComponentBase> Logger { get; set; } = null!;
         [Inject] protected INotificationService NotificationService { get; set; } = null!;
-        [Inject] protected ProcessMemoryScanner Scanner { get; set; } = null!;
+        [Inject] protected IProcessMemoryScanner Scanner { get; set; } = null!;
 
         protected virtual void OnInitializedBase()
         {

@@ -32,10 +32,32 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 _fridaScanner = _pythonRuntime.ExecuteWithGIL(() =>
                 {
                     dynamic sys = Py.Import("sys");
-                    string scriptPath = Path.GetDirectoryName(typeof(FridaInteropService).Assembly.Location)!;
-                    sys.path.append(scriptPath);
+                    string assemblyPath = Path.GetDirectoryName(typeof(FridaInteropService).Assembly.Location)!;
+                    string nativePath = Path.Combine(assemblyPath, "MemoryScanner", "Native");
+                    
+                    if (!Directory.Exists(nativePath))
+                    {
+                        _logger.LogError($"Python modules directory not found: {nativePath}");
+                        throw new FridaInteropException($"Python modules directory not found: {nativePath}");
+                    }
+                    
+                    _logger.LogInformation($"Adding Python module path: {nativePath}");
+                    sys.path.append(nativePath);
 
-                    dynamic fridaModule = Py.Import("frida_module");
+                    // Log the current Python path for debugging
+                    _logger.LogInformation($"Python sys.path: {string.Join(", ", sys.path.ToString())}");
+
+                    dynamic fridaModule;
+                    try
+                    {
+                        fridaModule = Py.Import("frida_module");
+                        _logger.LogInformation("Successfully imported frida_module");
+                    }
+                    catch (PythonException pex)
+                    {
+                        _logger.LogError(pex, "Failed to import frida_module. Python Error: {0}", pex.Message);
+                        throw new FridaInteropException($"Failed to import frida_module: {pex.Message}", pex);
+                    }
                     return fridaModule.FridaMemoryScanner();
                 });
             }

@@ -1,4 +1,4 @@
-from .executor import execute_script
+from executor import execute_script
 
 READ_SCRIPT = """
 rpc.exports = {
