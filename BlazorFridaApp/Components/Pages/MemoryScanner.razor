@@ -6,9 +6,10 @@
 @inject IProcessService ProcessService
 @inject IScanProfileService ProfileService
 @inject DialogService DialogService
-@inject ILogger<MemoryScanner> Logger
-
 @code {
+    [Inject]
+    private new ILogger<MemoryScanner> Logger { get; set; } = default!;
+
     protected override async Task OnInitializedAsync()
     {
         Logger.LogInformation("Initializing MemoryScanner component");

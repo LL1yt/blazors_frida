@@ -47,11 +47,6 @@ try
     // Add notification service
     builder.Services.AddScoped<INotificationService, AppNotificationService>();
 
-    // Configure ProcessInfo logger
-    var processInfoLogger = builder.Services.BuildServiceProvider()
-        .GetRequiredService<ILogger<ProcessInfo>>();
-    ProcessInfo.ConfigureLogger(processInfoLogger);
-
     // Add memory scanner services
     builder.Services.AddSingleton<IPythonRuntimeService, PythonRuntimeService>(); // Python runtime singleton
     builder.Services.AddScoped<IFridaInteropService, FridaInteropService>(); // Frida interop service
@@ -73,6 +68,13 @@ try
             sqliteOptions => sqliteOptions.MigrationsAssembly("BlazorFridaApp")));
     builder.Services.AddScoped<IDatabaseInitializationService, DatabaseInitializationService>();
 var app = builder.Build();
+
+// Configure ProcessInfo logger
+using (var scope = app.Services.CreateScope())
+{
+    var processInfoLogger = scope.ServiceProvider.GetRequiredService<ILogger<ProcessInfo>>();
+    ProcessInfo.ConfigureLogger(processInfoLogger);
+}
 
 // Initialize database
 await using (var scope = app.Services.CreateAsyncScope())
