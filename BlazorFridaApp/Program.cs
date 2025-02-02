@@ -62,19 +62,20 @@ try
     // Add the MemoryScanner page service
     builder.Services.AddScoped<MemoryScannerService>();
 
-    // Add database context
+    // Add database context and initialization service
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite("Data Source=gamememory.db"));
+    builder.Services.AddScoped<IDatabaseInitializationService, DatabaseInitializationService>();
+var app = builder.Build();
 
-    var app = builder.Build();
+// Initialize database
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var dbInitService = scope.ServiceProvider.GetRequiredService<IDatabaseInitializationService>();
+    await dbInitService.InitializeDatabaseAsync().ConfigureAwait(false);
+}
 
-    // Ensure database is created and migrations are applied
-    using (var scope = app.Services.CreateScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        dbContext.Database.Migrate();
-    }
-
+// Configure the HTTP request pipeline.
     // Configure the HTTP request pipeline.
     if (!app.Environment.IsDevelopment())
     {
