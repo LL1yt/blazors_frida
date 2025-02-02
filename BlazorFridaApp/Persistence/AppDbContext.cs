@@ -17,6 +17,9 @@ namespace BlazorFridaApp.Persistence
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            
+            // Enable SQLite foreign key support
+            modelBuilder.HasAnnotation("Sqlite:Pragma", "foreign_keys=ON");
 
             modelBuilder.Entity<ApplicationSetting>(entity =>
             {
