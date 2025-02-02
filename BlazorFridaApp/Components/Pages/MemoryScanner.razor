@@ -25,7 +25,8 @@
                     ProcessList="@_state.ProcessList"
                     SelectedProcessId="@_state.SelectedProcessId"
                     OnProcessSelected="@OnProcessSelected"
-                    OnRefreshClick="@RefreshProcessList" />
+                    OnRefreshClick="@RefreshProcessList"
+                    IsLoading="@_state.IsLoading" />
             </RadzenCard>
 
             <RadzenCard class="scan-options-card">
@@ -132,15 +133,20 @@
 @code {
     private MemoryScannerState _state = new();
 
-    protected override async Task OnInitializedAsync()
-    {
-        await RefreshProcessList();
-    }
-
     private async Task RefreshProcessList()
     {
-        await ScannerService.RefreshProcessList(_state);
+        _state.IsLoading = true;
         StateHasChanged();
+        
+        try
+        {
+            await ScannerService.RefreshProcessList(_state);
+        }
+        finally
+        {
+            _state.IsLoading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task OnProcessSelected()

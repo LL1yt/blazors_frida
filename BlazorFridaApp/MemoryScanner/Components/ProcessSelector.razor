@@ -2,29 +2,38 @@
 @using Radzen
 @using Radzen.Blazor
 
-<RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
-    <RadzenDropDown TValue="int?"
-                    @bind-Value="@SelectedProcessId"
-                    Data="@ProcessList"
-                    ValueProperty="Id"
-                    TextTemplate="@ProcessTemplate"
-                    Placeholder="Select process"
-                    Change="@(args => OnProcessSelected.InvokeAsync())"
-                    AllowClear="true"
-                    AllowFiltering="true"
-                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                    Style="width: 80%"/>
-    <RadzenButton Icon="refresh"
-                  Click="@(() => OnRefreshClick.InvokeAsync())"
-                  ButtonStyle="ButtonStyle.Light"
-                  Title="Refresh process list"/>
-</RadzenStack>
+<div>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
+        <RadzenDropDown TValue="int?"
+                        @bind-Value="@SelectedProcessId"
+                        Data="@ProcessList"
+                        ValueProperty="Id"
+                        TextTemplate="@ProcessTemplate"
+                        Placeholder="Select process"
+                        Change="@(args => OnProcessSelected.InvokeAsync())"
+                        AllowClear="true"
+                        AllowFiltering="true"
+                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                        Style="width: 80%"/>
+        <RadzenButton Icon="refresh"
+                      Click="@(() => OnRefreshClick.InvokeAsync())"
+                      ButtonStyle="ButtonStyle.Light"
+                      Title="Scan processes"
+                      Text="Scan"
+                      Disabled="@IsLoading"/>
+    </RadzenStack>
+    @if (IsLoading)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="mt-2"/>
+    }
+</div>
 
 @code {
     [Parameter] public required List<Process> ProcessList { get; set; }
     [Parameter] public int? SelectedProcessId { get; set; }
     [Parameter] public EventCallback OnProcessSelected { get; set; }
     [Parameter] public EventCallback OnRefreshClick { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
 
     private RenderFragment<dynamic> ProcessTemplate => (context) => builder =>
     {
