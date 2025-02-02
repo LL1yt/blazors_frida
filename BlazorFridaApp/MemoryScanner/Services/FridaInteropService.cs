@@ -39,25 +39,25 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     
                     if (!Directory.Exists(nativePath))
                     {
-                        _logger.LogError($"Python modules directory not found: {nativePath}");
+                        LoggerExtensions.LogError(_logger, "Python modules directory not found: {Path}", nativePath);
                         throw new FridaInteropException($"Python modules directory not found: {nativePath}");
                     }
                     
-                    _logger.LogInformation($"Adding Python module path: {nativePath}");
+                    LoggerExtensions.LogInformation(_logger, "Adding Python module path: {Path}", nativePath);
                     sys.path.append(nativePath);
 
                     // Log the current Python path for debugging
-                    _logger.LogInformation($"Python sys.path: {string.Join(", ", sys.path.ToString())}");
+                    LoggerExtensions.LogInformation(_logger, "Python sys.path: {Path}", string.Join(", ", sys.path.ToString()));
 
                     dynamic fridaModule;
                     try
                     {
                         fridaModule = Py.Import("frida_module");
-                        _logger.LogInformation("Successfully imported frida_module");
+                        LoggerExtensions.LogInformation(_logger, "Successfully imported frida_module");
                     }
                     catch (PythonException pex)
                     {
-                        _logger.LogError(pex, "Failed to import frida_module. Python Error: {0}", pex.Message);
+                        LoggerExtensions.LogError(_logger, pex, "Failed to import frida_module. Python Error: {Message}", pex.Message);
                         throw new FridaInteropException($"Failed to import frida_module: {pex.Message}", pex);
                     }
                     return fridaModule.FridaMemoryScanner();
@@ -65,7 +65,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to initialize Frida scanner");
+                LoggerExtensions.LogError(_logger, ex, "Failed to initialize Frida scanner");
                 throw new FridaInteropException("Failed to initialize Frida scanner", ex);
             }
         }
@@ -75,7 +75,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             var sw = Stopwatch.StartNew();
             try
             {
-                _logger.LogInformation("Attempting to attach to process: {ProcessName}", processName);
+                LoggerExtensions.LogInformation(_logger, "Attempting to attach to process: {ProcessName}", processName);
                 EnsureInitialized();
                 
                 var result = _pythonRuntime.ExecuteWithGIL(() =>
@@ -86,13 +86,13 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     }
                     catch (PythonException pex)
                     {
-                        _logger.LogError(pex, "Python error while attaching to process: {Message}", pex.Message);
+                        LoggerExtensions.LogError(_logger, pex, "Python error while attaching to process: {Message}", pex.Message);
                         throw new FridaInteropException($"Failed to attach to process: {pex.Message}", pex);
                     }
                 });
 
                 sw.Stop();
-                _logger.LogInformation(
+                LoggerExtensions.LogInformation(_logger,
                     "Process attachment {Status} for {ProcessName} in {Duration}ms",
                     result ? "succeeded" : "failed", processName, sw.ElapsedMilliseconds);
                 
@@ -101,7 +101,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             catch (Exception ex) when (ex is not FridaInteropException)
             {
                 sw.Stop();
-                _logger.LogError(ex,
+                LoggerExtensions.LogError(_logger, ex,
                     "Unexpected error attaching to process {ProcessName}. Duration: {Duration}ms",
                     processName, sw.ElapsedMilliseconds);
                 throw;
@@ -133,13 +133,13 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 sw.Stop();
                 if (result != null)
                 {
-                    _logger.LogInformation(
+                    LoggerExtensions.LogInformation(_logger,
                         "Successfully read {ByteCount} bytes from {Address} in {Duration}ms",
                         result.Length, address, sw.ElapsedMilliseconds);
                 }
                 else
                 {
-                    _logger.LogWarning(
+                    LoggerExtensions.LogWarning(_logger,
                         "No data read from address {Address} in {Duration}ms",
                         address, sw.ElapsedMilliseconds);
                 }
@@ -149,7 +149,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             catch (Exception ex) when (ex is not FridaInteropException)
             {
                 sw.Stop();
-                _logger.LogError(ex,
+                LoggerExtensions.LogError(_logger, ex,
                     "Unexpected error reading memory at {Address}. Duration: {Duration}ms",
                     address, sw.ElapsedMilliseconds);
                 throw;
@@ -161,7 +161,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             var sw = Stopwatch.StartNew();
             try
             {
-                _logger.LogDebug("Writing {ByteCount} bytes to address {Address}", value.Length, address);
+                LoggerExtensions.LogDebug(_logger, "Writing {ByteCount} bytes to address {Address}", value.Length, address);
                 EnsureInitialized();
                 
                 var result = _pythonRuntime.ExecuteWithGIL(() =>
@@ -172,13 +172,13 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     }
                     catch (PythonException pex)
                     {
-                        _logger.LogError(pex, "Python error while writing memory: {Message}", pex.Message);
+                        LoggerExtensions.LogError(_logger, pex, "Python error while writing memory: {Message}", pex.Message);
                         throw new FridaInteropException($"Failed to write memory: {pex.Message}", pex);
                     }
                 });
 
                 sw.Stop();
-                _logger.LogInformation(
+                LoggerExtensions.LogInformation(_logger,
                     "Memory write {Status} at {Address} in {Duration}ms",
                     result ? "succeeded" : "failed", address, sw.ElapsedMilliseconds);
                 
@@ -187,7 +187,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             catch (Exception ex) when (ex is not FridaInteropException)
             {
                 sw.Stop();
-                _logger.LogError(ex,
+                LoggerExtensions.LogError(_logger, ex,
                     "Unexpected error writing memory at {Address}. Duration: {Duration}ms",
                     address, sw.ElapsedMilliseconds);
                 throw;
@@ -220,7 +220,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error during Frida cleanup");
+                    LoggerExtensions.LogError(_logger, ex, "Error during Frida cleanup");
                 }
                 
                 _disposed = true;
