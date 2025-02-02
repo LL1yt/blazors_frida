@@ -25,12 +25,13 @@
         }
     }
 
+    // Process scanning should only be initiated by user action through the Scan button
+    // to prevent unnecessary system resource usage and provide better user control
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            Logger.LogInformation("MemoryScanner first render, refreshing process list");
-            await RefreshProcessList();
+            Logger.LogInformation("MemoryScanner component rendered for the first time");
         }
     }
 }

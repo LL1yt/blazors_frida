@@ -3,6 +3,11 @@
 @using BlazorFridaApp.MemoryScanner.Models
 @inject ILogger<ProcessSelector> Logger
 
+@*
+    IMPORTANT: Process scanning is only initiated by clicking the Scan button.
+    This component is designed to display processes after manual scan initiation,
+    not to automatically scan on page load or component initialization.
+*@
 <div>
 @code {
     protected override void OnInitialized()
