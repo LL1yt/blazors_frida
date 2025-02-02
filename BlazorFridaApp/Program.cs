@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Radzen;
 using Serilog;
 using Serilog.Events;
+using BlazorFridaApp.MemoryScanner.Base;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -56,7 +57,7 @@ try
     builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
 
     // Add the main ProcessMemoryScanner that orchestrates all services
-    builder.Services.AddScoped<ProcessMemoryScanner>();
+    builder.Services.AddScoped<IProcessMemoryScanner, ProcessMemoryScanner>();
 
     // Add the MemoryScanner page service
     builder.Services.AddScoped<MemoryScannerService>();
