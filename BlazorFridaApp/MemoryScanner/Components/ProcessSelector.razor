@@ -29,7 +29,6 @@
                         @bind-Value="@SelectedProcessId"
                         Data="@ProcessList"
                         ValueProperty="Id"
-                        TextProperty="Name"
                         TextTemplate="@ProcessTemplate"
                         Placeholder="Select process"
                         Change="@(args => HandleProcessSelected())"
