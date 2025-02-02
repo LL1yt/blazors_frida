@@ -64,7 +64,8 @@ try
 
     // Add database context and initialization service
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite("Data Source=gamememory.db"));
+        options.UseSqlite("Data Source=gamememory.db",
+            sqliteOptions => sqliteOptions.MigrationsAssembly("BlazorFridaApp")));
     builder.Services.AddScoped<IDatabaseInitializationService, DatabaseInitializationService>();
 var app = builder.Build();
 
