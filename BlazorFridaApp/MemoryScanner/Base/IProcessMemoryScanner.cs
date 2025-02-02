@@ -3,7 +3,7 @@ using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.MemoryScanner.Base
 {
-    public interface IProcessMemoryScanner : IDisposable
+    public interface IProcessMemoryScanner : IAsyncDisposable
     {
         List<Process> GetProcesses();
         Task<List<nint>> ScanForPattern(int processId, byte[] pattern, string mask);

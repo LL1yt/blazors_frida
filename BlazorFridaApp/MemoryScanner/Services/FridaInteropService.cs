@@ -3,7 +3,7 @@ using Python.Runtime;
 
 namespace BlazorFridaApp.MemoryScanner.Services
 {
-    public interface IFridaInteropService : IDisposable
+    public interface IFridaInteropService : IAsyncDisposable
     {
         void Initialize();
         bool AttachToProcess(string processName);
@@ -12,7 +12,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
         void Detach();
     }
 
-    public class FridaInteropService : IFridaInteropService, IDisposable
+    public class FridaInteropService : IFridaInteropService
     {
         private readonly ILogger<FridaInteropService> _logger;
         private readonly IPythonRuntimeService _pythonRuntime;
@@ -106,34 +106,22 @@ namespace BlazorFridaApp.MemoryScanner.Services
             }
         }
 
-        protected virtual void Dispose(bool disposing)
+        public async ValueTask DisposeAsync()
         {
             if (!_disposed)
             {
-                if (disposing)
+                try
                 {
-                    try
-                    {
-                        Detach();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error during Frida cleanup");
-                    }
+                    Detach();
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during Frida cleanup");
+                }
+                
                 _disposed = true;
+                GC.SuppressFinalize(this);
             }
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        ~FridaInteropService()
-        {
-            Dispose(false);
         }
     }
 

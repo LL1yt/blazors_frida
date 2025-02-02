@@ -34,7 +34,10 @@ namespace BlazorFridaApp.Components.Pages
             if (valueFreezer is IAsyncDisposable disposableFreezer)
             {
                 await disposableFreezer.DisposeAsync();
+                valueFreezer = null!;
             }
+
+            GC.SuppressFinalize(this);
         }
     }
 }

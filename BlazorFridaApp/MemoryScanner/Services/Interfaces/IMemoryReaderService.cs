@@ -1,6 +1,6 @@
 namespace BlazorFridaApp.MemoryScanner.Services.Interfaces
 {
-    public interface IMemoryReaderService : IMemoryScannerBaseService, IDisposable
+    public interface IMemoryReaderService : IMemoryScannerBaseService, IAsyncDisposable
     {
         nint ProcessHandle { get; }
         void OpenProcess(int processId);

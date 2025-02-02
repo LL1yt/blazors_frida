@@ -171,7 +171,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
             }
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
             if (!_disposed)
             {
@@ -181,6 +181,8 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 }
                 _freezeTimers.Clear();
                 _disposed = true;
+
+                GC.SuppressFinalize(this);
             }
         }
     }

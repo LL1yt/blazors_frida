@@ -71,13 +71,14 @@ namespace BlazorFridaApp.MemoryScanner
         public Task<int?> GetLastProcessId() =>
             _processOps.GetLastProcessId();
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
             if (!_disposed)
             {
-                _memoryOps.Dispose();
-                _freezeOps.Dispose();
+                await _memoryOps.DisposeAsync();
+                await _freezeOps.DisposeAsync();
                 _disposed = true;
+                GC.SuppressFinalize(this);
             }
         }
     }

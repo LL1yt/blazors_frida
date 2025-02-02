@@ -77,27 +77,14 @@ namespace BlazorFridaApp.MemoryScanner.Services
             }
         }
 
-        protected virtual void Dispose(bool disposing)
+        public async ValueTask DisposeAsync()
         {
             if (!_disposed)
             {
-                if (disposing)
-                {
-                    _fridaInterop.Dispose();
-                }
+                await _fridaInterop.DisposeAsync();
                 _disposed = true;
+                GC.SuppressFinalize(this);
             }
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        ~FridaMemoryService()
-        {
-            Dispose(false);
         }
     }
 

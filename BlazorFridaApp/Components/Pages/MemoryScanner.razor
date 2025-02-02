@@ -194,51 +194,43 @@
         valueFreezer.ToggleFreeze(address, GetCurrentValue(address));
 
     private bool IsFrozen(IntPtr address) => valueFreezer.IsFrozen(address);
-private async Task SaveConfig()
-{
-    try
+
+    private async Task SaveConfig()
     {
-        var config = _state.ToConfig();
-        var result = await DialogService.OpenAsync<SaveConfigDialog>("Save Configuration");
-        if (result is string configName && !string.IsNullOrEmpty(configName))
+        try
         {
-            await ProfileService.SaveScannerConfig(configName, config);
-            NotificationService.ShowSuccess("Success", "Configuration saved successfully");
+            var config = _state.ToConfig();
+            var result = await DialogService.OpenAsync<SaveConfigDialog>("Save Configuration");
+            if (result is string configName && !string.IsNullOrEmpty(configName))
+            {
+                await ProfileService.SaveScannerConfig(configName, config);
+                NotificationService.ShowSuccess("Success", "Configuration saved successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.ShowError("Error", "Failed to save configuration", ex);
         }
     }
-    catch (Exception ex)
-    {
-        NotificationService.ShowError("Error", "Failed to save configuration", ex);
-    }
-}
 
-private async Task LoadConfig()
-{
-    try
+    private async Task LoadConfig()
     {
-        var configs = await ProfileService.GetScannerConfigs();
-        var result = await DialogService.OpenAsync<LoadConfigDialog>("Load Configuration",
-            new Dictionary<string, object> { { "Configs", configs } });
-        
-        if (result is ScannerConfig config)
+        try
         {
-            _state.LoadConfig(config);
-            NotificationService.ShowSuccess("Success", "Configuration loaded successfully");
-            StateHasChanged();
+            var configs = await ProfileService.GetScannerConfigs();
+            var result = await DialogService.OpenAsync<LoadConfigDialog>("Load Configuration",
+                new Dictionary<string, object> { { "Configs", configs } });
+            
+            if (result is ScannerConfig config)
+            {
+                _state.LoadConfig(config);
+                NotificationService.ShowSuccess("Success", "Configuration loaded successfully");
+                StateHasChanged();
+            }
         }
-    }
-    catch (Exception ex)
-    {
-        NotificationService.ShowError("Error", "Failed to load configuration", ex);
-    }
-}
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (valueFreezer != null)
+        catch (Exception ex)
         {
-            await valueFreezer.DisposeAsync();
+            NotificationService.ShowError("Error", "Failed to load configuration", ex);
         }
     }
 }

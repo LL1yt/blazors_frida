@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlazorFridaApp.MemoryScanner.Operations
 {
-    public class ValueFreezeOperations : MemoryScannerBase, IDisposable
+    public class ValueFreezeOperations : MemoryScannerBase, IAsyncDisposable
     {
         private readonly IValueFreezerService _freezer;
         private bool _disposed;
@@ -32,12 +32,13 @@ namespace BlazorFridaApp.MemoryScanner.Operations
                 address);
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
             if (!_disposed)
             {
-                _freezer.Dispose();
+                await _freezer.DisposeAsync();
                 _disposed = true;
+                GC.SuppressFinalize(this);
             }
         }
     }
