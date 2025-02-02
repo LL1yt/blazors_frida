@@ -49,7 +49,7 @@ try
 
     // Add memory scanner services
     builder.Services.AddSingleton<IPythonRuntimeService, PythonRuntimeService>(); // Python runtime singleton
-    builder.Services.AddScoped<IFridaInteropService, FridaInteropService>(); // Frida interop service
+    builder.Services.AddSingleton<IFridaInteropService, FridaInteropService>(); // Frida interop service
     builder.Services.AddScoped<IProcessService, FridaProcessService>();
     builder.Services.AddScoped<IMemoryReaderService, FridaMemoryService>();
     builder.Services.AddScoped<IMemoryScannerService, FridaMemoryScannerService>();

@@ -29,6 +29,11 @@ namespace BlazorFridaApp.MemoryScanner.Services
 
         public void Initialize()
         {
+            if (_disposed)
+            {
+                _disposed = false;
+            }
+
             try
             {
                 _fridaScanner = _pythonRuntime.ExecuteWithGIL(() =>
@@ -44,6 +49,13 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     }
                     
                     LoggerExtensions.LogInformation(_logger, "Adding Python module path: {Path}", nativePath);
+                    
+                    // Clear existing path to avoid duplicates
+                    while (sys.path.count() > 0)
+                    {
+                        sys.path.pop();
+                    }
+                    
                     sys.path.append(nativePath);
 
                     // Log the current Python path for debugging
@@ -52,6 +64,11 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     dynamic fridaModule;
                     try
                     {
+                        // Force reload the module to ensure clean state
+                        if (sys.modules.contains("frida_module"))
+                        {
+                            sys.modules.pop("frida_module");
+                        }
                         fridaModule = Py.Import("frida_module");
                         LoggerExtensions.LogInformation(_logger, "Successfully imported frida_module");
                     }
@@ -216,7 +233,21 @@ namespace BlazorFridaApp.MemoryScanner.Services
             {
                 try
                 {
-                    Detach();
+                    if (_fridaScanner != null)
+                    {
+                        _pythonRuntime.ExecuteWithGIL(() =>
+                        {
+                            try
+                            {
+                                _fridaScanner.detach();
+                            }
+                            catch (PythonException pex)
+                            {
+                                LoggerExtensions.LogError(_logger, pex, "Python error during cleanup: {Message}", pex.Message);
+                            }
+                        });
+                        _fridaScanner = null;
+                    }
                 }
                 catch (Exception ex)
                 {
