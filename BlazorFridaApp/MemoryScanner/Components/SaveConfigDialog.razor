@@ -1,0 +1,25 @@
+@using Radzen
+@using Radzen.Blazor
+
+<div class="save-config-dialog">
+    <RadzenTextBox @bind-Value="@configName" 
+                  Placeholder="Enter configuration name"
+                  Style="width: 100%; margin-bottom: 1rem;" />
+    
+    <div class="d-flex justify-content-end gap-2">
+        <RadzenButton Text="Cancel" 
+                     Click="@(() => DialogService.Close())" 
+                     ButtonStyle="ButtonStyle.Light" />
+        <RadzenButton Text="Save" 
+                     Click="@(() => DialogService.Close(configName))" 
+                     ButtonStyle="ButtonStyle.Primary" 
+                     Disabled="@string.IsNullOrWhiteSpace(configName)" />
+    </div>
+</div>
+
+@code {
+    private string configName = "";
+
+    [Inject]
+    public required DialogService DialogService { get; set; }
+}

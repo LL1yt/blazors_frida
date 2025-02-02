@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text.Json;
 using BlazorFridaApp.MemoryScanner.Components;
 
 namespace BlazorFridaApp.Components.Pages
@@ -43,6 +44,44 @@ namespace BlazorFridaApp.Components.Pages
         {
             ScanResults = results;
             IsFirstScan = false;
+        }
+
+        public ScannerConfig ToConfig()
+        {
+            return new ScannerConfig
+            {
+                ScanType = SelectedScanType,
+                ValueType = SelectedValueType,
+                PatternHex = PatternHex,
+                Mask = Mask,
+                SearchValue = SearchValue
+            };
+        }
+
+        public void LoadConfig(ScannerConfig config)
+        {
+            SelectedScanType = config.ScanType;
+            SelectedValueType = config.ValueType;
+            PatternHex = config.PatternHex;
+            Mask = config.Mask;
+            SearchValue = config.SearchValue;
+            Reset();
+        }
+    }
+
+    public class ScannerConfig
+    {
+        public ScanType ScanType { get; set; }
+        public MemoryValueType ValueType { get; set; }
+        public string PatternHex { get; set; } = "";
+        public string Mask { get; set; } = "";
+        public int SearchValue { get; set; }
+
+        public string ToJson() => JsonSerializer.Serialize(this);
+        public static ScannerConfig FromJson(string json)
+        {
+            var config = JsonSerializer.Deserialize<ScannerConfig>(json);
+            return config ?? throw new JsonException("Failed to deserialize ScannerConfig");
         }
     }
 }

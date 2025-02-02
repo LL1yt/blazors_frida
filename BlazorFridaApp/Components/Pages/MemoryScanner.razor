@@ -5,59 +5,129 @@
 
 @inject IProcessService ProcessService
 @inject IScanProfileService ProfileService
+@inject DialogService DialogService
 
-<RadzenCard>
-    <h2>Memory Scanner</h2>
-    
-    <RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
-        <ProcessSelector 
-            ProcessList="@_state.ProcessList"
-            SelectedProcessId="@_state.SelectedProcessId"
-            OnProcessSelected="@OnProcessSelected"
-            OnRefreshClick="@RefreshProcessList" />
+<div class="memory-scanner-container">
+    <RadzenCard class="header-card">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>Memory Scanner</h2>
+            <div class="d-flex gap-2">
+                <RadzenButton Icon="save" Text="Save Config" ButtonStyle="ButtonStyle.Secondary" Click="@SaveConfig" />
+                <RadzenButton Icon="folder_open" Text="Load Config" ButtonStyle="ButtonStyle.Secondary" Click="@LoadConfig" />
+            </div>
+        </div>
+    </RadzenCard>
 
-        <ScanControls 
-            ScanType="@_state.SelectedScanType"
-            ValueType="@_state.SelectedValueType"
-            ScanTypes="@_state.ScanTypes"
-            ValueTypes="@_state.ValueTypes"
-            PatternHex="@_state.PatternHex"
-            Mask="@_state.Mask"
-            @bind-SearchValue="@_state.SearchValue"
-            IsFirstScan="@_state.IsFirstScan"
-            IsLoading="@_state.IsLoading"
-            CanScan="@_state.CanScan"
-            OnScanTypeChanged="@OnScanTypeChanged"
-            OnValueTypeChanged="@OnValueTypeChanged"
-            OnScanClick="@OnScan" />
-        
-        <ScanExecutor @ref="scanExecutor"
-            ProcessId="@_state.SelectedProcessId"
-            ScanType="@_state.SelectedScanType"
-            ValueType="@_state.SelectedValueType"
-            PatternHex="@_state.PatternHex"
-            Mask="@_state.Mask"
-            SearchValue="@_state.SearchValue"
-            IsFirstScan="@_state.IsFirstScan"
-            IsLoading="@_state.IsLoading"
-            OnScanComplete="@OnScanComplete"
-            OnLoadingChanged="@OnLoadingChanged" />
-        
-        <MemoryValueHandler @ref="valueHandler"
-            ValueType="@_state.SelectedValueType" />
-            
-        <ValueFreezer @ref="valueFreezer"
-            ValueType="@_state.SelectedValueType" />
-        
-        <ScanResultsGrid 
-            Results="@_state.ScanResults"
-            ValueType="@_state.SelectedValueType"
-            GetCurrentValue="@GetCurrentValue"
-            IsFrozen="@IsFrozen"
-            OnValueChanged="@OnValueChanged"
-            OnFreezeToggle="@ToggleFreeze" />
-    </RadzenStack>
-</RadzenCard>
+    <div class="scanner-content">
+        <div class="scanner-controls">
+            <RadzenCard class="process-card">
+                <ProcessSelector
+                    ProcessList="@_state.ProcessList"
+                    SelectedProcessId="@_state.SelectedProcessId"
+                    OnProcessSelected="@OnProcessSelected"
+                    OnRefreshClick="@RefreshProcessList" />
+            </RadzenCard>
+
+            <RadzenCard class="scan-options-card">
+                <ScanControls
+                    ScanType="@_state.SelectedScanType"
+                    ValueType="@_state.SelectedValueType"
+                    ScanTypes="@_state.ScanTypes"
+                    ValueTypes="@_state.ValueTypes"
+                    PatternHex="@_state.PatternHex"
+                    Mask="@_state.Mask"
+                    @bind-SearchValue="@_state.SearchValue"
+                    IsFirstScan="@_state.IsFirstScan"
+                    IsLoading="@_state.IsLoading"
+                    CanScan="@_state.CanScan"
+                    OnScanTypeChanged="@OnScanTypeChanged"
+                    OnValueTypeChanged="@OnValueTypeChanged"
+                    OnScanClick="@OnScan" />
+
+                <ScanExecutor @ref="scanExecutor"
+                    ProcessId="@_state.SelectedProcessId"
+                    ScanType="@_state.SelectedScanType"
+                    ValueType="@_state.SelectedValueType"
+                    PatternHex="@_state.PatternHex"
+                    Mask="@_state.Mask"
+                    SearchValue="@_state.SearchValue"
+                    IsFirstScan="@_state.IsFirstScan"
+                    IsLoading="@_state.IsLoading"
+                    OnScanComplete="@OnScanComplete"
+                    OnLoadingChanged="@OnLoadingChanged" />
+            </RadzenCard>
+
+            <RadzenCard class="value-handlers-card">
+                <div class="d-flex gap-2">
+                    <div class="flex-grow-1">
+                        <MemoryValueHandler @ref="valueHandler"
+                            ValueType="@_state.SelectedValueType" />
+                    </div>
+                    <div class="flex-grow-1">
+                        <ValueFreezer @ref="valueFreezer"
+                            ValueType="@_state.SelectedValueType" />
+                    </div>
+                </div>
+            </RadzenCard>
+        </div>
+
+        <RadzenCard class="results-card">
+            <ScanResultsGrid
+                Results="@_state.ScanResults"
+                ValueType="@_state.SelectedValueType"
+                GetCurrentValue="@GetCurrentValue"
+                IsFrozen="@IsFrozen"
+                OnValueChanged="@OnValueChanged"
+                OnFreezeToggle="@ToggleFreeze" />
+        </RadzenCard>
+    </div>
+</div>
+
+<style>
+    .memory-scanner-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        height: 100%;
+    }
+
+    .header-card {
+        margin-bottom: 0;
+    }
+
+    .scanner-content {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 1rem;
+        height: calc(100vh - 200px);
+    }
+
+    .scanner-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        height: 100%;
+    }
+
+    .process-card {
+        margin-bottom: 0;
+    }
+
+    .scan-options-card {
+        margin-bottom: 0;
+        flex-grow: 1;
+    }
+
+    .value-handlers-card {
+        margin-bottom: 0;
+    }
+
+    .results-card {
+        margin-bottom: 0;
+        height: 100%;
+        overflow: auto;
+    }
+</style>
 
 @code {
     private MemoryScannerState _state = new();
@@ -111,13 +181,52 @@
 
     private int GetCurrentValue(IntPtr address) => valueHandler.GetCurrentValue(address);
 
-    private Task OnValueChanged((IntPtr address, int value) change) => 
+    private Task OnValueChanged((IntPtr address, int value) change) =>
         valueHandler.OnValueChanged(change);
 
-    private Task ToggleFreeze(IntPtr address) => 
+    private Task ToggleFreeze(IntPtr address) =>
         valueFreezer.ToggleFreeze(address, GetCurrentValue(address));
 
     private bool IsFrozen(IntPtr address) => valueFreezer.IsFrozen(address);
+private async Task SaveConfig()
+{
+    try
+    {
+        var config = _state.ToConfig();
+        var result = await DialogService.OpenAsync<SaveConfigDialog>("Save Configuration");
+        if (result is string configName && !string.IsNullOrEmpty(configName))
+        {
+            await ProfileService.SaveScannerConfig(configName, config);
+            NotificationService.ShowSuccess("Success", "Configuration saved successfully");
+        }
+    }
+    catch (Exception ex)
+    {
+        NotificationService.ShowError("Error", "Failed to save configuration", ex);
+    }
+}
+
+private async Task LoadConfig()
+{
+    try
+    {
+        var configs = await ProfileService.GetScannerConfigs();
+        var result = await DialogService.OpenAsync<LoadConfigDialog>("Load Configuration",
+            new Dictionary<string, object> { { "Configs", configs } });
+        
+        if (result is ScannerConfig config)
+        {
+            _state.LoadConfig(config);
+            NotificationService.ShowSuccess("Success", "Configuration loaded successfully");
+            StateHasChanged();
+        }
+    }
+    catch (Exception ex)
+    {
+        NotificationService.ShowError("Error", "Failed to load configuration", ex);
+    }
+}
+    }
 
     public async ValueTask DisposeAsync()
     {

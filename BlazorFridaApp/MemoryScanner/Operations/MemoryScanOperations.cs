@@ -25,7 +25,13 @@ namespace BlazorFridaApp.MemoryScanner.Operations
                 async () =>
                 {
                     var matches = await _scanner.ScanForPattern(processId, pattern, mask);
-                    await _profileService.SaveScanResults(processId, pattern, mask, matches);
+                    await _profileService.SaveScanResults(new[] { new ScanResult
+                    {
+                        ProcessId = processId,
+                        Pattern = pattern,
+                        Mask = mask,
+                        Addresses = matches
+                    }});
                     return matches;
                 },
                 "Pattern scan",

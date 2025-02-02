@@ -1,0 +1,70 @@
+@using Radzen
+@using Radzen.Blazor
+@using BlazorFridaApp.Components.Pages
+@using BlazorFridaApp.MemoryScanner.Services.Interfaces
+
+<div class="load-config-dialog">
+    <RadzenDataGrid Data="@Configs" 
+                   TItem="KeyValuePair<string, ScannerConfig>"
+                   AllowFiltering="true"
+                   AllowSorting="true"
+                   RowSelect="@(args => selectedConfig = args)"
+                   Style="margin-bottom: 1rem;">
+        <Columns>
+            <RadzenDataGridColumn TItem="KeyValuePair<string, ScannerConfig>" 
+                                Property="Key" 
+                                Title="Name" />
+            <RadzenDataGridColumn TItem="KeyValuePair<string, ScannerConfig>" 
+                                Property="Value.ScanType" 
+                                Title="Scan Type" />
+            <RadzenDataGridColumn TItem="KeyValuePair<string, ScannerConfig>" 
+                                Property="Value.ValueType" 
+                                Title="Value Type" />
+            <RadzenDataGridColumn TItem="KeyValuePair<string, ScannerConfig>" 
+                                Context="config" 
+                                Filterable="false" 
+                                Sortable="false" 
+                                TextAlign="TextAlign.Center">
+                <Template Context="config">
+                    <RadzenButton Icon="delete" 
+                                ButtonStyle="ButtonStyle.Danger" 
+                                Size="ButtonSize.Small"
+                                Click="@(() => DeleteConfig(config.Key))" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+    
+    <div class="d-flex justify-content-end gap-2">
+        <RadzenButton Text="Cancel" 
+                     Click="@(() => DialogService.Close())" 
+                     ButtonStyle="ButtonStyle.Light" />
+        <RadzenButton Text="Load" 
+                     Click="@(() => DialogService.Close(selectedConfig?.Value))" 
+                     ButtonStyle="ButtonStyle.Primary" 
+                     Disabled="@(selectedConfig == null)" />
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public required Dictionary<string, ScannerConfig> Configs { get; set; }
+
+    [Inject]
+    public required DialogService DialogService { get; set; }
+
+    [Inject]
+    public required IScanProfileService ProfileService { get; set; }
+
+    private KeyValuePair<string, ScannerConfig>? selectedConfig;
+
+    private async Task DeleteConfig(string name)
+    {
+        if (await DialogService.Confirm($"Are you sure you want to delete '{name}'?") == true)
+        {
+            await ProfileService.DeleteScannerConfig(name);
+            Configs.Remove(name);
+            StateHasChanged();
+        }
+    }
+}
