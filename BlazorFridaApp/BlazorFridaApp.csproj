@@ -47,6 +47,7 @@
   <!-- Persistence -->
   <ItemGroup>
     <Compile Include="Persistence\**\*.cs" />
+    <Compile Include="Migrations\**\*.cs" />
   </ItemGroup>
 
   <!-- Static Web Content -->

@@ -11,21 +11,88 @@ namespace BlazorFridaApp.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "ApplicationSettings",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Type = table.Column<string>(type: "TEXT", nullable: false),
-                    Key = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
-                    Value = table.Column<string>(type: "TEXT", nullable: false),
-                    LastModified = table.Column<DateTime>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ApplicationSettings", x => x.Id);
-                });
+            migrationBuilder.AddColumn<string>(
+                name: "Type",
+                table: "ApplicationSettings",
+                type: "TEXT",
+                nullable: false,
+                defaultValue: "");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Key",
+                table: "ApplicationSettings",
+                type: "TEXT",
+                maxLength: 50,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ProcessName",
+                table: "LockedAddresses",
+                type: "TEXT",
+                maxLength: 255,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ValueType",
+                table: "LockedAddresses",
+                type: "TEXT",
+                maxLength: 50,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT");
+
+            migrationBuilder.AddColumn<int>(
+                name: "ProcessSettingsId",
+                table: "LockedAddresses",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: 0);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ProcessName",
+                table: "ScanProfiles",
+                type: "TEXT",
+                maxLength: 255,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Name",
+                table: "ScanProfiles",
+                type: "TEXT",
+                maxLength: 255,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Mask",
+                table: "ScanProfiles",
+                type: "TEXT",
+                maxLength: 255,
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT");
+
+            migrationBuilder.AlterColumn<byte[]>(
+                name: "Pattern",
+                table: "ScanProfiles",
+                type: "BLOB",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT");
+
+            migrationBuilder.AddColumn<int>(
+                name: "ProcessSettingsId",
+                table: "ScanProfiles",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: 0);
 
             migrationBuilder.CreateTable(
                 name: "ProcessSettings",
@@ -41,64 +108,6 @@ namespace BlazorFridaApp.Migrations
                 {
                     table.PrimaryKey("PK_ProcessSettings", x => x.Id);
                 });
-
-            migrationBuilder.CreateTable(
-                name: "LockedAddresses",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    ProcessName = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
-                    Address = table.Column<long>(type: "INTEGER", nullable: false),
-                    ValueType = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
-                    OriginalBytes = table.Column<byte[]>(type: "BLOB", nullable: false),
-                    CurrentValue = table.Column<byte[]>(type: "BLOB", nullable: false),
-                    IsFrozen = table.Column<bool>(type: "INTEGER", nullable: false),
-                    LastAccessed = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    ProcessSettingsId = table.Column<int>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_LockedAddresses", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_LockedAddresses_ProcessSettings_ProcessSettingsId",
-                        column: x => x.ProcessSettingsId,
-                        principalTable: "ProcessSettings",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ScanProfiles",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
-                    ProcessName = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
-                    Pattern = table.Column<byte[]>(type: "BLOB", nullable: false),
-                    Mask = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
-                    Offsets = table.Column<string>(type: "TEXT", nullable: false),
-                    Created = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    LastUsed = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    ProcessSettingsId = table.Column<int>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ScanProfiles", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ScanProfiles_ProcessSettings_ProcessSettingsId",
-                        column: x => x.ProcessSettingsId,
-                        principalTable: "ProcessSettings",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ApplicationSettings_Key",
-                table: "ApplicationSettings",
-                column: "Key",
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_LockedAddresses_ProcessSettingsId_Address",
@@ -117,22 +126,119 @@ namespace BlazorFridaApp.Migrations
                 table: "ScanProfiles",
                 columns: new[] { "ProcessSettingsId", "Name" },
                 unique: true);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_LockedAddresses_ProcessSettings_ProcessSettingsId",
+                table: "LockedAddresses",
+                column: "ProcessSettingsId",
+                principalTable: "ProcessSettings",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_ScanProfiles_ProcessSettings_ProcessSettingsId",
+                table: "ScanProfiles",
+                column: "ProcessSettingsId",
+                principalTable: "ProcessSettings",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "ApplicationSettings");
+            migrationBuilder.DropForeignKey(
+                name: "FK_LockedAddresses_ProcessSettings_ProcessSettingsId",
+                table: "LockedAddresses");
 
-            migrationBuilder.DropTable(
-                name: "LockedAddresses");
-
-            migrationBuilder.DropTable(
-                name: "ScanProfiles");
+            migrationBuilder.DropForeignKey(
+                name: "FK_ScanProfiles_ProcessSettings_ProcessSettingsId",
+                table: "ScanProfiles");
 
             migrationBuilder.DropTable(
                 name: "ProcessSettings");
+
+            migrationBuilder.DropIndex(
+                name: "IX_LockedAddresses_ProcessSettingsId_Address",
+                table: "LockedAddresses");
+
+            migrationBuilder.DropIndex(
+                name: "IX_ScanProfiles_ProcessSettingsId_Name",
+                table: "ScanProfiles");
+
+            migrationBuilder.DropColumn(
+                name: "Type",
+                table: "ApplicationSettings");
+
+            migrationBuilder.DropColumn(
+                name: "ProcessSettingsId",
+                table: "LockedAddresses");
+
+            migrationBuilder.DropColumn(
+                name: "ProcessSettingsId",
+                table: "ScanProfiles");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Key",
+                table: "ApplicationSettings",
+                type: "TEXT",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT",
+                oldMaxLength: 50);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ProcessName",
+                table: "LockedAddresses",
+                type: "TEXT",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT",
+                oldMaxLength: 255);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ValueType",
+                table: "LockedAddresses",
+                type: "TEXT",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT",
+                oldMaxLength: 50);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ProcessName",
+                table: "ScanProfiles",
+                type: "TEXT",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT",
+                oldMaxLength: 255);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Name",
+                table: "ScanProfiles",
+                type: "TEXT",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT",
+                oldMaxLength: 255);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Pattern",
+                table: "ScanProfiles",
+                type: "TEXT",
+                nullable: false,
+                oldClrType: typeof(byte[]),
+                oldType: "BLOB");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Mask",
+                table: "ScanProfiles",
+                type: "TEXT",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "TEXT",
+                oldMaxLength: 255);
         }
     }
 }
