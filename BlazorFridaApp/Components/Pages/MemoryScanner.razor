@@ -10,30 +10,6 @@
     [Inject]
     private new ILogger<MemoryScanner> Logger { get; set; } = default!;
 
-    protected override async Task OnInitializedAsync()
-    {
-        Logger.LogInformation("Initializing MemoryScanner component");
-        try
-        {
-            await base.OnInitializedAsync();
-            Logger.LogInformation("MemoryScanner component initialized successfully");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to initialize MemoryScanner component");
-            throw;
-        }
-    }
-
-    // Process scanning should only be initiated by user action through the Scan button
-    // to prevent unnecessary system resource usage and provide better user control
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            Logger.LogInformation("MemoryScanner component rendered for the first time");
-        }
-    }
 }
 
 

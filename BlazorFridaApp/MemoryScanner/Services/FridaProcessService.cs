@@ -42,35 +42,61 @@ namespace BlazorFridaApp.MemoryScanner.Services
 
         public IEnumerable<ProcessInfo> GetAccessibleProcesses()
         {
-            _logger.LogInformation("Getting accessible processes...");
+            var sw = Stopwatch.StartNew();
+            _logger.LogInformation("Starting to get accessible processes...");
+            
             try
             {
+                _logger.LogDebug("Calling Process.GetProcesses()...");
                 var processes = Process.GetProcesses();
-                _logger.LogDebug("Found {Count} total processes", processes.Length);
+                _logger.LogInformation("Found {Count} total processes in {ElapsedMs}ms",
+                    processes.Length, sw.ElapsedMilliseconds);
 
                 var result = new List<ProcessInfo>();
+                var convertSw = Stopwatch.StartNew();
+                var processedCount = 0;
+                
                 foreach (var process in processes)
                 {
                     try
                     {
-                        _logger.LogTrace("Converting process {Name} (ID: {Id})",
-                            process.ProcessName, process.Id);
+                        processedCount++;
+                        if (processedCount % 100 == 0)
+                        {
+                            _logger.LogDebug("Processed {Count}/{Total} processes in {ElapsedMs}ms",
+                                processedCount, processes.Length, convertSw.ElapsedMilliseconds);
+                        }
+
+                        _logger.LogTrace("Converting process {Name} (ID: {Id}, Responding: {Responding})",
+                            process.ProcessName, process.Id, process.Responding);
+                            
                         var processInfo = ProcessInfo.FromProcess(process);
                         result.Add(processInfo);
+                        
+                        process.Dispose(); // Clean up Process object
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to convert process {Name} (ID: {Id})",
-                            process.ProcessName, process.Id);
+                        _logger.LogWarning(ex,
+                            "Failed to convert process {Name} (ID: {Id}). Error: {Error}",
+                            process.ProcessName, process.Id, ex.Message);
+                        process.Dispose(); // Ensure cleanup even on error
                     }
                 }
 
-                _logger.LogInformation("Successfully retrieved {Count} accessible processes", result.Count);
+                sw.Stop();
+                _logger.LogInformation(
+                    "Successfully retrieved {Count} accessible processes out of {Total} in {ElapsedMs}ms",
+                    result.Count, processes.Length, sw.ElapsedMilliseconds);
+                    
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to get accessible processes");
+                sw.Stop();
+                _logger.LogError(ex,
+                    "Failed to get accessible processes after {ElapsedMs}ms. Error: {Error}",
+                    sw.ElapsedMilliseconds, ex.Message);
                 return new List<ProcessInfo>();
             }
         }

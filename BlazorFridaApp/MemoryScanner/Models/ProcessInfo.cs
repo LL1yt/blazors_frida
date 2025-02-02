@@ -18,10 +18,25 @@ namespace BlazorFridaApp.MemoryScanner.Models
 
         public static ProcessInfo FromProcess(Process process)
         {
+            var sw = Stopwatch.StartNew();
             try
             {
-                _logger?.LogTrace("Converting Process {ProcessName} (ID: {ProcessId}) to ProcessInfo",
-                    process.ProcessName, process.Id);
+                _logger?.LogTrace("Starting conversion of Process {ProcessName} (ID: {ProcessId}) to ProcessInfo. HasExited: {HasExited}, Responding: {Responding}",
+                    process.ProcessName, process.Id, process.HasExited, process.Responding);
+
+                // Check if process is still valid
+                if (process.HasExited)
+                {
+                    _logger?.LogWarning("Process {ProcessName} (ID: {ProcessId}) has exited during conversion",
+                        process.ProcessName, process.Id);
+                    throw new InvalidOperationException("Process has exited");
+                }
+
+                if (!process.Responding)
+                {
+                    _logger?.LogWarning("Process {ProcessName} (ID: {ProcessId}) is not responding during conversion",
+                        process.ProcessName, process.Id);
+                }
 
                 var processInfo = new ProcessInfo
                 {
@@ -29,15 +44,19 @@ namespace BlazorFridaApp.MemoryScanner.Models
                     Name = process.ProcessName
                 };
 
-                _logger?.LogDebug("Successfully converted Process to ProcessInfo: {Name} (ID: {Id})",
-                    processInfo.Name, processInfo.Id);
+                sw.Stop();
+                _logger?.LogDebug(
+                    "Successfully converted Process to ProcessInfo: {Name} (ID: {Id}) in {ElapsedMs}ms",
+                    processInfo.Name, processInfo.Id, sw.ElapsedMilliseconds);
 
                 return processInfo;
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to convert Process {ProcessName} (ID: {ProcessId}) to ProcessInfo",
-                    process.ProcessName, process.Id);
+                sw.Stop();
+                _logger?.LogError(ex,
+                    "Failed to convert Process {ProcessName} (ID: {ProcessId}) to ProcessInfo after {ElapsedMs}ms. Error: {Error}",
+                    process.ProcessName, process.Id, sw.ElapsedMilliseconds, ex.Message);
                 throw;
             }
         }

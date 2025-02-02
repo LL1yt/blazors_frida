@@ -2,6 +2,40 @@
 @using Radzen.Blazor
 @using BlazorFridaApp.MemoryScanner.Models
 @inject ILogger<ProcessSelector> Logger
+@implements IDisposable
+
+@code {
+    private void ValidateComponentState(string operation)
+    {
+        try
+        {
+            if (ProcessList == null)
+            {
+                Logger.LogWarning("{Operation}: ProcessList is null", operation);
+            }
+            
+            if (IsLoading)
+            {
+                Logger.LogDebug("{Operation}: Component is in loading state", operation);
+            }
+
+            if (SelectedProcessId.HasValue)
+            {
+                var processExists = ProcessList?.Any(p => p.Id == SelectedProcessId.Value) ?? false;
+                if (!processExists)
+                {
+                    Logger.LogWarning(
+                        "{Operation}: Selected process ID {ProcessId} not found in process list",
+                        operation, SelectedProcessId.Value);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error validating component state during {Operation}", operation);
+        }
+    }
+}
 
 @*
     IMPORTANT: Process scanning is only initiated by clicking the Scan button.
@@ -10,17 +44,61 @@
 *@
 <div>
 @code {
+    private readonly Stopwatch _lifecycleTimer = new();
+    private int _renderCount = 0;
+
     protected override void OnInitialized()
     {
-        Logger.LogInformation("ProcessSelector component initialized");
+        _lifecycleTimer.Start();
+        Logger.LogInformation(
+            "Initializing ProcessSelector component. Component ID: {ComponentId}",
+            GetHashCode());
         base.OnInitialized();
     }
 
     protected override void OnParametersSet()
     {
-        Logger.LogDebug("ProcessSelector parameters updated: ProcessList count: {Count}, SelectedProcessId: {ProcessId}, IsLoading: {IsLoading}",
-            ProcessList?.Count ?? 0, SelectedProcessId, IsLoading);
+        Logger.LogDebug(
+            "ProcessSelector parameters updating at {ElapsedMs}ms. ProcessList count: {Count}, SelectedProcessId: {ProcessId}, IsLoading: {IsLoading}, RenderCount: {RenderCount}",
+            _lifecycleTimer.ElapsedMilliseconds,
+            ProcessList?.Count ?? 0,
+            SelectedProcessId,
+            IsLoading,
+            _renderCount);
         base.OnParametersSet();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        _renderCount++;
+        if (firstRender)
+        {
+            Logger.LogInformation(
+                "ProcessSelector component rendered for the first time after {ElapsedMs}ms. Component ID: {ComponentId}",
+                _lifecycleTimer.ElapsedMilliseconds,
+                GetHashCode());
+        }
+        else
+        {
+            Logger.LogTrace(
+                "ProcessSelector re-rendered (#{RenderCount}) at {ElapsedMs}ms. State: {{ ProcessCount: {Count}, SelectedId: {ProcessId}, IsLoading: {IsLoading} }}",
+                _renderCount,
+                _lifecycleTimer.ElapsedMilliseconds,
+                ProcessList?.Count ?? 0,
+                SelectedProcessId,
+                IsLoading);
+        }
+        base.OnAfterRender(firstRender);
+    }
+
+    public void Dispose()
+    {
+        Logger.LogInformation(
+            "Disposing ProcessSelector component after {ElapsedMs}ms. Component ID: {ComponentId}, Final render count: {RenderCount}",
+            _lifecycleTimer.ElapsedMilliseconds,
+            GetHashCode(),
+            _renderCount);
+        _lifecycleTimer.Stop();
     }
 }
 
@@ -60,32 +138,96 @@
     [Parameter] public EventCallback OnRefreshClick { get; set; }
     [Parameter] public bool IsLoading { get; set; }
 
+    private readonly Stopwatch _operationTimer = new();
+
     private async Task HandleProcessSelected()
     {
+        _operationTimer.Restart();
+        ValidateComponentState("ProcessSelection");
+        
         try
         {
-            Logger.LogInformation("Process selection changed to ID: {ProcessId}", SelectedProcessId);
+            var previousId = SelectedProcessId;
+            Logger.LogInformation(
+                "Process selection changing from {PreviousId} to {NewId} at {ElapsedMs}ms",
+                previousId, SelectedProcessId, _lifecycleTimer.ElapsedMilliseconds);
+
+            if (IsLoading)
+            {
+                Logger.LogWarning(
+                    "Process selection attempted while component is loading. Previous: {PreviousId}, New: {NewId}",
+                    previousId, SelectedProcessId);
+            }
+
             await OnProcessSelected.InvokeAsync();
-            Logger.LogDebug("Process selection handler completed successfully");
+            
+            _operationTimer.Stop();
+            Logger.LogDebug(
+                "Process selection handler completed in {OpElapsedMs}ms (total uptime: {TotalElapsedMs}ms). Previous: {PreviousId}, New: {NewId}, IsLoading: {IsLoading}",
+                _operationTimer.ElapsedMilliseconds,
+                _lifecycleTimer.ElapsedMilliseconds,
+                previousId,
+                SelectedProcessId,
+                IsLoading);
+
+            ValidateComponentState("PostProcessSelection");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error handling process selection for ID: {ProcessId}", SelectedProcessId);
+            _operationTimer.Stop();
+            Logger.LogError(ex,
+                "Error handling process selection after {OpElapsedMs}ms (total uptime: {TotalElapsedMs}ms). ID: {ProcessId}, IsLoading: {IsLoading}",
+                _operationTimer.ElapsedMilliseconds,
+                _lifecycleTimer.ElapsedMilliseconds,
+                SelectedProcessId,
+                IsLoading);
             throw;
         }
     }
 
     private async Task HandleRefreshClick()
     {
+        _operationTimer.Restart();
+        ValidateComponentState("ProcessListRefresh");
+        
         try
         {
-            Logger.LogInformation("Process list refresh requested");
+            var currentProcessCount = ProcessList?.Count ?? 0;
+            Logger.LogInformation(
+                "Process list refresh requested at {ElapsedMs}ms. Current count: {Count}, Selected: {ProcessId}, IsLoading: {IsLoading}",
+                _lifecycleTimer.ElapsedMilliseconds,
+                currentProcessCount,
+                SelectedProcessId,
+                IsLoading);
+
+            if (IsLoading)
+            {
+                Logger.LogWarning("Process list refresh attempted while component is already loading");
+                return;
+            }
+
             await OnRefreshClick.InvokeAsync();
-            Logger.LogDebug("Process list refresh handler completed successfully");
+            
+            var newProcessCount = ProcessList?.Count ?? 0;
+            _operationTimer.Stop();
+            Logger.LogDebug(
+                "Process list refresh completed in {OpElapsedMs}ms (total uptime: {TotalElapsedMs}ms). Previous count: {PreviousCount}, New count: {NewCount}, IsLoading: {IsLoading}",
+                _operationTimer.ElapsedMilliseconds,
+                _lifecycleTimer.ElapsedMilliseconds,
+                currentProcessCount,
+                newProcessCount,
+                IsLoading);
+
+            ValidateComponentState("PostProcessListRefresh");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error handling process list refresh");
+            _operationTimer.Stop();
+            Logger.LogError(ex,
+                "Error handling process list refresh after {OpElapsedMs}ms (total uptime: {TotalElapsedMs}ms). IsLoading: {IsLoading}",
+                _operationTimer.ElapsedMilliseconds,
+                _lifecycleTimer.ElapsedMilliseconds,
+                IsLoading);
             throw;
         }
     }
