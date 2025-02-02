@@ -62,9 +62,9 @@
 @code {
     private MemoryScannerState _state = new();
 
-    protected override Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
-        return Task.CompletedTask;
+        await RefreshProcessList();
     }
 
     private async Task RefreshProcessList()

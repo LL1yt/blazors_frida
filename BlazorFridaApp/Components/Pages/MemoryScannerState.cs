@@ -28,12 +28,15 @@ namespace BlazorFridaApp.Components.Pages
             (SelectedScanType == ScanType.Pattern ?
                 !string.IsNullOrWhiteSpace(PatternHex) && !string.IsNullOrWhiteSpace(Mask) :
                 SelectedScanType == ScanType.UnknownInitialValue ||
-                (SearchValue != 0 && SelectedValueType != default(MemoryValueType)));
+                SelectedValueType != default(MemoryValueType));
 
         public void Reset()
         {
             ScanResults.Clear();
-            IsFirstScan = true;
+            if (SelectedProcessId.HasValue)
+            {
+                IsFirstScan = true;
+            }
         }
 
         public void OnScanComplete(List<IntPtr> results)

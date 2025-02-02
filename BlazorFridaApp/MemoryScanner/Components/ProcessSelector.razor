@@ -4,20 +4,20 @@
 
 <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
     <RadzenDropDown TValue="int?"
-                   @bind-Value="@SelectedProcessId"
-                   Data="@ProcessList"
-                   TextProperty="ProcessName"
-                   ValueProperty="Id"
-                   Placeholder="Select process"
-                   Change="@(args => OnProcessSelected.InvokeAsync())"
-                   AllowClear="true"
-                   AllowFiltering="true"
-                   FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                   Style="width: 80%"/>
+                    @bind-Value="@SelectedProcessId"
+                    Data="@ProcessList"
+                    ValueProperty="Id"
+                    TextTemplate="@ProcessTemplate"
+                    Placeholder="Select process"
+                    Change="@(args => OnProcessSelected.InvokeAsync())"
+                    AllowClear="true"
+                    AllowFiltering="true"
+                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                    Style="width: 80%"/>
     <RadzenButton Icon="refresh"
-                 Click="@(() => OnRefreshClick.InvokeAsync())"
-                 ButtonStyle="ButtonStyle.Light"
-                 Title="Refresh process list"/>
+                  Click="@(() => OnRefreshClick.InvokeAsync())"
+                  ButtonStyle="ButtonStyle.Light"
+                  Title="Refresh process list"/>
 </RadzenStack>
 
 @code {
@@ -25,4 +25,10 @@
     [Parameter] public int? SelectedProcessId { get; set; }
     [Parameter] public EventCallback OnProcessSelected { get; set; }
     [Parameter] public EventCallback OnRefreshClick { get; set; }
+
+    private RenderFragment<dynamic> ProcessTemplate => (context) => builder =>
+    {
+        var process = (Process)context;
+        builder.AddContent(0, $"{process.ProcessName} ({process.Id})");
+    };
 }
