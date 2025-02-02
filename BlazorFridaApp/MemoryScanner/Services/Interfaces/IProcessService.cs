@@ -1,12 +1,12 @@
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading.Tasks;
+using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.MemoryScanner.Services.Interfaces
 {
     public interface IProcessService
     {
-        Task<Process> GetTargetProcessAsync();
-        IEnumerable<Process> GetAccessibleProcesses();
+        Task<ProcessInfo> GetTargetProcessAsync();
+        IEnumerable<ProcessInfo> GetAccessibleProcesses();
     }
 }

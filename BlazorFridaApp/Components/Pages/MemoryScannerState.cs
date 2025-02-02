@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text.Json;
 using BlazorFridaApp.MemoryScanner.Components;
+using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.Components.Pages
 {
     public class MemoryScannerState
     {
-        public List<Process> ProcessList { get; set; } = new();
+        public List<ProcessInfo> ProcessList { get; set; } = new();
         public int? SelectedProcessId { get; set; }
         public string PatternHex { get; set; } = "";
         public string Mask { get; set; } = "";

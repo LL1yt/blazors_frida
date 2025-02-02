@@ -1,6 +1,6 @@
-@using System.Diagnostics
 @using Radzen
 @using Radzen.Blazor
+@using BlazorFridaApp.MemoryScanner.Models
 
 <div>
     <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
@@ -8,6 +8,7 @@
                         @bind-Value="@SelectedProcessId"
                         Data="@ProcessList"
                         ValueProperty="Id"
+                        TextProperty="Name"
                         TextTemplate="@ProcessTemplate"
                         Placeholder="Select process"
                         Change="@(args => OnProcessSelected.InvokeAsync())"
@@ -29,15 +30,14 @@
 </div>
 
 @code {
-    [Parameter] public required List<Process> ProcessList { get; set; }
+    [Parameter] public required List<ProcessInfo> ProcessList { get; set; }
     [Parameter] public int? SelectedProcessId { get; set; }
     [Parameter] public EventCallback OnProcessSelected { get; set; }
     [Parameter] public EventCallback OnRefreshClick { get; set; }
     [Parameter] public bool IsLoading { get; set; }
 
-    private RenderFragment<dynamic> ProcessTemplate => (context) => builder =>
+    private RenderFragment<ProcessInfo> ProcessTemplate => (process) => builder =>
     {
-        var process = (Process)context;
-        builder.AddContent(0, $"{process.ProcessName} ({process.Id})");
+        builder.AddContent(0, $"{process.Name} ({process.Id})");
     };
 }

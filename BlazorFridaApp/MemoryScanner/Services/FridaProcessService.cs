@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 
 namespace BlazorFridaApp.MemoryScanner.Services
 {
     public class FridaProcessService : IProcessService
     {
-        public async Task<Process> GetTargetProcessAsync()
+        public async Task<ProcessInfo> GetTargetProcessAsync()
         {
             // For demonstration purposes, return the first accessible process.
             var target = GetAccessibleProcesses().FirstOrDefault();
@@ -20,16 +21,18 @@ namespace BlazorFridaApp.MemoryScanner.Services
             return await Task.FromResult(target);
         }
 
-        public IEnumerable<Process> GetAccessibleProcesses()
+        public IEnumerable<ProcessInfo> GetAccessibleProcesses()
         {
             try
             {
-                return Process.GetProcesses();
+                return Process.GetProcesses()
+                    .Select(p => ProcessInfo.FromProcess(p))
+                    .ToList();
             }
             catch (Exception)
             {
                 // Log the exception as needed.
-                return new List<Process>();
+                return new List<ProcessInfo>();
             }
         }
     }
