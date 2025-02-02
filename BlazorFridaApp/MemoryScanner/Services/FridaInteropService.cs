@@ -51,7 +51,8 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     LoggerExtensions.LogInformation(_logger, "Adding Python module path: {Path}", nativePath);
                     
                     // Clear existing path to avoid duplicates
-                    while (sys.path.count() > 0)
+                    var pathLength = sys.path.__len__().As<int>();
+                    for (int i = 0; i < pathLength; i++)
                     {
                         sys.path.pop();
                     }
@@ -65,11 +66,15 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     try
                     {
                         // Force reload the module to ensure clean state
-                        if (sys.modules.contains("frida_module"))
+                        if (sys.modules.__contains__("frida_module"))
                         {
-                            sys.modules.pop("frida_module");
+                            dynamic imp = Py.Import("importlib");
+                            fridaModule = imp.reload(sys.modules["frida_module"]);
                         }
-                        fridaModule = Py.Import("frida_module");
+                        else
+                        {
+                            fridaModule = Py.Import("frida_module");
+                        }
                         LoggerExtensions.LogInformation(_logger, "Successfully imported frida_module");
                     }
                     catch (PythonException pex)
