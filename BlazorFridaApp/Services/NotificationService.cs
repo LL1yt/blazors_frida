@@ -5,9 +5,9 @@ namespace BlazorFridaApp.Services
 {
     public class NotificationService : INotificationService
     {
-        private readonly NotificationService _radzenNotificationService;
+        private readonly Radzen.NotificationService _radzenNotificationService;
 
-        public NotificationService(NotificationService radzenNotificationService)
+        public NotificationService(Radzen.NotificationService radzenNotificationService)
         {
             _radzenNotificationService = radzenNotificationService;
         }
@@ -43,6 +43,17 @@ namespace BlazorFridaApp.Services
                 Summary = title,
                 Detail = detail,
                 Duration = 6000
+            });
+        }
+
+        public void ShowSuccess(string title, string message)
+        {
+            _radzenNotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = title,
+                Detail = message,
+                Duration = 4000
             });
         }
     }

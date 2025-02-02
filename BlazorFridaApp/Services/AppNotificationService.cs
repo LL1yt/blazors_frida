@@ -36,5 +36,13 @@ namespace BlazorFridaApp.Services
                 OkButtonText = "OK"
             });
         }
+
+        public void ShowSuccess(string title, string message)
+        {
+            _dialogService.Alert(message, title, new AlertOptions
+            {
+                OkButtonText = "OK"
+            });
+        }
     }
 }

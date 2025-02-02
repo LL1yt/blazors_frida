@@ -6,7 +6,7 @@ namespace BlazorFridaApp.MemoryScanner.Components
     public abstract class MemoryScannerComponentBase : ComponentBase
     {
         [Inject] protected ILogger<MemoryScannerComponentBase> Logger { get; set; } = null!;
-        [Inject] protected NotificationService NotificationService { get; set; } = null!;
+        [Inject] protected INotificationService NotificationService { get; set; } = null!;
         [Inject] protected ProcessMemoryScanner Scanner { get; set; } = null!;
 
         protected virtual void OnInitializedBase()
@@ -22,28 +22,28 @@ namespace BlazorFridaApp.MemoryScanner.Components
 
         protected void ShowError(string title, string message, Exception? ex = null)
         {
-            NotificationService.Notify(NotificationSeverity.Error, title, message);
+            NotificationService.ShowError(title, message, ex);
             if (ex != null)
                 Logger.LogError(ex, $"{title}: {message}");
             else
                 Logger.LogError($"{title}: {message}");
         }
 
-        protected void ShowSuccess(string title, string message)
-        {
-            NotificationService.Notify(NotificationSeverity.Success, title, message);
-            Logger.LogInformation($"{title}: {message}");
-        }
-
         protected void ShowWarning(string title, string message)
         {
-            NotificationService.Notify(NotificationSeverity.Warning, title, message);
+            NotificationService.ShowWarning(title, message);
             Logger.LogWarning($"{title}: {message}");
         }
 
         protected void ShowInfo(string title, string message)
         {
-            NotificationService.Notify(NotificationSeverity.Info, title, message);
+            NotificationService.ShowInfo(title, message);
+            Logger.LogInformation($"{title}: {message}");
+        }
+
+        protected void ShowSuccess(string title, string message)
+        {
+            NotificationService.ShowSuccess(title, message);
             Logger.LogInformation($"{title}: {message}");
         }
     }

@@ -41,6 +41,7 @@ try
     // Add Radzen services
     builder.Services.AddRadzenComponents();
     builder.Services.AddScoped<DialogService>();
+    builder.Services.AddScoped<Radzen.NotificationService>();
 
     // Add notification service
     builder.Services.AddScoped<INotificationService, AppNotificationService>();
