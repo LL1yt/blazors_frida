@@ -6,6 +6,34 @@
 @inject IProcessService ProcessService
 @inject IScanProfileService ProfileService
 @inject DialogService DialogService
+@inject ILogger<MemoryScanner> Logger
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Logger.LogInformation("Initializing MemoryScanner component");
+        try
+        {
+            await base.OnInitializedAsync();
+            Logger.LogInformation("MemoryScanner component initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to initialize MemoryScanner component");
+            throw;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Logger.LogInformation("MemoryScanner first render, refreshing process list");
+            await RefreshProcessList();
+        }
+    }
+}
+
 
 <div class="memory-scanner-container">
     <RadzenCard class="header-card">
@@ -135,12 +163,20 @@
 
     private async Task RefreshProcessList()
     {
+        Logger.LogInformation("Starting process list refresh");
         _state.IsLoading = true;
         StateHasChanged();
         
         try
         {
+            Logger.LogDebug("Calling ScannerService.RefreshProcessList");
             await ScannerService.RefreshProcessList(_state);
+            Logger.LogInformation("Process list refreshed successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh process list");
+            throw;
         }
         finally
         {
@@ -151,64 +187,181 @@
 
     private async Task OnProcessSelected()
     {
-        await ScannerService.OnProcessSelected(_state);
-        StateHasChanged();
+        try
+        {
+            Logger.LogInformation("Process selected: ID {ProcessId}", _state.SelectedProcessId);
+            await ScannerService.OnProcessSelected(_state);
+            Logger.LogDebug("Process selection handled successfully");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error handling process selection for ID {ProcessId}", _state.SelectedProcessId);
+            throw;
+        }
     }
 
     private async Task OnScanTypeChanged(ScanType newType)
     {
-        await ScannerService.OnScanTypeChanged(_state, newType);
-        StateHasChanged();
+        try
+        {
+            Logger.LogInformation("Scan type changing from {OldType} to {NewType}",
+                _state.SelectedScanType, newType);
+            await ScannerService.OnScanTypeChanged(_state, newType);
+            Logger.LogDebug("Scan type changed successfully");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error changing scan type to {NewType}", newType);
+            throw;
+        }
     }
 
     private void OnValueTypeChanged(MemoryValueType newType)
     {
-        ScannerService.OnValueTypeChanged(_state, newType);
-        StateHasChanged();
+        try
+        {
+            Logger.LogInformation("Value type changing from {OldType} to {NewType}",
+                _state.SelectedValueType, newType);
+            ScannerService.OnValueTypeChanged(_state, newType);
+            Logger.LogDebug("Value type changed successfully");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error changing value type to {NewType}", newType);
+            throw;
+        }
     }
 
     private async Task OnScan()
     {
-        if (!_state.CanScan) return;
-        await scanExecutor.ExecuteScan(valueHandler.GetCurrentValue);
+        if (!_state.CanScan)
+        {
+            Logger.LogWarning("Scan attempted but CanScan is false");
+            return;
+        }
+
+        try
+        {
+            Logger.LogInformation("Starting memory scan");
+            await scanExecutor.ExecuteScan(valueHandler.GetCurrentValue);
+            Logger.LogDebug("Scan execution initiated successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error executing memory scan");
+            throw;
+        }
     }
 
     private void OnScanComplete(List<IntPtr> results)
     {
-        _state.OnScanComplete(results);
-        StateHasChanged();
+        try
+        {
+            Logger.LogInformation("Scan completed with {Count} results", results.Count);
+            _state.OnScanComplete(results);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error handling scan completion");
+            throw;
+        }
     }
 
     private void OnLoadingChanged(bool loading)
     {
+        Logger.LogDebug("Loading state changed to {Loading}", loading);
         _state.IsLoading = loading;
         StateHasChanged();
     }
 
-    private int GetCurrentValue(IntPtr address) => valueHandler.GetCurrentValue(address);
+    private int GetCurrentValue(IntPtr address)
+    {
+        try
+        {
+            var value = valueHandler.GetCurrentValue(address);
+            Logger.LogTrace("Retrieved current value {Value} from address {Address}", value, address);
+            return value;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error getting current value from address {Address}", address);
+            throw;
+        }
+    }
 
-    private Task OnValueChanged((IntPtr address, int value) change) =>
-        valueHandler.OnValueChanged(change);
+    private async Task OnValueChanged((IntPtr address, int value) change)
+    {
+        try
+        {
+            Logger.LogDebug("Value change requested: Address {Address}, New Value {Value}",
+                change.address, change.value);
+            await valueHandler.OnValueChanged(change);
+            Logger.LogTrace("Value changed successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error changing value at address {Address}", change.address);
+            throw;
+        }
+    }
 
-    private Task ToggleFreeze(IntPtr address) =>
-        valueFreezer.ToggleFreeze(address, GetCurrentValue(address));
+    private async Task ToggleFreeze(IntPtr address)
+    {
+        try
+        {
+            Logger.LogDebug("Toggle freeze requested for address {Address}", address);
+            await valueFreezer.ToggleFreeze(address, GetCurrentValue(address));
+            Logger.LogTrace("Freeze toggle completed successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling freeze for address {Address}", address);
+            throw;
+        }
+    }
 
-    private bool IsFrozen(IntPtr address) => valueFreezer.IsFrozen(address);
+    private bool IsFrozen(IntPtr address)
+    {
+        try
+        {
+            var frozen = valueFreezer.IsFrozen(address);
+            Logger.LogTrace("Checked freeze status for address {Address}: {IsFrozen}", address, frozen);
+            return frozen;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error checking freeze status for address {Address}", address);
+            throw;
+        }
+    }
 
     private async Task SaveConfig()
     {
         try
         {
+            Logger.LogInformation("Starting configuration save");
             var config = _state.ToConfig();
             var result = await DialogService.OpenAsync<SaveConfigDialog>("Save Configuration");
+            
             if (result is string configName && !string.IsNullOrEmpty(configName))
             {
+                Logger.LogDebug("Saving configuration with name: {ConfigName}", configName);
                 await ProfileService.SaveScannerConfig(configName, config);
                 NotificationService.ShowSuccess("Success", "Configuration saved successfully");
+                Logger.LogInformation("Configuration saved successfully: {ConfigName}", configName);
+            }
+            else
+            {
+                Logger.LogDebug("Configuration save cancelled or invalid name provided");
             }
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to save configuration");
             NotificationService.ShowError("Error", "Failed to save configuration", ex);
         }
     }
@@ -217,19 +370,29 @@
     {
         try
         {
+            Logger.LogInformation("Starting configuration load");
             var configs = await ProfileService.GetScannerConfigs();
+            Logger.LogDebug("Retrieved {Count} configurations", configs.Count);
+            
             var result = await DialogService.OpenAsync<LoadConfigDialog>("Load Configuration",
                 new Dictionary<string, object> { { "Configs", configs } });
             
             if (result is ScannerConfig config)
             {
+                Logger.LogDebug("Loading selected configuration");
                 _state.LoadConfig(config);
                 NotificationService.ShowSuccess("Success", "Configuration loaded successfully");
+                Logger.LogInformation("Configuration loaded successfully");
                 StateHasChanged();
+            }
+            else
+            {
+                Logger.LogDebug("Configuration load cancelled");
             }
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load configuration");
             NotificationService.ShowError("Error", "Failed to load configuration", ex);
         }
     }

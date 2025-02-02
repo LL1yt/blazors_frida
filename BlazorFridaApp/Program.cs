@@ -47,6 +47,11 @@ try
     // Add notification service
     builder.Services.AddScoped<INotificationService, AppNotificationService>();
 
+    // Configure ProcessInfo logger
+    var processInfoLogger = builder.Services.BuildServiceProvider()
+        .GetRequiredService<ILogger<ProcessInfo>>();
+    ProcessInfo.ConfigureLogger(processInfoLogger);
+
     // Add memory scanner services
     builder.Services.AddSingleton<IPythonRuntimeService, PythonRuntimeService>(); // Python runtime singleton
     builder.Services.AddScoped<IFridaInteropService, FridaInteropService>(); // Frida interop service

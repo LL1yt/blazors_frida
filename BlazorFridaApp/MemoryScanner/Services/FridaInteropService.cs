@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Python.Runtime;
+using System.Diagnostics;
 
 namespace BlazorFridaApp.MemoryScanner.Services
 {
@@ -70,24 +72,126 @@ namespace BlazorFridaApp.MemoryScanner.Services
 
         public bool AttachToProcess(string processName)
         {
-            EnsureInitialized();
-            return _pythonRuntime.ExecuteWithGIL(() => _fridaScanner!.attach_to_process(processName));
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                _logger.LogInformation("Attempting to attach to process: {ProcessName}", processName);
+                EnsureInitialized();
+                
+                var result = _pythonRuntime.ExecuteWithGIL(() =>
+                {
+                    try
+                    {
+                        return _fridaScanner!.attach_to_process(processName);
+                    }
+                    catch (PythonException pex)
+                    {
+                        _logger.LogError(pex, "Python error while attaching to process: {Message}", pex.Message);
+                        throw new FridaInteropException($"Failed to attach to process: {pex.Message}", pex);
+                    }
+                });
+
+                sw.Stop();
+                _logger.LogInformation(
+                    "Process attachment {Status} for {ProcessName} in {Duration}ms",
+                    result ? "succeeded" : "failed", processName, sw.ElapsedMilliseconds);
+                
+                return result;
+            }
+            catch (Exception ex) when (ex is not FridaInteropException)
+            {
+                sw.Stop();
+                _logger.LogError(ex,
+                    "Unexpected error attaching to process {ProcessName}. Duration: {Duration}ms",
+                    processName, sw.ElapsedMilliseconds);
+                throw;
+            }
         }
 
         public byte[]? ReadMemory(string address, int length)
         {
-            EnsureInitialized();
-            return _pythonRuntime.ExecuteWithGIL(() =>
+            var sw = Stopwatch.StartNew();
+            try
             {
-                var result = _fridaScanner!.read_memory(address, length);
-                return result?.As<byte[]>();
-            });
+                LoggerExtensions.LogInformation(_logger, "Reading memory at address {Address}, length: {Length}", address, length);
+                EnsureInitialized();
+                
+                var result = _pythonRuntime.ExecuteWithGIL(() =>
+                {
+                    try
+                    {
+                        var data = _fridaScanner!.read_memory(address, length);
+                        return data?.As<byte[]>();
+                    }
+                    catch (PythonException pex)
+                    {
+                        _logger.LogError(pex, "Python error while reading memory: {Message}", pex.Message);
+                        throw new FridaInteropException($"Failed to read memory: {pex.Message}", pex);
+                    }
+                });
+
+                sw.Stop();
+                if (result != null)
+                {
+                    _logger.LogInformation(
+                        "Successfully read {ByteCount} bytes from {Address} in {Duration}ms",
+                        result.Length, address, sw.ElapsedMilliseconds);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "No data read from address {Address} in {Duration}ms",
+                        address, sw.ElapsedMilliseconds);
+                }
+                
+                return result;
+            }
+            catch (Exception ex) when (ex is not FridaInteropException)
+            {
+                sw.Stop();
+                _logger.LogError(ex,
+                    "Unexpected error reading memory at {Address}. Duration: {Duration}ms",
+                    address, sw.ElapsedMilliseconds);
+                throw;
+            }
         }
 
         public bool WriteMemory(string address, byte[] value)
         {
-            EnsureInitialized();
-            return _pythonRuntime.ExecuteWithGIL(() => _fridaScanner!.write_memory(address, value));
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                _logger.LogDebug("Writing {ByteCount} bytes to address {Address}", value.Length, address);
+                EnsureInitialized();
+                
+                var result = _pythonRuntime.ExecuteWithGIL(() =>
+                {
+                    try
+                    {
+                        return _fridaScanner!.write_memory(address, value);
+                    }
+                    catch (PythonException pex)
+                    {
+                        _logger.LogError(pex, "Python error while writing memory: {Message}", pex.Message);
+                        throw new FridaInteropException($"Failed to write memory: {pex.Message}", pex);
+                    }
+                });
+
+                sw.Stop();
+                _logger.LogInformation(
+                    "Memory write {Status} at {Address} in {Duration}ms",
+                    result ? "succeeded" : "failed", address, sw.ElapsedMilliseconds);
+                
+                return result;
+            }
+            catch (Exception ex) when (ex is not FridaInteropException)
+            {
+                sw.Stop();
+                _logger.LogError(ex,
+                    "Unexpected error writing memory at {Address}. Duration: {Duration}ms",
+                    address, sw.ElapsedMilliseconds);
+                throw;
+            }
         }
 
         public void Detach()
