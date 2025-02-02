@@ -25,18 +25,21 @@
 }
 
     <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
-        <RadzenDropDown TValue="int?"
-                        @bind-Value="@SelectedProcessId"
-                        Data="@ProcessList"
-                        ValueProperty="Id"
-                        TextProperty="Name"
-                        TextTemplate="@ProcessTemplate"
-                        Placeholder="Select process"
-                        Change="@(args => HandleProcessSelected())"
-                        AllowClear="true"
-                        AllowFiltering="true"
-                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                        Style="width: 80%"/>
+        <RadzenDropDownDataGrid TValue="int?"
+                               @bind-Value="@SelectedProcessId"
+                               Data="@ProcessList"
+                               ValueProperty="Id"
+                               TextProperty="DisplayName"
+                               Placeholder="Select process"
+                               Change="@(args => HandleProcessSelected())"
+                               AllowClear="true"
+                               AllowFiltering="true"
+                               FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                               Style="width: 80%">
+            <Columns>
+                <RadzenDropDownDataGridColumn Property="DisplayName" Title="Process" />
+            </Columns>
+        </RadzenDropDownDataGrid>
         <RadzenButton Icon="refresh"
                       Click="@HandleRefreshClick"
                       ButtonStyle="ButtonStyle.Light"

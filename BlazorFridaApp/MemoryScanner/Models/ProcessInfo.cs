@@ -9,6 +9,7 @@ namespace BlazorFridaApp.MemoryScanner.Models
 
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string DisplayName => $"{Name} ({Id})";
 
         public static void ConfigureLogger(ILogger<ProcessInfo> logger)
         {
