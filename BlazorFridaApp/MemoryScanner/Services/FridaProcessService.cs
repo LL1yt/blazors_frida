@@ -174,18 +174,16 @@ namespace BlazorFridaApp.MemoryScanner.Services
                                 dynamic? result = null;
                                 try
                                 {
-                                    var fridaTask = Task.Run(() => _fridaScanner.get_process_list());
-                                    if (!fridaTask.Wait(TimeSpan.FromSeconds(5)))
-                                    {
-                                        _logger.LogError("Timeout while calling Frida get_process_list");
-                                        throw new TimeoutException("Frida get_process_list call timed out");
-                                    }
-                                    result = fridaTask.Result;
+                                    result = _fridaScanner.get_process_list();
                                     _logger.LogDebug("Successfully got process list from Frida");
                                 }
                                 catch (PythonException pex)
                                 {
                                     _logger.LogError(pex, "Python error during get_process_list");
+                                    if (pex.Message.Contains("timed out"))
+                                    {
+                                        throw new TimeoutException("Frida get_process_list call timed out", pex);
+                                    }
                                     throw new InvalidOperationException("Failed to get process list from Frida", pex);
                                 }
                                 return result;
