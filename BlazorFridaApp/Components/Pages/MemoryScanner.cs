@@ -54,23 +54,43 @@ namespace BlazorFridaApp.Components.Pages
                 // Clean up existing resources before refresh
                 if (_state?.SelectedProcessId.HasValue == true)
                 {
-                    Logger.LogDebug("Cleaning up before process list refresh");
-                    await CleanupService.CleanupAsync();
+                    Logger.LogDebug("Cleaning up before process list refresh. Current ProcessId: {ProcessId}", _state.SelectedProcessId.Value);
+                    try
+                    {
+                        await CleanupService.CleanupAsync();
+                        Logger.LogDebug("Cleanup completed successfully");
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        Logger.LogWarning(cleanupEx, "Non-critical error during cleanup");
+                    }
                 }
 
-                Logger.LogDebug("Calling ScannerService.RefreshProcessList");
+                Logger.LogDebug("Starting process list refresh. Current state: {@State}", _state);
                 ArgumentNullException.ThrowIfNull(_state, nameof(_state));
+
+                var sw = Stopwatch.StartNew();
+                Logger.LogDebug("Calling ScannerService.RefreshProcessList");
                 await ScannerService.RefreshProcessList(_state);
-                Logger.LogInformation("Process list refreshed successfully");
+                sw.Stop();
+
+                Logger.LogInformation(
+                    "Process list refreshed successfully in {ElapsedMs}ms. Found {Count} processes. State after refresh: {@State}", 
+                    sw.ElapsedMilliseconds,
+                    _state.ProcessList?.Count ?? 0,
+                    _state);
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Failed to refresh process list");
+                Logger.LogError(ex, "Failed to refresh process list. Last known state: {@State}", _state);
+                NotificationService.ShowError("Process List Error", 
+                    $"Failed to refresh process list: {ex.Message}. Check if you have the necessary permissions.");
                 throw;
             }
             finally
             {
                 _state.IsLoading = false;
+                Logger.LogDebug("Process list refresh completed. Final state: {@State}", _state);
                 StateHasChanged();
             }
         }
@@ -133,16 +153,76 @@ namespace BlazorFridaApp.Components.Pages
                 return;
             }
 
+            if (!_state.SelectedProcessId.HasValue)
+            {
+                Logger.LogWarning("Scan attempted without selected process");
+                NotificationService.ShowError("Scan Error", "Please select a process first");
+                return;
+            }
+
+            if (scanExecutor == null)
+            {
+                Logger.LogError("ScanExecutor is null");
+                NotificationService.ShowError("Scan Error", "Scanner component not initialized properly");
+                return;
+            }
+
             try
             {
-                Logger.LogInformation("Starting memory scan");
-                await scanExecutor.ExecuteScan(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0));
-                Logger.LogDebug("Scan execution initiated successfully");
+                Logger.LogInformation("Starting memory scan with parameters - ProcessId: {ProcessId}, ScanType: {ScanType}, ValueType: {ValueType}, IsFirstScan: {IsFirstScan}",
+                    _state.SelectedProcessId, _state.SelectedScanType, _state.SelectedValueType, _state.IsFirstScan);
+                
+                _state.IsLoading = true;
+                StateHasChanged();
+
+                Logger.LogDebug("Starting background scan task");
+                await Task.Run(async () =>
+                {
+                    Logger.LogDebug("Background task started");
+                    try 
+                    {
+                        Logger.LogDebug("Executing scan with executor: {@ScanExecutor}", scanExecutor);
+                        await scanExecutor.ExecuteScan(addr => {
+                            try
+                            {
+                                Logger.LogTrace("Reading value at address: {Address:X}", addr);
+                                var value = GetCurrentValue(addr).Result;
+                                if (value == null || value.Length == 0)
+                                {
+                                    Logger.LogWarning("Got empty value at address {Address:X}", addr);
+                                    return 0;
+                                }
+                                var result = BitConverter.ToInt32(value, 0);
+                                Logger.LogTrace("Value read at {Address:X}: {Value}", addr, result);
+                                return result;
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.LogError(ex, "Error reading value at {Address:X}", addr);
+                                return 0;
+                            }
+                        });
+                        Logger.LogDebug("Scan execution completed in background task");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, "Error in background scan task. State: {@State}", _state);
+                        throw;
+                    }
+                });
+
+                Logger.LogInformation("Scan execution completed successfully. State: IsLoading={IsLoading}", _state.IsLoading);
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error executing memory scan");
-                throw;
+                Logger.LogError(ex, "Error executing memory scan. State: {@State}", _state);
+                NotificationService.ShowError("Scan Error", $"Error during scan: {ex.Message}");
+            }
+            finally
+            {
+                _state.IsLoading = false;
+                Logger.LogDebug("Scan cleanup completed. Final state: {@State}", _state);
+                StateHasChanged();
             }
         }
 

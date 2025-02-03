@@ -115,70 +115,121 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 using var cts = new CancellationTokenSource(OperationTimeout);
                 return await Task.Run(() =>
                 {
-                    using (Py.GIL())
+                    _logger.LogDebug("Entering Task.Run for process list retrieval");
+                    List<ProcessInfo> processes = new();
+
+                    try
                     {
-                        if (_fridaScanner == null)
-                            throw new InvalidOperationException("Frida scanner not initialized");
-
-                        string jsonProcesses = _fridaScanner.get_process_list();
-                        _logger.LogDebug("Got process list JSON: {Json}", jsonProcesses);
-
-                        var processes = new List<ProcessInfo>();
-                        var processDatas = JsonSerializer.Deserialize<List<ProcessData>>(jsonProcesses);
-                        
-                        if (processDatas != null)
+                        _logger.LogDebug("Acquiring Python GIL");
+                        using (Py.GIL())
                         {
-                            _logger.LogInformation("Found {Count} processes from frida", processDatas.Count);
-                            foreach (var data in processDatas)
+                            if (_fridaScanner == null)
                             {
+                                _logger.LogError("Frida scanner is null after initialization");
+                                throw new InvalidOperationException("Frida scanner not initialized");
+                            }
+
+                            _logger.LogDebug("Calling Frida get_process_list");
+                            dynamic? result = null;
+                            try
+                            {
+                                result = _fridaScanner.get_process_list();
+                            }
+                            catch (PythonException pex)
+                            {
+                                _logger.LogError(pex, "Python error during get_process_list");
+                                throw new InvalidOperationException("Failed to get process list from Frida", pex);
+                            }
+
+                            if (result == null)
+                            {
+                                _logger.LogError("Frida returned null process list");
+                                throw new InvalidOperationException("Frida returned null process list");
+                            }
+
+                            string jsonProcesses = (string)result;
+                            _logger.LogDebug("Got process list JSON: {Json}", jsonProcesses);
+
+                            if (string.IsNullOrEmpty(jsonProcesses))
+                            {
+                                _logger.LogError("Frida returned empty process list");
+                                throw new InvalidOperationException("Frida returned empty process list");
+                            }
+
+                            var processDatas = JsonSerializer.Deserialize<List<ProcessData>>(jsonProcesses);
+                            
+                            if (processDatas == null || !processDatas.Any())
+                            {
+                                _logger.LogWarning("No processes found in Frida response");
+                                return processes;
+                            }
+
+                            _logger.LogInformation("Found {Count} processes from frida", processDatas.Count);
+                            var addedPids = new HashSet<int>();
+
+                            foreach (var data in processDatas.Where(p => p.Pid != 0))
+                            {
+                                if (cts.Token.IsCancellationRequested)
+                                {
+                                    _logger.LogWarning("Process enumeration cancelled");
+                                    break;
+                                }
+
                                 try
                                 {
-                                    cts.Token.ThrowIfCancellationRequested();
-                                    var process = Process.GetProcessById(data.Pid);
-                                    if (process is not null)
+                                    _logger.LogTrace("Processing PID: {Pid} ({Name})", data.Pid, data.Name);
+                                    Process? process = null;
+                                    try { process = Process.GetProcessById(data.Pid); } catch { }
+                                    
+                                    if (process != null && !string.IsNullOrEmpty(process.ProcessName) && !addedPids.Contains(process.Id))
                                     {
-                                        if (!string.IsNullOrEmpty(process.ProcessName))
+                                        processes.Add(new ProcessInfo
                                         {
-                                            processes.Add(new ProcessInfo
-                                            {
-                                                Id = process.Id,
-                                                Name = process.ProcessName,
-                                                DisplayName = $"{process.ProcessName} ({process.Id})"
-                                            });
-                                        }
-                                        process.Dispose();
+                                            Id = process.Id,
+                                            Name = process.ProcessName,
+                                            DisplayName = $"{process.ProcessName} ({process.Id})"
+                                        });
+                                        addedPids.Add(process.Id);
+                                        _logger.LogTrace("Added process {Name} ({Id})", process.ProcessName, process.Id);
                                     }
-                                }
-                                catch (OperationCanceledException)
-                                {
-                                    _logger.LogWarning("Process enumeration timed out after {Timeout}ms", OperationTimeout.TotalMilliseconds);
-                                    throw;
+                                    process?.Dispose();
                                 }
                                 catch (Exception ex) when (
                                     ex is ArgumentException ||
-                                    ex is System.ComponentModel.Win32Exception)
+                                    ex is System.ComponentModel.Win32Exception ||
+                                    ex is InvalidOperationException)
                                 {
-                                    _logger.LogWarning(ex, "Could not access process {Pid}", data.Pid);
+                                    _logger.LogWarning(ex, "Could not access process {Pid} ({Name})", data.Pid, data.Name);
                                     continue;
                                 }
                             }
                         }
                         
                         sw.Stop();
+                        var orderedProcesses = processes.OrderBy(p => p.Name).ToList();
                         _logger.LogInformation(
                             "Successfully retrieved {Count} accessible processes in {ElapsedMs}ms",
-                            processes.Count, sw.ElapsedMilliseconds);
+                            orderedProcesses.Count, sw.ElapsedMilliseconds);
                             
-                        return processes;
+                        return orderedProcesses;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error in Task.Run while getting process list");
+                        throw;
                     }
                 }, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                sw.Stop();
+                _logger.LogWarning("Process list retrieval timed out after {ElapsedMs}ms", sw.ElapsedMilliseconds);
+                return new List<ProcessInfo>();
             }
             catch (Exception ex)
             {
                 sw.Stop();
-                _logger.LogError(ex,
-                    "Failed to get accessible processes after {ElapsedMs}ms",
-                    sw.ElapsedMilliseconds);
+                _logger.LogError(ex, "Failed to get accessible processes after {ElapsedMs}ms", sw.ElapsedMilliseconds);
                 return new List<ProcessInfo>();
             }
         }
