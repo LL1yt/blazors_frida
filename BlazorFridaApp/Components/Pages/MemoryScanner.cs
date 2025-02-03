@@ -7,6 +7,7 @@ using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.MemoryScanner.Models;
 using System.Runtime.InteropServices;
 using System;
+using BlazorFridaApp.Services.Interfaces;
 
 namespace BlazorFridaApp.Components.Pages
 {
@@ -14,6 +15,7 @@ namespace BlazorFridaApp.Components.Pages
     {
         [Inject] protected new MemoryScannerService ScannerService { get; set; } = default!;
         [Inject] protected new INotificationService NotificationService { get; set; } = default!;
+        [Inject] protected IMemoryCleanupService CleanupService { get; set; } = default!;
 
         private readonly Stopwatch _componentLifetimeStopwatch = new();
         private ScanExecutor scanExecutor = default!;
@@ -49,7 +51,15 @@ namespace BlazorFridaApp.Components.Pages
             
             try
             {
+                // Clean up existing resources before refresh
+                if (_state?.SelectedProcessId.HasValue == true)
+                {
+                    Logger.LogDebug("Cleaning up before process list refresh");
+                    await CleanupService.CleanupAsync();
+                }
+
                 Logger.LogDebug("Calling ScannerService.RefreshProcessList");
+                ArgumentNullException.ThrowIfNull(_state, nameof(_state));
                 await ScannerService.RefreshProcessList(_state);
                 Logger.LogInformation("Process list refreshed successfully");
             }
@@ -291,6 +301,21 @@ namespace BlazorFridaApp.Components.Pages
                 {
                     Logger.LogDebug("Disposing scanner service");
                     await disposableService.DisposeAsync().ConfigureAwait(false);
+                }
+                
+
+                // Ensure Python runtime is released
+                if (_state?.SelectedProcessId.HasValue == true)
+                {
+                    Logger.LogDebug("Detaching from process {ProcessId}", _state.SelectedProcessId.Value);
+                    try
+                    {
+                        await CleanupService.CleanupAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Error detaching from process");
+                    }
                 }
 
                 // Dispose other components

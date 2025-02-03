@@ -243,8 +243,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 {
                     if (_fridaScanner != null)
                     {
-                        _pythonRuntime.ExecuteWithGIL(() =>
-                        {
+                        await Task.Run(() => _pythonRuntime.ExecuteWithGIL(() => {
                             try
                             {
                                 _fridaScanner.detach();
@@ -253,7 +252,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                             {
                                 LoggerExtensions.LogError(_logger, pex, "Python error during cleanup: {Message}", pex.Message);
                             }
-                        });
+                        }));
                         _fridaScanner = null;
                     }
                 }
@@ -273,13 +272,12 @@ namespace BlazorFridaApp.MemoryScanner.Services
             {
                 _logger.LogDebug("Detaching from Frida session");
                 await Task.Run(() => {
-                    using (Py.GIL())
-                    {
+                    _pythonRuntime.ExecuteWithGIL(() => {
                         if (_fridaScanner != null)
                         {
                             _fridaScanner.detach();
                         }
-                    }
+                    });
                 });
             }
             catch (Exception ex)
