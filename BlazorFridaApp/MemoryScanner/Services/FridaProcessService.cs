@@ -139,9 +139,10 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     {
                         try
                         {
+                            _logger.LogDebug("Starting get_process_list thread");
                             dynamic result = _fridaScanner.get_process_list();
                             jsonProcesses = (string)result;
-                            _logger.LogDebug("Successfully got process list from Frida");
+                            _logger.LogDebug("Successfully got process list from Frida: {Length} chars", jsonProcesses?.Length ?? 0);
                         }
                         catch (Exception ex)
                         {
@@ -150,18 +151,22 @@ namespace BlazorFridaApp.MemoryScanner.Services
                         }
                         finally
                         {
+                            _logger.LogDebug("get_process_list thread finished");
                             done.Set();
                         }
                     });
                     
                     thread.Start();
-                    if (!done.Wait(TimeSpan.FromSeconds(5)))
+                    _logger.LogDebug("Waiting for get_process_list thread...");
+                    if (!done.Wait(TimeSpan.FromSeconds(15))) // Увеличиваем таймаут до 15 секунд
                     {
+                        _logger.LogError("Frida get_process_list call timed out after 15 seconds");
                         throw new TimeoutException("Frida get_process_list call timed out");
                     }
                     
                     if (error != null)
                     {
+                        _logger.LogError(error, "Error from get_process_list thread");
                         throw error;
                     }
 
