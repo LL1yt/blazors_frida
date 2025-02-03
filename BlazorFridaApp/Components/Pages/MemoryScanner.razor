@@ -73,10 +73,10 @@
             <ScanResultsGrid
                 Results="@_state.ScanResults"
                 ValueType="@_state.SelectedValueType"
-                GetCurrentValue="@GetCurrentValue"
+                GetCurrentValue="@(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0))"
                 IsFrozen="@IsFrozen"
-                OnValueChanged="@OnValueChanged"
-                OnFreezeToggle="@ToggleFreeze" />
+                OnValueChanged="@(args => OnValueChanged(args.address, args.value))"
+                OnFreezeToggle="@(addr => ToggleFreeze(addr, BitConverter.GetBytes(0)))" />
         </RadzenCard>
     </div>
 </div>

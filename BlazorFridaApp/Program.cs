@@ -4,6 +4,7 @@ using BlazorFridaApp.MemoryScanner.Services;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.Persistence;
 using BlazorFridaApp.Services;
+using BlazorFridaApp.Services.Interfaces;
 using BlazorFridaApp.Components.Pages;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;

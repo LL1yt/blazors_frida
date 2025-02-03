@@ -1,13 +1,9 @@
 using Microsoft.Extensions.Logging;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using BlazorFridaApp.Services.Interfaces;
 
 namespace BlazorFridaApp.Services
 {
-    public interface IMemoryCleanupService
-    {
-        Task CleanupAsync();
-    }
-
     public class MemoryCleanupService : IMemoryCleanupService
     {
         private readonly IFridaInteropService _fridaInterop;

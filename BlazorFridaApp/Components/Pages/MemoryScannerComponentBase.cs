@@ -1,8 +1,13 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
-using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.MemoryScanner.Models;
+using System.Runtime.InteropServices;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using BlazorFridaApp.MemoryScanner.Components;
 
 namespace BlazorFridaApp.Components.Pages
 {
@@ -56,7 +61,7 @@ namespace BlazorFridaApp.Components.Pages
             await Task.CompletedTask;
         }
 
-        public virtual void OnScanComplete(List<IntPtr> results)
+        public virtual void OnScanComplete(List<nint> results)
         {
         }
 
@@ -74,9 +79,9 @@ namespace BlazorFridaApp.Components.Pages
             await Task.CompletedTask;
         }
 
-        public virtual async Task<byte[]> GetCurrentValue(nint address)
+        public virtual Task<byte[]> GetCurrentValue(nint address)
         {
-            return Array.Empty<byte>();
+            return Task.FromResult(new byte[0]);
         }
 
         public virtual bool IsFrozen(nint address)
@@ -84,14 +89,14 @@ namespace BlazorFridaApp.Components.Pages
             return false;
         }
 
-        public virtual async Task OnValueChanged(nint address, byte[] newValue)
+        public virtual Task OnValueChanged(nint address, byte[] newValue)
         {
-            await Task.CompletedTask;
+            return Task.CompletedTask;
         }
 
-        public virtual async Task ToggleFreeze(nint address, byte[] value)
+        public virtual Task ToggleFreeze(nint address, byte[] value)
         {
-            await Task.CompletedTask;
+            return Task.CompletedTask;
         }
     }
 }

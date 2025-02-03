@@ -1,4 +1,4 @@
- using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.Services;
 using System.Diagnostics;
@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.MemoryScanner.Models;
 using System.Runtime.InteropServices;
+using System;
 
 namespace BlazorFridaApp.Components.Pages
 {
@@ -13,13 +14,11 @@ namespace BlazorFridaApp.Components.Pages
     {
         [Inject] protected new MemoryScannerService ScannerService { get; set; } = default!;
         [Inject] protected new INotificationService NotificationService { get; set; } = default!;
-        [Inject] protected new ILogger<MemoryScanner> Logger { get; set; } = default!;
 
         private readonly Stopwatch _componentLifetimeStopwatch = new();
         private ScanExecutor scanExecutor = default!;
         private MemoryValueHandler valueHandler = default!;
         private ValueFreezer valueFreezer = default!;
-        protected MemoryScannerState _state => base._state;
 
         protected override async Task OnInitializedAsync()
         {
@@ -127,7 +126,7 @@ namespace BlazorFridaApp.Components.Pages
             try
             {
                 Logger.LogInformation("Starting memory scan");
-                await scanExecutor.ExecuteScan(GetCurrentValue);
+                await scanExecutor.ExecuteScan(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0));
                 Logger.LogDebug("Scan execution initiated successfully");
             }
             catch (Exception ex)
@@ -137,12 +136,12 @@ namespace BlazorFridaApp.Components.Pages
             }
         }
 
-        public override void OnScanComplete(List<IntPtr> results)
+        public override void OnScanComplete(List<nint> results)
         {
             try
             {
                 Logger.LogInformation("Scan completed with {Count} results", results.Count);
-                _state.OnScanComplete(results.ConvertAll(ptr => (nint)ptr));
+                _state.OnScanComplete(results);
                 StateHasChanged();
             }
             catch (Exception ex)
@@ -188,11 +187,11 @@ namespace BlazorFridaApp.Components.Pages
             }
         }
 
-        public override async Task<byte[]> GetCurrentValue(nint address)
+        public override Task<byte[]> GetCurrentValue(nint address)
         {
             try
             {
-                return await valueHandler.GetCurrentValue((IntPtr)address);
+                return valueHandler.GetCurrentValue((IntPtr)address);
             }
             catch (Exception ex)
             {
@@ -214,11 +213,11 @@ namespace BlazorFridaApp.Components.Pages
             }
         }
 
-        public override async Task OnValueChanged(nint address, byte[] newValue)
+        public override Task OnValueChanged(nint address, byte[] newValue)
         {
             try
             {
-                await valueHandler.OnValueChanged((IntPtr)address, newValue);
+                return valueHandler.OnValueChanged(((IntPtr)address, newValue));
             }
             catch (Exception ex)
             {
@@ -227,11 +226,12 @@ namespace BlazorFridaApp.Components.Pages
             }
         }
 
-        public override async Task ToggleFreeze(nint address, byte[] value)
+        public override Task ToggleFreeze(nint address, byte[] value)
         {
             try
             {
-                await valueFreezer.ToggleFreeze((IntPtr)address, value);
+                int intValue = BitConverter.ToInt32(value, 0);
+                return valueFreezer.ToggleFreeze((IntPtr)address, intValue);
             }
             catch (Exception ex)
             {
