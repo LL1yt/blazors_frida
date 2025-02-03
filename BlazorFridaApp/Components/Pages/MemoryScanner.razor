@@ -3,15 +3,14 @@
 @inherits MemoryScannerComponentBase
 @implements IAsyncDisposable
 
-@inject IProcessService ProcessService
-@inject IScanProfileService ProfileService
 @inject DialogService DialogService
+
 @code {
     [Inject]
     private new ILogger<MemoryScanner> Logger { get; set; } = default!;
 
+    private MemoryScannerState _state = new();
 }
-
 
 <div class="memory-scanner-container">
     <RadzenCard class="header-card">
@@ -137,7 +136,15 @@
 </style>
 
 @code {
-    private MemoryScannerState _state = new();
+    private ScanExecutor scanExecutor = default!;
+    private MemoryValueHandler valueHandler = default!;
+    private ValueFreezer valueFreezer = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Logger.LogInformation("Initializing MemoryScanner component");
+        await base.OnInitializedAsync();
+    }
 
     private async Task RefreshProcessList()
     {
@@ -249,98 +256,24 @@
         }
     }
 
-    private void OnLoadingChanged(bool loading)
+    private void OnLoadingChanged(bool isLoading)
     {
-        Logger.LogDebug("Loading state changed to {Loading}", loading);
-        _state.IsLoading = loading;
+        _state.IsLoading = isLoading;
         StateHasChanged();
-    }
-
-    private int GetCurrentValue(IntPtr address)
-    {
-        try
-        {
-            var value = valueHandler.GetCurrentValue(address);
-            Logger.LogTrace("Retrieved current value {Value} from address {Address}", value, address);
-            return value;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error getting current value from address {Address}", address);
-            throw;
-        }
-    }
-
-    private async Task OnValueChanged((IntPtr address, int value) change)
-    {
-        try
-        {
-            Logger.LogDebug("Value change requested: Address {Address}, New Value {Value}",
-                change.address, change.value);
-            await valueHandler.OnValueChanged(change);
-            Logger.LogTrace("Value changed successfully");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error changing value at address {Address}", change.address);
-            throw;
-        }
-    }
-
-    private async Task ToggleFreeze(IntPtr address)
-    {
-        try
-        {
-            Logger.LogDebug("Toggle freeze requested for address {Address}", address);
-            await valueFreezer.ToggleFreeze(address, GetCurrentValue(address));
-            Logger.LogTrace("Freeze toggle completed successfully");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error toggling freeze for address {Address}", address);
-            throw;
-        }
-    }
-
-    private bool IsFrozen(IntPtr address)
-    {
-        try
-        {
-            var frozen = valueFreezer.IsFrozen(address);
-            Logger.LogTrace("Checked freeze status for address {Address}: {IsFrozen}", address, frozen);
-            return frozen;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error checking freeze status for address {Address}", address);
-            throw;
-        }
     }
 
     private async Task SaveConfig()
     {
         try
         {
-            Logger.LogInformation("Starting configuration save");
-            var config = _state.ToConfig();
-            var result = await DialogService.OpenAsync<SaveConfigDialog>("Save Configuration");
-            
-            if (result is string configName && !string.IsNullOrEmpty(configName))
-            {
-                Logger.LogDebug("Saving configuration with name: {ConfigName}", configName);
-                await ProfileService.SaveScannerConfig(configName, config);
-                NotificationService.ShowSuccess("Success", "Configuration saved successfully");
-                Logger.LogInformation("Configuration saved successfully: {ConfigName}", configName);
-            }
-            else
-            {
-                Logger.LogDebug("Configuration save cancelled or invalid name provided");
-            }
+            Logger.LogInformation("Saving scan configuration");
+            // TODO: Implement configuration saving
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to save configuration");
-            NotificationService.ShowError("Error", "Failed to save configuration", ex);
+            Logger.LogError(ex, "Error saving scan configuration");
+            throw;
         }
     }
 
@@ -348,30 +281,84 @@
     {
         try
         {
-            Logger.LogInformation("Starting configuration load");
-            var configs = await ProfileService.GetScannerConfigs();
-            Logger.LogDebug("Retrieved {Count} configurations", configs.Count);
-            
-            var result = await DialogService.OpenAsync<LoadConfigDialog>("Load Configuration",
-                new Dictionary<string, object> { { "Configs", configs } });
-            
-            if (result is ScannerConfig config)
-            {
-                Logger.LogDebug("Loading selected configuration");
-                _state.LoadConfig(config);
-                NotificationService.ShowSuccess("Success", "Configuration loaded successfully");
-                Logger.LogInformation("Configuration loaded successfully");
-                StateHasChanged();
-            }
-            else
-            {
-                Logger.LogDebug("Configuration load cancelled");
-            }
+            Logger.LogInformation("Loading scan configuration");
+            // TODO: Implement configuration loading
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to load configuration");
-            NotificationService.ShowError("Error", "Failed to load configuration", ex);
+            Logger.LogError(ex, "Error loading scan configuration");
+            throw;
+        }
+    }
+
+    private async Task<byte[]?> GetCurrentValue(nint address)
+    {
+        try
+        {
+            return await valueHandler.GetCurrentValue(address);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error getting current value at address {Address:X}", address);
+            throw;
+        }
+    }
+
+    private bool IsFrozen(nint address)
+    {
+        try
+        {
+            return valueFreezer.IsFrozen(address);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error checking freeze state for address {Address:X}", address);
+            throw;
+        }
+    }
+
+    private async Task OnValueChanged(nint address, byte[] newValue)
+    {
+        try
+        {
+            await valueHandler.OnValueChanged(address, newValue);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error handling value change at address {Address:X}", address);
+            throw;
+        }
+    }
+
+    private async Task ToggleFreeze(nint address, byte[] value)
+    {
+        try
+        {
+            await valueFreezer.ToggleFreeze(address, value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling freeze state for address {Address:X}", address);
+            throw;
+        }
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        try
+        {
+            Logger.LogInformation("Disposing MemoryScanner component");
+            if (valueFreezer != null)
+            {
+                await valueFreezer.DisposeAsync();
+            }
+            await base.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error disposing MemoryScanner component");
+            throw;
         }
     }
 }
