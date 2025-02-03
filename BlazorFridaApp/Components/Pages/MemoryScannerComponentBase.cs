@@ -74,9 +74,9 @@ namespace BlazorFridaApp.Components.Pages
             await Task.CompletedTask;
         }
 
-        public virtual async Task<byte[]?> GetCurrentValue(nint address)
+        public virtual async Task<byte[]> GetCurrentValue(nint address)
         {
-            return null;
+            return Array.Empty<byte>();
         }
 
         public virtual bool IsFrozen(nint address)

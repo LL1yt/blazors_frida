@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components;
+ using Microsoft.AspNetCore.Components;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.Services;
 using System.Diagnostics;
@@ -19,6 +19,7 @@ namespace BlazorFridaApp.Components.Pages
         private ScanExecutor scanExecutor = default!;
         private MemoryValueHandler valueHandler = default!;
         private ValueFreezer valueFreezer = default!;
+        protected MemoryScannerState _state => base._state;
 
         protected override async Task OnInitializedAsync()
         {
@@ -187,7 +188,7 @@ namespace BlazorFridaApp.Components.Pages
             }
         }
 
-        public override async Task<byte[]?> GetCurrentValue(nint address)
+        public override async Task<byte[]> GetCurrentValue(nint address)
         {
             try
             {

@@ -8,86 +8,63 @@
     [Parameter]
     public MemoryValueType ValueType { get; set; }
 
-    public int GetCurrentValue(IntPtr address)
+    public async Task<byte[]> GetCurrentValue(IntPtr address)
     {
         try
         {
-            if (!currentValues.TryGetValue(address, out var value))
+            if (ValueType == MemoryValueType.String || ValueType == MemoryValueType.Array)
             {
-                if (ValueType == MemoryValueType.String || ValueType == MemoryValueType.Array)
-                {
-                    ShowWarning("Unsupported type", $"Type {ValueType} is not supported yet");
-                    return 0;
-                }
-
-                var size = ValueType switch
-                {
-                    MemoryValueType.Byte => 1,
-                    MemoryValueType.Short => 2,
-                    MemoryValueType.Int => 4,
-                    MemoryValueType.Float => 4,
-                    MemoryValueType.Long => 8,
-                    MemoryValueType.Double => 8,
-                    _ => throw new ArgumentException($"Unsupported value type: {ValueType}")
-                };
-
-                byte[] bytes;
-                try
-                {
-                    bytes = MemoryReader.ReadMemoryBytes(address, size).Result;
-                }
-                catch (Exception ex)
-                {
-                    ShowError("Memory read error", $"Failed to read memory at {address:X}", ex);
-                    return 0;
-                }
-
-                try
-                {
-                    value = ValueType switch
-                    {
-                        MemoryValueType.Byte => bytes[0],
-                        MemoryValueType.Short => BitConverter.ToInt16(bytes),
-                        MemoryValueType.Int => BitConverter.ToInt32(bytes),
-                        MemoryValueType.Float => (int)BitConverter.ToSingle(bytes),
-                        MemoryValueType.Long => (int)BitConverter.ToInt64(bytes),
-                        MemoryValueType.Double => (int)BitConverter.ToDouble(bytes),
-                        _ => throw new ArgumentException($"Unsupported value type: {ValueType}")
-                    };
-                    currentValues[address] = value;
-                }
-                catch (Exception ex)
-                {
-                    ShowError("Value conversion error", $"Failed to convert bytes to {ValueType}", ex);
-                    return 0;
-                }
+                ShowWarning("Unsupported type", $"Type {ValueType} is not supported yet");
+                return Array.Empty<byte>();
             }
-            return value;
+
+            int size = ValueType switch
+            {
+                MemoryValueType.Byte => 1,
+                MemoryValueType.Short => 2,
+                MemoryValueType.Int => 4,
+                MemoryValueType.Float => 4,
+                MemoryValueType.Long => 8,
+                MemoryValueType.Double => 8,
+                _ => throw new ArgumentException($"Unsupported value type: {ValueType}")
+            };
+
+            byte[] bytes;
+            try
+            {
+                bytes = await MemoryReader.ReadMemoryBytes(address, size);
+            }
+            catch (Exception ex)
+            {
+                ShowError("Memory read error", $"Failed to read memory at {address:X}", ex);
+                return Array.Empty<byte>();
+            }
+            
+            return bytes;
         }
         catch (Exception ex)
         {
             ShowError("Unexpected error", "Error getting value", ex);
-            return 0;
+            return Array.Empty<byte>();
         }
     }
 
-    public async Task OnValueChanged((IntPtr address, int value) change)
+    public async Task OnValueChanged((IntPtr address, byte[] value) change)
     {
         try
         {
-            var bytes = ValueType switch
+            await MemoryReader.WriteMemoryBytes(change.address, change.value);
+            int computedValue = ValueType switch
             {
-                MemoryValueType.Byte => new[] { (byte)change.value },
-                MemoryValueType.Short => BitConverter.GetBytes((short)change.value),
-                MemoryValueType.Int => BitConverter.GetBytes(change.value),
-                MemoryValueType.Float => BitConverter.GetBytes((float)change.value),
-                MemoryValueType.Long => BitConverter.GetBytes((long)change.value),
-                MemoryValueType.Double => BitConverter.GetBytes((double)change.value),
-                _ => BitConverter.GetBytes(change.value)
+                MemoryValueType.Byte => change.value[0],
+                MemoryValueType.Short => BitConverter.ToInt16(change.value, 0),
+                MemoryValueType.Int => BitConverter.ToInt32(change.value, 0),
+                MemoryValueType.Float => (int)BitConverter.ToSingle(change.value, 0),
+                MemoryValueType.Long => (int)BitConverter.ToInt64(change.value, 0),
+                MemoryValueType.Double => (int)BitConverter.ToDouble(change.value, 0),
+                _ => 0
             };
-
-            await MemoryReader.WriteMemoryBytes(change.address, bytes);
-            currentValues[change.address] = change.value;
+            currentValues[change.address] = computedValue;
         }
         catch (Exception ex)
         {
