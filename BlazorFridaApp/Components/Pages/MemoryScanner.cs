@@ -4,13 +4,16 @@ using BlazorFridaApp.Services;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using BlazorFridaApp.MemoryScanner.Models;
+using System.Runtime.InteropServices;
 
 namespace BlazorFridaApp.Components.Pages
 {
-    public partial class MemoryScanner : MemoryScannerComponentBase, IAsyncDisposable
+    public partial class MemoryScanner : MemoryScannerComponentBase
     {
-        [Inject] private MemoryScannerService ScannerService { get; set; } = default!;
-        [Inject] new private INotificationService NotificationService { get; set; } = default!;
+        [Inject] protected new MemoryScannerService ScannerService { get; set; } = default!;
+        [Inject] protected new INotificationService NotificationService { get; set; } = default!;
+        [Inject] protected new ILogger<MemoryScanner> Logger { get; set; } = default!;
 
         private readonly Stopwatch _componentLifetimeStopwatch = new();
         private ScanExecutor scanExecutor = default!;
@@ -27,7 +30,6 @@ namespace BlazorFridaApp.Components.Pages
                 await base.OnInitializedAsync();
                 Logger.LogInformation("Base initialization completed after {ElapsedMs}ms", _componentLifetimeStopwatch.ElapsedMilliseconds);
                 
-                // Log initial state
                 Logger.LogDebug("Initial state - Selected Process: {ProcessId}, Scan Type: {ScanType}, Value Type: {ValueType}",
                     _state.SelectedProcessId, _state.SelectedScanType, _state.SelectedValueType);
             }
@@ -39,39 +41,205 @@ namespace BlazorFridaApp.Components.Pages
             }
         }
 
-        protected override async Task OnParametersSetAsync()
+        public override async Task RefreshProcessList()
         {
-            Logger.LogDebug("Parameters being set for MemoryScanner component after {ElapsedMs}ms", 
-                _componentLifetimeStopwatch.ElapsedMilliseconds);
-            await base.OnParametersSetAsync();
-        }
-
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (firstRender)
+            Logger.LogInformation("Starting process list refresh");
+            _state.IsLoading = true;
+            StateHasChanged();
+            
+            try
             {
-                Logger.LogInformation(
-                    "MemoryScanner component rendered for the first time after {ElapsedMs}ms. Component ID: {ComponentId}",
-                    _componentLifetimeStopwatch.ElapsedMilliseconds, GetHashCode());
-                
-                try
-                {
-                    await RefreshProcessList();
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "Failed to perform initial process list refresh");
-                }
+                Logger.LogDebug("Calling ScannerService.RefreshProcessList");
+                await ScannerService.RefreshProcessList(_state);
+                Logger.LogInformation("Process list refreshed successfully");
             }
-            else
+            catch (Exception ex)
             {
-                Logger.LogTrace(
-                    "MemoryScanner component re-rendered after {ElapsedMs}ms. State: {{ ProcessId: {ProcessId}, IsLoading: {IsLoading} }}",
-                    _componentLifetimeStopwatch.ElapsedMilliseconds, _state.SelectedProcessId, _state.IsLoading);
+                Logger.LogError(ex, "Failed to refresh process list");
+                throw;
+            }
+            finally
+            {
+                _state.IsLoading = false;
+                StateHasChanged();
             }
         }
 
-        public async ValueTask DisposeAsync()
+        public override async Task OnProcessSelected()
+        {
+            try
+            {
+                Logger.LogInformation("Process selected: ID {ProcessId}", _state.SelectedProcessId);
+                await ScannerService.OnProcessSelected(_state);
+                Logger.LogDebug("Process selection handled successfully");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error handling process selection for ID {ProcessId}", _state.SelectedProcessId);
+                throw;
+            }
+        }
+
+        public override async Task OnScanTypeChanged(ScanType newType)
+        {
+            try
+            {
+                Logger.LogInformation("Scan type changing from {OldType} to {NewType}",
+                    _state.SelectedScanType, newType);
+                await ScannerService.OnScanTypeChanged(_state, newType);
+                Logger.LogDebug("Scan type changed successfully");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error changing scan type to {NewType}", newType);
+                throw;
+            }
+        }
+
+        public override void OnValueTypeChanged(MemoryValueType newType)
+        {
+            try
+            {
+                Logger.LogInformation("Value type changing from {OldType} to {NewType}",
+                    _state.SelectedValueType, newType);
+                ScannerService.OnValueTypeChanged(_state, newType);
+                Logger.LogDebug("Value type changed successfully");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error changing value type to {NewType}", newType);
+                throw;
+            }
+        }
+
+        public override async Task OnScan()
+        {
+            if (!_state.CanScan)
+            {
+                Logger.LogWarning("Scan attempted but CanScan is false");
+                return;
+            }
+
+            try
+            {
+                Logger.LogInformation("Starting memory scan");
+                await scanExecutor.ExecuteScan(GetCurrentValue);
+                Logger.LogDebug("Scan execution initiated successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error executing memory scan");
+                throw;
+            }
+        }
+
+        public override void OnScanComplete(List<IntPtr> results)
+        {
+            try
+            {
+                Logger.LogInformation("Scan completed with {Count} results", results.Count);
+                _state.OnScanComplete(results.ConvertAll(ptr => (nint)ptr));
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error handling scan completion");
+                throw;
+            }
+        }
+
+        public override void OnLoadingChanged(bool isLoading)
+        {
+            _state.IsLoading = isLoading;
+            StateHasChanged();
+        }
+
+        public override async Task SaveConfig()
+        {
+            try
+            {
+                Logger.LogInformation("Saving scan configuration");
+                // TODO: Implement configuration saving
+                await Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error saving scan configuration");
+                throw;
+            }
+        }
+
+        public override async Task LoadConfig()
+        {
+            try
+            {
+                Logger.LogInformation("Loading scan configuration");
+                // TODO: Implement configuration loading
+                await Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error loading scan configuration");
+                throw;
+            }
+        }
+
+        public override async Task<byte[]?> GetCurrentValue(nint address)
+        {
+            try
+            {
+                return await valueHandler.GetCurrentValue((IntPtr)address);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error getting current value at address {Address:X}", address);
+                throw;
+            }
+        }
+
+        public override bool IsFrozen(nint address)
+        {
+            try
+            {
+                return valueFreezer.IsFrozen((IntPtr)address);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error checking freeze state for address {Address:X}", address);
+                throw;
+            }
+        }
+
+        public override async Task OnValueChanged(nint address, byte[] newValue)
+        {
+            try
+            {
+                await valueHandler.OnValueChanged((IntPtr)address, newValue);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error handling value change at address {Address:X}", address);
+                throw;
+            }
+        }
+
+        public override async Task ToggleFreeze(nint address, byte[] value)
+        {
+            try
+            {
+                await valueFreezer.ToggleFreeze((IntPtr)address, value);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error toggling freeze state for address {Address:X}", address);
+                throw;
+            }
+        }
+
+        protected override async ValueTask DisposeAsyncCore()
         {
             Logger.LogInformation(
                 "Disposing MemoryScanner component after {ElapsedMs}ms. Component ID: {ComponentId}",
@@ -93,20 +261,6 @@ namespace BlazorFridaApp.Components.Pages
                     await disposableService.DisposeAsync().ConfigureAwait(false);
                 }
 
-                // Ensure Python runtime is released
-                if (_state?.SelectedProcessId.HasValue == true)
-                {
-                    Logger.LogDebug("Detaching from process {ProcessId}", _state.SelectedProcessId.Value);
-                    try
-                    {
-                        // Add detach logic here if needed
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "Error detaching from process");
-                    }
-                }
-
                 // Dispose other components
                 await DisposeManagedResources().ConfigureAwait(false);
                 
@@ -117,10 +271,6 @@ namespace BlazorFridaApp.Components.Pages
             {
                 Logger.LogError(ex, "Error during MemoryScanner component disposal");
                 throw;
-            }
-            finally
-            {
-                GC.SuppressFinalize(this);
             }
         }
 
@@ -139,41 +289,6 @@ namespace BlazorFridaApp.Components.Pages
             if (valueFreezer is IAsyncDisposable disposableFreezer)
             {
                 await disposableFreezer.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-    }
-
-    public interface IMemoryCleanupService
-    {
-        Task CleanupAsync();
-    }
-
-    public class MemoryCleanupService : IMemoryCleanupService
-    {
-        private readonly BlazorFridaApp.MemoryScanner.Services.Interfaces.IFridaInteropService _fridaInterop;
-        private readonly BlazorFridaApp.MemoryScanner.Services.Interfaces.IPythonRuntimeService _pythonRuntime;
-        private readonly ILogger<MemoryCleanupService> _logger;
-
-        public MemoryCleanupService(
-            BlazorFridaApp.MemoryScanner.Services.Interfaces.IFridaInteropService fridaInterop,
-            BlazorFridaApp.MemoryScanner.Services.Interfaces.IPythonRuntimeService pythonRuntime,
-            ILogger<MemoryCleanupService> logger)
-        {
-            _fridaInterop = fridaInterop;
-            _pythonRuntime = pythonRuntime;
-            _logger = logger;
-        }
-
-        public async Task CleanupAsync()
-        {
-            try
-            {
-                await _fridaInterop.DetachAsync();
-                _pythonRuntime.ReleaseGIL();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during memory cleanup");
             }
         }
     }
