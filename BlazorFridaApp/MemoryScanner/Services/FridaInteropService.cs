@@ -2,18 +2,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Python.Runtime;
 using System.Diagnostics;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 
 namespace BlazorFridaApp.MemoryScanner.Services
 {
-    public interface IFridaInteropService : IAsyncDisposable
-    {
-        void Initialize();
-        bool AttachToProcess(string processName);
-        byte[]? ReadMemory(string address, int length);
-        bool WriteMemory(string address, byte[] value);
-        void Detach();
-    }
-
     public class FridaInteropService : IFridaInteropService
     {
         private readonly ILogger<FridaInteropService> _logger;
@@ -272,6 +264,20 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 
                 _disposed = true;
                 GC.SuppressFinalize(this);
+            }
+        }
+
+        public async Task DetachAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Detaching from Frida session");
+                await Task.CompletedTask; // Placeholder for actual detach logic
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error detaching from Frida session");
+                throw;
             }
         }
     }

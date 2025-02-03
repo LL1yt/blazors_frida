@@ -2,9 +2,11 @@ using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.MemoryScanner.Base
 {
-    public interface IProcessMemoryScanner : IAsyncDisposable
+    public interface IProcessMemoryScanner
     {
-        List<ProcessInfo> GetProcesses();
+        Task<List<ProcessInfo>> GetProcessListAsync();
+        Task SaveLastProcess(int processId);
+        Task<int?> GetLastProcessId();
         Task<List<nint>> ScanForPattern(int processId, byte[] pattern, string mask);
         Task<List<nint>> ScanForValue(int processId, int value, MemoryValueType valueType);
         Task<List<nint>> GetAllAddresses(int processId, MemoryValueType valueType);
@@ -12,7 +14,6 @@ namespace BlazorFridaApp.MemoryScanner.Base
         Task WriteMemory(nint address, byte[] value);
         Task FreezeValue(nint address, byte[] value, string valueType);
         Task UnfreezeValue(nint address);
-        Task SaveLastProcess(int processId);
-        Task<int?> GetLastProcessId();
+        ValueTask DisposeAsync();
     }
 }

@@ -6,7 +6,7 @@ namespace BlazorFridaApp.MemoryScanner.Services.Interfaces
 {
     public interface IProcessService
     {
+        Task<List<ProcessInfo>> GetAccessibleProcessesAsync();
         Task<ProcessInfo> GetTargetProcessAsync();
-        IEnumerable<ProcessInfo> GetAccessibleProcesses();
     }
 }

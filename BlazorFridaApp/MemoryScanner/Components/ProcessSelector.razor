@@ -103,27 +103,24 @@
 }
 
     <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
-        <RadzenDropDownDataGrid TValue="int?"
-                               @bind-Value="@SelectedProcessId"
-                               Data="@ProcessList"
-                               ValueProperty="Id"
-                               TextProperty="DisplayName"
-                               Placeholder="Select process"
-                               Change="@(args => HandleProcessSelected())"
-                               AllowClear="true"
-                               AllowFiltering="true"
-                               FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                               Style="width: 80%">
-            <Columns>
-                <RadzenDropDownDataGridColumn Property="DisplayName" Title="Process" />
-            </Columns>
-        </RadzenDropDownDataGrid>
-        <RadzenButton Icon="refresh"
-                      Click="@HandleRefreshClick"
-                      ButtonStyle="ButtonStyle.Light"
-                      Title="Scan processes"
-                      Text="Scan"
-                      Disabled="@IsLoading"/>
+        <RadzenDropDown TValue="int?"
+                       @bind-Value="@SelectedProcessId"
+                       Data="@ProcessList"
+                       ValueProperty="Id"
+                       TextProperty="DisplayName"
+                       Placeholder="@(IsLoading ? "Loading processes..." : "Click Scan to load processes")"
+                       Change="@(args => HandleProcessSelected())"
+                       AllowClear="true"
+                       AllowFiltering="true"
+                       FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                       Style="width: 80%"
+                       Disabled="@IsLoading"/>
+        <RadzenButton Icon="@(IsLoading ? "hourglass_empty" : "refresh")"
+                     Click="@HandleRefreshClick"
+                     ButtonStyle="ButtonStyle.Primary"
+                     Title="@(IsLoading ? "Loading..." : "Scan processes")"
+                     Text="@(IsLoading ? "Loading..." : "Scan")"
+                     Disabled="@IsLoading"/>
     </RadzenStack>
     @if (IsLoading)
     {

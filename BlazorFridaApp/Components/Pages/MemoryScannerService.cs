@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.Services;
+using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.Components.Pages
 {
@@ -31,23 +32,14 @@ namespace BlazorFridaApp.Components.Pages
         {
             try
             {
-                _logger.LogInformation("Refreshing process list...");
-                state.ProcessList = _processService.GetAccessibleProcesses().ToList();
-                
-                if (!state.ProcessList.Any())
-                {
-                    _notificationService.ShowWarning("No processes found",
-                        "No accessible processes were found");
-                    return;
-                }
-                
-                _logger.LogInformation($"Successfully loaded {state.ProcessList.Count} processes");
-                await LoadLastProcess(state);
+                _logger.LogInformation("Refreshing process list");
+                var processes = await _processService.GetAccessibleProcessesAsync();
+                state.ProcessList = processes;
+                _logger.LogInformation("Process list refreshed successfully");
             }
             catch (Exception ex)
             {
-                _notificationService.ShowError("Failed to refresh process list",
-                    "Failed to load process list", ex);
+                _logger.LogError(ex, "Failed to refresh process list");
                 throw;
             }
         }
@@ -64,18 +56,9 @@ namespace BlazorFridaApp.Components.Pages
 
         public async Task OnProcessSelected(MemoryScannerState state)
         {
-            try
+            if (state.SelectedProcessId.HasValue)
             {
-                if (state.SelectedProcessId.HasValue)
-                {
-                    await _profileService.SaveLastProcess(state.SelectedProcessId.Value);
-                    state.Reset();
-                }
-            }
-            catch (Exception ex)
-            {
-                _notificationService.ShowError("Error selecting process", ex.Message, ex);
-                throw;
+                await Task.CompletedTask; // Placeholder for future async operations
             }
         }
 

@@ -19,11 +19,9 @@ namespace BlazorFridaApp.MemoryScanner.Operations
             _profileService = profileService;
         }
 
-        public List<ProcessInfo> GetProcesses()
+        public async Task<List<ProcessInfo>> GetProcessListAsync()
         {
-            return ExecuteWithLogging(
-                () => Task.FromResult(_processService.GetAccessibleProcesses().ToList()),
-                "Getting accessible processes").Result;
+            return await _processService.GetAccessibleProcessesAsync();
         }
 
         public async Task SaveLastProcess(int processId)

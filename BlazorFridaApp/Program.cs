@@ -67,6 +67,10 @@ try
         options.UseSqlite("Data Source=gamememory.db",
             sqliteOptions => sqliteOptions.MigrationsAssembly("BlazorFridaApp")));
     builder.Services.AddScoped<IDatabaseInitializationService, DatabaseInitializationService>();
+
+    // Add memory cleanup service
+    builder.Services.AddScoped<IMemoryCleanupService, MemoryCleanupService>();
+
 var app = builder.Build();
 
 // Configure ProcessInfo logger

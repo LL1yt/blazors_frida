@@ -14,6 +14,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
         private readonly ILogger<ValueFreezerService> _logger;
         private readonly Dictionary<nint, Timer> _freezeTimers = new();
         private bool _disposed;
+        private CancellationTokenSource _freezeTokenSource = new();
 
         public ValueFreezerService(
             IMemoryReaderService memoryReader,
@@ -169,6 +170,15 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 _logger.LogError(ex, "Failed to unfreeze value at address {Address:X}", address);
                 throw;
             }
+        }
+
+        public async Task StopFreezingAsync()
+        {
+            await Task.Run(() => {
+                _freezeTokenSource.Cancel();
+                _freezeTokenSource.Dispose();
+                _freezeTokenSource = new CancellationTokenSource();
+            });
         }
 
         public async ValueTask DisposeAsync()

@@ -12,6 +12,7 @@ namespace BlazorFridaApp.MemoryScanner
         private readonly MemoryScanOperations _scanOps;
         private readonly MemoryAccessOperations _memoryOps;
         private readonly ValueFreezeOperations _freezeOps;
+        private readonly ILogger<ProcessMemoryScanner> _logger;
         private bool _disposed;
 
         public ProcessMemoryScanner(
@@ -39,9 +40,14 @@ namespace BlazorFridaApp.MemoryScanner
             _freezeOps = new ValueFreezeOperations(
                 freezer,
                 loggerFactory.CreateLogger<ValueFreezeOperations>());
+
+            _logger = loggerFactory.CreateLogger<ProcessMemoryScanner>();
         }
 
-        public List<ProcessInfo> GetProcesses() => _processOps.GetProcesses();
+        public async Task<List<ProcessInfo>> GetProcessListAsync()
+        {
+            return await _processOps.GetProcessListAsync();
+        }
 
         public Task<List<nint>> ScanForPattern(int processId, byte[] pattern, string mask) =>
             _scanOps.ScanForPattern(processId, pattern, mask);
@@ -64,11 +70,15 @@ namespace BlazorFridaApp.MemoryScanner
         public Task UnfreezeValue(nint address) =>
             _freezeOps.UnfreezeValue(address);
 
-        public Task SaveLastProcess(int processId) =>
-            _processOps.SaveLastProcess(processId);
+        public async Task SaveLastProcess(int processId)
+        {
+            await _processOps.SaveLastProcess(processId);
+        }
 
-        public Task<int?> GetLastProcessId() =>
-            _processOps.GetLastProcessId();
+        public async Task<int?> GetLastProcessId()
+        {
+            return await _processOps.GetLastProcessId();
+        }
 
         public async ValueTask DisposeAsync()
         {

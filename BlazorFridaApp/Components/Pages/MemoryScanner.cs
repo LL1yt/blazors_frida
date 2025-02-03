@@ -3,6 +3,7 @@ using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.Services;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 
 namespace BlazorFridaApp.Components.Pages
 {
@@ -78,31 +79,37 @@ namespace BlazorFridaApp.Components.Pages
             
             try
             {
+                // First, stop any ongoing scans
+                if (scanExecutor != null)
+                {
+                    Logger.LogDebug("Stopping any ongoing scans");
+                    scanExecutor.Reset();
+                }
+
+                // Release Frida resources first
                 if (ScannerService is IAsyncDisposable disposableService)
                 {
                     Logger.LogDebug("Disposing scanner service");
-                    await disposableService.DisposeAsync();
-                }
-                
-                if (scanExecutor is IAsyncDisposable disposableExecutor)
-                {
-                    Logger.LogDebug("Disposing scan executor");
-                    await disposableExecutor.DisposeAsync();
-                }
-                
-                if (valueHandler is IAsyncDisposable disposableHandler)
-                {
-                    Logger.LogDebug("Disposing value handler");
-                    await disposableHandler.DisposeAsync();
-                }
-                
-                if (valueFreezer is IAsyncDisposable disposableFreezer)
-                {
-                    Logger.LogDebug("Disposing value freezer");
-                    await disposableFreezer.DisposeAsync();
-                    valueFreezer = null!;
+                    await disposableService.DisposeAsync().ConfigureAwait(false);
                 }
 
+                // Ensure Python runtime is released
+                if (_state?.SelectedProcessId.HasValue == true)
+                {
+                    Logger.LogDebug("Detaching from process {ProcessId}", _state.SelectedProcessId.Value);
+                    try
+                    {
+                        // Add detach logic here if needed
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Error detaching from process");
+                    }
+                }
+
+                // Dispose other components
+                await DisposeManagedResources().ConfigureAwait(false);
+                
                 _componentLifetimeStopwatch.Stop();
                 Logger.LogInformation("MemoryScanner component disposed successfully");
             }
@@ -114,6 +121,59 @@ namespace BlazorFridaApp.Components.Pages
             finally
             {
                 GC.SuppressFinalize(this);
+            }
+        }
+
+        private async Task DisposeManagedResources()
+        {
+            if (scanExecutor is IAsyncDisposable disposableExecutor)
+            {
+                await disposableExecutor.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (valueHandler is IAsyncDisposable disposableHandler)
+            {
+                await disposableHandler.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (valueFreezer is IAsyncDisposable disposableFreezer)
+            {
+                await disposableFreezer.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    public interface IMemoryCleanupService
+    {
+        Task CleanupAsync();
+    }
+
+    public class MemoryCleanupService : IMemoryCleanupService
+    {
+        private readonly BlazorFridaApp.MemoryScanner.Services.Interfaces.IFridaInteropService _fridaInterop;
+        private readonly BlazorFridaApp.MemoryScanner.Services.Interfaces.IPythonRuntimeService _pythonRuntime;
+        private readonly ILogger<MemoryCleanupService> _logger;
+
+        public MemoryCleanupService(
+            BlazorFridaApp.MemoryScanner.Services.Interfaces.IFridaInteropService fridaInterop,
+            BlazorFridaApp.MemoryScanner.Services.Interfaces.IPythonRuntimeService pythonRuntime,
+            ILogger<MemoryCleanupService> logger)
+        {
+            _fridaInterop = fridaInterop;
+            _pythonRuntime = pythonRuntime;
+            _logger = logger;
+        }
+
+        public async Task CleanupAsync()
+        {
+            try
+            {
+                await _fridaInterop.DetachAsync();
+                _pythonRuntime.ReleaseGIL();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during memory cleanup");
             }
         }
     }

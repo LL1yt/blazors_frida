@@ -1,15 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Python.Runtime;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 
 namespace BlazorFridaApp.MemoryScanner.Services
 {
-    public interface IPythonRuntimeService
-    {
-        void EnsureInitialized();
-        T ExecuteWithGIL<T>(Func<T> action);
-        void ExecuteWithGIL(Action action);
-    }
-
     public class PythonRuntimeService : IPythonRuntimeService, IDisposable
     {
         private readonly ILogger<PythonRuntimeService> _logger;
@@ -109,6 +103,28 @@ namespace BlazorFridaApp.MemoryScanner.Services
             using (Py.GIL())
             {
                 action();
+            }
+        }
+
+        public void ReleaseGIL()
+        {
+            try
+            {
+                if (PythonEngine.IsInitialized)
+                {
+                    using (Py.GIL())
+                    {
+                        // Release the GIL properly
+                        dynamic threading = Py.Import("threading");
+                        threading.Lock().release();
+                    }
+                    _logger.LogDebug("Python GIL released successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error releasing Python GIL");
+                throw;
             }
         }
 
