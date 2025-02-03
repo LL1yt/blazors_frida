@@ -47,7 +47,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
         {
             try
             {
-                var result = _fridaInterop.ReadMemory(address.ToString(), length);
+                var result = await Task.Run(() => _fridaInterop.ReadMemory(address.ToString(), length));
                 if (result == null)
                 {
                     throw new MemoryOperationException($"Failed to read memory at address {address}");
@@ -65,7 +65,8 @@ namespace BlazorFridaApp.MemoryScanner.Services
         {
             try
             {
-                if (!_fridaInterop.WriteMemory(address.ToString(), value))
+                var success = await Task.Run(() => _fridaInterop.WriteMemory(address.ToString(), value));
+                if (!success)
                 {
                     throw new MemoryOperationException($"Failed to write memory at address {address}");
                 }

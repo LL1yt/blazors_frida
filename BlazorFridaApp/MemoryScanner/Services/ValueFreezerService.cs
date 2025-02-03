@@ -185,11 +185,13 @@ namespace BlazorFridaApp.MemoryScanner.Services
         {
             if (!_disposed)
             {
-                foreach (var timer in _freezeTimers.Values)
-                {
-                    timer.Dispose();
-                }
-                _freezeTimers.Clear();
+                await Task.Run(() => {
+                    foreach (var timer in _freezeTimers.Values)
+                    {
+                        timer.Dispose();
+                    }
+                    _freezeTimers.Clear();
+                });
                 _disposed = true;
 
                 GC.SuppressFinalize(this);

@@ -272,7 +272,15 @@ namespace BlazorFridaApp.MemoryScanner.Services
             try
             {
                 _logger.LogDebug("Detaching from Frida session");
-                await Task.CompletedTask; // Placeholder for actual detach logic
+                await Task.Run(() => {
+                    using (Py.GIL())
+                    {
+                        if (_fridaScanner != null)
+                        {
+                            _fridaScanner.detach();
+                        }
+                    }
+                });
             }
             catch (Exception ex)
             {

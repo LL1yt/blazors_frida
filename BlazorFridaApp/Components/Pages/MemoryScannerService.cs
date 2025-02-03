@@ -68,13 +68,13 @@ namespace BlazorFridaApp.Components.Pages
             {
                 _logger.LogInformation($"Changing scan type from {state.SelectedScanType} to {newType}");
                 state.SelectedScanType = newType;
-                state.Reset();
+                await Task.Run(() => state.Reset());
                 
-                _notificationService.ShowInfo("Scan type changed", $"Selected scan type: {state.SelectedScanType}");
+                await Task.Run(() => _notificationService.ShowInfo("Scan type changed", $"Selected scan type: {state.SelectedScanType}"));
             }
             catch (Exception ex)
             {
-                _notificationService.ShowError("Error changing scan type", ex.Message, ex);
+                await Task.Run(() => _notificationService.ShowError("Error changing scan type", ex.Message, ex));
                 throw;
             }
         }

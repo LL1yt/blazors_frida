@@ -27,7 +27,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     process.Name, process.Id, searchPattern);
 
                 // TODO: Implement actual scanning logic
-                var results = new List<string>();
+                var results = await Task.Run(() => new List<string>());
 
                 sw.Stop();
                 _logger.LogInformation(
@@ -56,7 +56,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     processId, pattern.Length, mask);
 
                 // TODO: Implement actual pattern scanning logic
-                var results = new List<nint>();
+                var results = await Task.Run(() => new List<nint>());
 
                 sw.Stop();
                 _logger.LogInformation(
@@ -85,7 +85,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     processId, value, valueType);
 
                 // TODO: Implement actual value scanning logic
-                var results = new List<nint>();
+                var results = await Task.Run(() => new List<nint>());
 
                 sw.Stop();
                 _logger.LogInformation(
@@ -114,7 +114,7 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     processId, valueType);
 
                 // TODO: Implement actual address scanning logic
-                var results = new List<nint>();
+                var results = await Task.Run(() => new List<nint>());
 
                 sw.Stop();
                 _logger.LogInformation(
