@@ -75,8 +75,8 @@
                 ValueType="@_state.SelectedValueType"
                 GetCurrentValue="@(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0))"
                 IsFrozen="@IsFrozen"
-                OnValueChanged="@(args => OnValueChanged(args.address, args.value))"
-                OnFreezeToggle="@(addr => ToggleFreeze(addr, BitConverter.GetBytes(0)))" />
+                OnValueChanged="@(args => OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
+                OnFreezeToggle="@(addr => ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
         </RadzenCard>
     </div>
 </div>

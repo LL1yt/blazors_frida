@@ -226,11 +226,42 @@ namespace BlazorFridaApp.Components.Pages
             }
         }
 
+        private byte[] GetDefaultValueBytes(MemoryValueType valueType)
+        {
+            try
+            {
+                return valueType switch
+                {
+                    MemoryValueType.Byte => new byte[] { 0 },
+                    MemoryValueType.Short => BitConverter.GetBytes((short)0),
+                    MemoryValueType.Int => BitConverter.GetBytes(0),
+                    MemoryValueType.Long => BitConverter.GetBytes((long)0),
+                    MemoryValueType.Float => BitConverter.GetBytes(0.0f),
+                    MemoryValueType.Double => BitConverter.GetBytes(0.0),
+                    _ => BitConverter.GetBytes(0)
+                };
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error getting default value bytes for type {ValueType}", valueType);
+                throw;
+            }
+        }
+
         public override Task ToggleFreeze(nint address, byte[] value)
         {
             try
             {
-                int intValue = BitConverter.ToInt32(value, 0);
+                var intValue = _state.SelectedValueType switch
+                {
+                    MemoryValueType.Byte => (int)value[0],
+                    MemoryValueType.Short => (int)BitConverter.ToInt16(value, 0),
+                    MemoryValueType.Int => BitConverter.ToInt32(value, 0),
+                    MemoryValueType.Long => (int)BitConverter.ToInt64(value, 0),
+                    MemoryValueType.Float => (int)BitConverter.ToSingle(value, 0),
+                    MemoryValueType.Double => (int)BitConverter.ToDouble(value, 0),
+                    _ => BitConverter.ToInt32(value, 0)
+                };
                 return valueFreezer.ToggleFreeze((IntPtr)address, intValue);
             }
             catch (Exception ex)
