@@ -12,6 +12,7 @@ using Python.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks;
+using System.Security.Principal;
 
 namespace BlazorFridaApp.MemoryScanner.Services
 {
@@ -32,49 +33,74 @@ namespace BlazorFridaApp.MemoryScanner.Services
         {
             if (_isInitialized) return;
 
+            if (!await _initLock.WaitAsync(TimeSpan.FromSeconds(30)))
+            {
+                _logger.LogError("Timeout waiting for initialization lock");
+                throw new TimeoutException("Failed to acquire initialization lock");
+            }
+
             try
             {
-                await _initLock.WaitAsync();
-                if (_isInitialized) return; // Double check after acquiring lock
-                
-                await Task.Run(() => {
+                if (_isInitialized) return;
+
+                _logger.LogInformation("Starting Python/Frida initialization...");
+                await Task.Run(() =>
+                {
                     try
                     {
                         if (!PythonEngine.IsInitialized)
                         {
-                            var pythonHome = Environment.GetEnvironmentVariable("PYTHONHOME");
-                            if (string.IsNullOrEmpty(pythonHome))
-                            {
-                                _logger.LogWarning("PYTHONHOME environment variable not set");
-                                pythonHome = @"C:\Users\n0n4a\AppData\Local\Programs\Python\Python313";
-                            }
-                            
-                            Runtime.PythonDLL = Path.Combine(pythonHome, "python313.dll");
-                            _logger.LogInformation($"Using Python DLL: {Runtime.PythonDLL}");
-                            
-                            if (!File.Exists(Runtime.PythonDLL))
-                            {
-                                throw new FileNotFoundException($"Python DLL not found at {Runtime.PythonDLL}");
-                            }
-                            
+                            _logger.LogDebug("Initializing Python engine...");
                             PythonEngine.Initialize();
+                            _logger.LogInformation("Python engine initialized successfully");
                         }
 
                         using (Py.GIL())
                         {
+                            _logger.LogDebug("Importing sys module...");
                             dynamic sys = Py.Import("sys");
-                            string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MemoryScanner", "Native");
-                            _logger.LogInformation($"Adding Python path: {scriptPath}");
-                            sys.path.append(scriptPath);
+                            _logger.LogDebug("sys.path: {Path}", (string)((dynamic)sys.path).ToString());
 
                             try
                             {
+                                _logger.LogDebug("Attempting to import frida...");
                                 dynamic frida = Py.Import("frida");
                                 _logger.LogInformation("Successfully imported frida module");
                                 
+                                _logger.LogDebug("Checking Frida device manager...");
+                                try
+                                {
+                                    var deviceManagerTask = Task.Run(() => {
+                                        dynamic deviceManager = frida.get_device_manager();
+                                        dynamic localDevice = deviceManager.get_local_device();
+                                        _logger.LogInformation("Frida local device: {Type}", (string)localDevice.type);
+                                        return true;
+                                    });
+
+                                    if (!deviceManagerTask.Wait(TimeSpan.FromSeconds(5)))
+                                    {
+                                        throw new TimeoutException("Timeout while initializing Frida device manager");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Failed to initialize Frida device manager");
+                                    throw new InvalidOperationException("Frida device manager initialization failed", ex);
+                                }
+                                
+                                _logger.LogDebug("Attempting to import frida_module...");
                                 dynamic fridaModule = Py.Import("frida_module");
                                 _logger.LogInformation("Successfully imported frida_module module");
-                                _fridaScanner = fridaModule.FridaMemoryScanner();
+
+                                _logger.LogDebug("Creating FridaMemoryScanner instance...");
+                                var scannerTask = Task.Run(() => fridaModule.FridaMemoryScanner());
+                                if (!scannerTask.Wait(TimeSpan.FromSeconds(5)))
+                                {
+                                    throw new TimeoutException("Timeout while creating FridaMemoryScanner instance");
+                                }
+                                _fridaScanner = scannerTask.Result;
+                                _logger.LogInformation("FridaMemoryScanner instance created successfully");
+                                
                                 _isInitialized = true;
                             }
                             catch (PythonException pex)
@@ -97,9 +123,16 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     }
                 });
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Initialization failed");
+                _isInitialized = false;
+                throw;
+            }
             finally
             {
                 _initLock.Release();
+                _logger.LogInformation("Initialization completed. Success: {Success}", _isInitialized);
             }
         }
 
@@ -110,6 +143,12 @@ namespace BlazorFridaApp.MemoryScanner.Services
             
             try
             {
+                // Check if running as admin
+                using var identity = WindowsIdentity.GetCurrent();
+                var principal = new WindowsPrincipal(identity);
+                bool isAdmin = principal.IsInRole(WindowsBuiltInRole.Administrator);
+                _logger.LogInformation("Running with admin privileges: {IsAdmin}", isAdmin);
+                
                 await EnsureInitializedAsync();
 
                 using var cts = new CancellationTokenSource(OperationTimeout);
@@ -121,103 +160,120 @@ namespace BlazorFridaApp.MemoryScanner.Services
                     try
                     {
                         _logger.LogDebug("Acquiring Python GIL");
-                        using (Py.GIL())
-                        {
-                            if (_fridaScanner == null)
+                        var gilTimeout = Task.Delay(TimeSpan.FromSeconds(5));
+                        var gilTask = Task.Run(() => {
+                            using (Py.GIL())
                             {
-                                _logger.LogError("Frida scanner is null after initialization");
-                                throw new InvalidOperationException("Frida scanner not initialized");
-                            }
-
-                            _logger.LogDebug("Calling Frida get_process_list");
-                            dynamic? result = null;
-                            try
-                            {
-                                result = _fridaScanner.get_process_list();
-                            }
-                            catch (PythonException pex)
-                            {
-                                _logger.LogError(pex, "Python error during get_process_list");
-                                throw new InvalidOperationException("Failed to get process list from Frida", pex);
-                            }
-
-                            if (result == null)
-                            {
-                                _logger.LogError("Frida returned null process list");
-                                throw new InvalidOperationException("Frida returned null process list");
-                            }
-
-                            string jsonProcesses = (string)result;
-                            _logger.LogDebug("Got process list JSON: {Json}", jsonProcesses);
-
-                            if (string.IsNullOrEmpty(jsonProcesses))
-                            {
-                                _logger.LogError("Frida returned empty process list");
-                                throw new InvalidOperationException("Frida returned empty process list");
-                            }
-
-                            var processDatas = JsonSerializer.Deserialize<List<ProcessData>>(jsonProcesses);
-                            
-                            if (processDatas == null || !processDatas.Any())
-                            {
-                                _logger.LogWarning("No processes found in Frida response");
-                                return processes;
-                            }
-
-                            _logger.LogInformation("Found {Count} processes from frida", processDatas.Count);
-                            var addedPids = new HashSet<int>();
-
-                            foreach (var data in processDatas.Where(p => p.Pid != 0))
-                            {
-                                if (cts.Token.IsCancellationRequested)
+                                if (_fridaScanner == null)
                                 {
-                                    _logger.LogWarning("Process enumeration cancelled");
-                                    break;
+                                    _logger.LogError("Frida scanner is null after initialization");
+                                    throw new InvalidOperationException("Frida scanner not initialized");
                                 }
 
+                                _logger.LogDebug("Calling Frida get_process_list");
+                                dynamic? result = null;
                                 try
                                 {
-                                    _logger.LogTrace("Processing PID: {Pid} ({Name})", data.Pid, data.Name);
-                                    Process? process = null;
-                                    try { process = Process.GetProcessById(data.Pid); } catch { }
-                                    
-                                    if (process != null && !string.IsNullOrEmpty(process.ProcessName) && !addedPids.Contains(process.Id))
+                                    var fridaTask = Task.Run(() => _fridaScanner.get_process_list());
+                                    if (!fridaTask.Wait(TimeSpan.FromSeconds(5)))
                                     {
-                                        processes.Add(new ProcessInfo
-                                        {
-                                            Id = process.Id,
-                                            Name = process.ProcessName,
-                                            DisplayName = $"{process.ProcessName} ({process.Id})"
-                                        });
-                                        addedPids.Add(process.Id);
-                                        _logger.LogTrace("Added process {Name} ({Id})", process.ProcessName, process.Id);
+                                        _logger.LogError("Timeout while calling Frida get_process_list");
+                                        throw new TimeoutException("Frida get_process_list call timed out");
                                     }
-                                    process?.Dispose();
+                                    result = fridaTask.Result;
+                                    _logger.LogDebug("Successfully got process list from Frida");
                                 }
-                                catch (Exception ex) when (
-                                    ex is ArgumentException ||
-                                    ex is System.ComponentModel.Win32Exception ||
-                                    ex is InvalidOperationException)
+                                catch (PythonException pex)
                                 {
-                                    _logger.LogWarning(ex, "Could not access process {Pid} ({Name})", data.Pid, data.Name);
-                                    continue;
+                                    _logger.LogError(pex, "Python error during get_process_list");
+                                    throw new InvalidOperationException("Failed to get process list from Frida", pex);
                                 }
+                                return result;
+                            }
+                        });
+
+                        if (Task.WhenAny(gilTask, gilTimeout).Result == gilTimeout)
+                        {
+                            throw new TimeoutException("Timeout while acquiring GIL or calling Frida");
+                        }
+
+                        var result = gilTask.Result;
+                        if (result == null)
+                        {
+                            _logger.LogError("Frida returned null process list");
+                            throw new InvalidOperationException("Frida returned null process list");
+                        }
+
+                        string jsonProcesses = (string)result;
+                        _logger.LogDebug("Got process list JSON: {Json}", jsonProcesses);
+
+                        if (string.IsNullOrEmpty(jsonProcesses))
+                        {
+                            _logger.LogError("Frida returned empty process list");
+                            throw new InvalidOperationException("Frida returned empty process list");
+                        }
+
+                        var processDatas = JsonSerializer.Deserialize<List<ProcessData>>(jsonProcesses);
+                        
+                        if (processDatas == null || !processDatas.Any())
+                        {
+                            _logger.LogWarning("No processes found in Frida response");
+                            return processes;
+                        }
+
+                        _logger.LogInformation("Found {Count} processes from frida", processDatas.Count);
+                        var addedPids = new HashSet<int>();
+
+                        foreach (var data in processDatas.Where(p => p.Pid != 0))
+                        {
+                            if (cts.Token.IsCancellationRequested)
+                            {
+                                _logger.LogWarning("Process enumeration cancelled");
+                                break;
+                            }
+
+                            try
+                            {
+                                _logger.LogTrace("Processing PID: {Pid} ({Name})", data.Pid, data.Name);
+                                Process? process = null;
+                                try { process = Process.GetProcessById(data.Pid); } catch { }
+                                
+                                if (process != null && !string.IsNullOrEmpty(process.ProcessName) && !addedPids.Contains(process.Id))
+                                {
+                                    processes.Add(new ProcessInfo
+                                    {
+                                        Id = process.Id,
+                                        Name = process.ProcessName,
+                                        DisplayName = $"{process.ProcessName} ({process.Id})"
+                                    });
+                                    addedPids.Add(process.Id);
+                                    _logger.LogTrace("Added process {Name} ({Id})", process.ProcessName, process.Id);
+                                }
+                                process?.Dispose();
+                            }
+                            catch (Exception ex) when (
+                                ex is ArgumentException ||
+                                ex is System.ComponentModel.Win32Exception ||
+                                ex is InvalidOperationException)
+                            {
+                                _logger.LogWarning(ex, "Could not access process {Pid} ({Name})", data.Pid, data.Name);
+                                continue;
                             }
                         }
-                        
-                        sw.Stop();
-                        var orderedProcesses = processes.OrderBy(p => p.Name).ToList();
-                        _logger.LogInformation(
-                            "Successfully retrieved {Count} accessible processes in {ElapsedMs}ms",
-                            orderedProcesses.Count, sw.ElapsedMilliseconds);
-                            
-                        return orderedProcesses;
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error in Task.Run while getting process list");
                         throw;
                     }
+                    
+                    sw.Stop();
+                    var orderedProcesses = processes.OrderBy(p => p.Name).ToList();
+                    _logger.LogInformation(
+                        "Successfully retrieved {Count} accessible processes in {ElapsedMs}ms",
+                        orderedProcesses.Count, sw.ElapsedMilliseconds);
+                        
+                    return orderedProcesses;
                 }, cts.Token);
             }
             catch (OperationCanceledException)
