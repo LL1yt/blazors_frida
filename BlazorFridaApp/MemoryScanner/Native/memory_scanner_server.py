@@ -21,7 +21,7 @@ import memory_scanner_pb2_grpc
 import health_pb2
 import health_pb2_grpc
 from health_service import HealthServicer
-from frida_module import FridaModule
+from frida_module import FridaMemoryScanner
 from process_list import get_process_list
 from scanner import MemoryScanner
 from reader import MemoryReader
@@ -54,7 +54,7 @@ grpc_client_instrumentor.instrument()
 
 class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     def __init__(self):
-        self.sessions: Dict[str, FridaModule] = {}
+        self.sessions: Dict[str, FridaMemoryScanner] = {}
         self.scanners: Dict[str, MemoryScanner] = {}
         self.freezer_tasks: Dict[str, asyncio.Task] = {}
         self.state_versions: Dict[str, str] = {}
@@ -87,11 +87,11 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         with tracer.start_as_current_span("attach_to_process") as span:
             try:
                 session_id = str(uuid.uuid4())
-                frida_module = FridaModule()
-                await frida_module.attach(request.pid)
+                frida_scanner = FridaMemoryScanner()
+                await frida_scanner.attach_to_process(request.pid)
 
-                self.sessions[session_id] = frida_module
-                self.scanners[session_id] = MemoryScanner(frida_module)
+                self.sessions[session_id] = frida_scanner
+                self.scanners[session_id] = MemoryScanner(frida_scanner)
                 self.state_versions[session_id] = str(uuid.uuid4())
 
                 return memory_scanner_pb2.AttachResponse(
@@ -111,7 +111,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         with tracer.start_as_current_span("detach_from_process") as span:
             try:
                 if request.session_id in self.sessions:
-                    await self.sessions[request.session_id].detach()
+                    await self.sessions[request.session_id].detach_from_process()
                     del self.sessions[request.session_id]
                     del self.scanners[request.session_id]
                     del self.state_versions[request.session_id]

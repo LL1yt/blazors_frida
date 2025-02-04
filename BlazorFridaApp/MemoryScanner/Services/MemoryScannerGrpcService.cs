@@ -29,7 +29,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
     private readonly IPythonProcessManager _processManager;
     private readonly ConcurrentDictionary<string, GrpcChannel> _channels = new();
     private static readonly TextMapPropagator Propagator = new TraceContextPropagator();
-    private string _currentSessionId;
+    private string _currentSessionId = string.Empty;
     private nint _processHandle;
 
     public nint ProcessHandle => _processHandle;

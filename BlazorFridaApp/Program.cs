@@ -2,6 +2,7 @@ using BlazorFridaApp.Components;
 using BlazorFridaApp.MemoryScanner;
 using BlazorFridaApp.MemoryScanner.Services;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using BlazorFridaApp.MemoryScanner.Services.Adapters;
 using BlazorFridaApp.Persistence;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.Services.Interfaces;
@@ -81,10 +82,18 @@ try
     // Add memory scanner services
     builder.Services.AddScoped<IProcessService>(sp =>
         new ProcessServiceAdapter(sp.GetRequiredService<IMemoryScannerGrpcService>()));
+    // Register the gRPC service first
+    builder.Services.AddScoped<IMemoryScannerGrpcService, MemoryScannerGrpcService>();
+    
+    // Register the adapters
     builder.Services.AddScoped<IMemoryReaderService>(sp =>
-        new MemoryReaderServiceAdapter(sp.GetRequiredService<IMemoryScannerGrpcService>()));
+        new MemoryReaderServiceAdapter(
+            sp.GetRequiredService<IMemoryScannerGrpcService>(),
+            sp.GetRequiredService<ILogger<MemoryReaderServiceAdapter>>()));
+    
+    // Use the gRPC service directly for IMemoryScannerService
     builder.Services.AddScoped<IMemoryScannerService>(sp =>
-        new MemoryScannerServiceAdapter(sp.GetRequiredService<IMemoryScannerGrpcService>()));
+        (IMemoryScannerService)sp.GetRequiredService<IMemoryScannerGrpcService>());
     builder.Services.AddScoped<IValueFreezerService, ValueFreezerService>();
     builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
 

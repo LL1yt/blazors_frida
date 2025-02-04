@@ -25,7 +25,7 @@ public class GrpcHealthCheck : IHealthCheck
                 return HealthCheckResult.Healthy("gRPC service is not enabled");
             }
 
-            var isRunning = _pythonProcessManager.IsProcessRunning();
+            var isRunning = _pythonProcessManager.IsRunning;
             if (!isRunning)
             {
                 return HealthCheckResult.Unhealthy("Python gRPC server is not running");

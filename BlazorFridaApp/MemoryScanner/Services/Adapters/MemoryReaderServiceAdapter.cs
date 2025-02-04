@@ -9,18 +9,18 @@ namespace BlazorFridaApp.MemoryScanner.Services.Adapters
 {
     public class MemoryReaderServiceAdapter : IMemoryReaderService
     {
-        private readonly MemoryScanner.MemoryScannerClient _grpcClient;
+        private readonly IMemoryScannerGrpcService _grpcService;
         private readonly ILogger<MemoryReaderServiceAdapter> _logger;
-        private string _sessionId;
+        private string _sessionId = string.Empty;
         private int _processId;
 
         public nint ProcessHandle => (nint)_processId;
 
         public MemoryReaderServiceAdapter(
-            MemoryScanner.MemoryScannerClient grpcClient,
+            IMemoryScannerGrpcService grpcService,
             ILogger<MemoryReaderServiceAdapter> logger)
         {
-            _grpcClient = grpcClient;
+            _grpcService = grpcService;
             _logger = logger;
         }
 
@@ -28,15 +28,15 @@ namespace BlazorFridaApp.MemoryScanner.Services.Adapters
         {
             try
             {
-                var response = await _grpcClient.AttachToProcessAsync(new ProcessRequest { Pid = processId });
-                if (!response.Success)
+                var response = await _grpcService.AttachToProcessAsync(processId);
+                if (!response.success)
                 {
-                    throw new MemoryOperationException($"Failed to attach to process: {response.ErrorMessage}", null);
+                    throw new MemoryOperationException("Failed to attach to process", null);
                 }
                 _processId = processId;
-                _sessionId = response.SessionId;
+                _sessionId = response.sessionId;
             }
-            catch (RpcException ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "[gRPC Error] Failed to attach to process {ProcessId}", processId);
                 throw new MemoryOperationException("Failed to attach to process via gRPC", ex);
@@ -47,22 +47,14 @@ namespace BlazorFridaApp.MemoryScanner.Services.Adapters
         {
             try
             {
-                var response = await _grpcClient.ReadMemoryAsync(new ReadRequest
+                var response = await _grpcService.ReadMemoryAsync(_sessionId, (ulong)address, length, "bytes");
+                if (!response.success)
                 {
-                    SessionId = _sessionId,
-                    Address = (ulong)address,
-                    Size = length,
-                    ValueType = "bytes"
-                });
-
-                if (!response.Success)
-                {
-                    throw new MemoryOperationException($"Failed to read memory: {response.ErrorMessage}", null);
+                    throw new MemoryOperationException($"Failed to read memory: {response.error}", null);
                 }
-
-                return response.Value.ToByteArray();
+                return response.value;
             }
-            catch (RpcException ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "[gRPC Error] ReadMemory failed for address {Address}", address);
                 throw new MemoryOperationException("Failed to read memory via gRPC", ex);
@@ -73,20 +65,13 @@ namespace BlazorFridaApp.MemoryScanner.Services.Adapters
         {
             try
             {
-                var response = await _grpcClient.WriteMemoryAsync(new WriteRequest
+                var response = await _grpcService.WriteMemoryAsync(_sessionId, (ulong)address, value, "bytes");
+                if (!response.success)
                 {
-                    SessionId = _sessionId,
-                    Address = (ulong)address,
-                    Value = Google.Protobuf.ByteString.CopyFrom(value),
-                    ValueType = "bytes"
-                });
-
-                if (!response.Success)
-                {
-                    throw new MemoryOperationException($"Failed to write memory: {response.ErrorMessage}", null);
+                    throw new MemoryOperationException($"Failed to write memory: {response.error}", null);
                 }
             }
-            catch (RpcException ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "[gRPC Error] WriteMemory failed for address {Address}", address);
                 throw new MemoryOperationException("Failed to write memory via gRPC", ex);
@@ -99,9 +84,9 @@ namespace BlazorFridaApp.MemoryScanner.Services.Adapters
             {
                 try
                 {
-                    await _grpcClient.DetachFromProcessAsync(new ProcessRequest { Pid = _processId });
+                    await _grpcService.DetachFromProcessAsync(_sessionId);
                 }
-                catch (RpcException ex)
+                catch (Exception ex)
                 {
                     _logger.LogError(ex, "[gRPC Error] Failed to detach from process {ProcessId}", _processId);
                 }
