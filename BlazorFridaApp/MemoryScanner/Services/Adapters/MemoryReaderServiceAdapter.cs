@@ -96,7 +96,7 @@ namespace BlazorFridaApp.MemoryScanner.Services.Adapters
 
     public class MemoryOperationException : Exception
     {
-        public MemoryOperationException(string message, Exception innerException)
+        public MemoryOperationException(string message, Exception? innerException)
             : base(message, innerException) { }
     }
 }

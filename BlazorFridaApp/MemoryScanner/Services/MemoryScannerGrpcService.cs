@@ -146,7 +146,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
             var channel = await GetChannelAsync();
             if (sessionId == _currentSessionId)
             {
-                _currentSessionId = null;
+                _currentSessionId = string.Empty;
                 _processHandle = 0;
             }
         }

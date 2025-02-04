@@ -16,29 +16,29 @@ public class GrpcHealthCheck : IHealthCheck
         _featureFlagService = featureFlagService;
     }
 
-    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try
         {
             if (!_featureFlagService.IsGrpcServiceEnabled())
             {
-                return HealthCheckResult.Healthy("gRPC service is not enabled");
+                return Task.FromResult(HealthCheckResult.Healthy("gRPC service is not enabled"));
             }
 
             var isRunning = _pythonProcessManager.IsRunning;
             if (!isRunning)
             {
-                return HealthCheckResult.Unhealthy("Python gRPC server is not running");
+                return Task.FromResult(HealthCheckResult.Unhealthy("Python gRPC server is not running"));
             }
 
             // Add additional checks here as needed
             // For example, try to make a simple gRPC call
 
-            return HealthCheckResult.Healthy("gRPC service is healthy");
+            return Task.FromResult(HealthCheckResult.Healthy("gRPC service is healthy"));
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy("Health check failed", ex);
+            return Task.FromResult(HealthCheckResult.Unhealthy("Health check failed", ex));
         }
     }
 }
