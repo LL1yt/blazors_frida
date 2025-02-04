@@ -30,18 +30,25 @@ public class TestPythonNet : IDisposable
         {
             _logger.LogInformation("Initializing Python engine...");
             
-            var pythonHome = Environment.GetEnvironmentVariable("PYTHONHOME");
-            if (string.IsNullOrEmpty(pythonHome))
+            // Set PythonHome and PythonDLL first
+            var pythonHome = Environment.GetEnvironmentVariable("PYTHONHOME") 
+                ?? @"C:\Users\n0n4a\AppData\Local\Programs\Python\Python313";
+            
+            // Set PythonDLL before any engine initialization
+            if (string.IsNullOrEmpty(Runtime.PythonDLL))
             {
-                pythonHome = @"C:\Users\n0n4a\AppData\Local\Programs\Python\Python313";
+                var pythonDll = Path.Combine(pythonHome, "python313.dll");
+                _logger.LogInformation("Setting Python DLL: {DllPath}", pythonDll);
+                Runtime.PythonDLL = pythonDll;
             }
             
-            Runtime.PythonDLL = Path.Combine(pythonHome, "python313.dll");
-            _logger.LogInformation("Using Python DLL: {DllPath}", Runtime.PythonDLL);
-            
-            PythonEngine.Initialize();
-            _isInitialized = true;
-            _logger.LogInformation("Python initialized successfully");
+            // Initialize only if not already initialized
+            if (!PythonEngine.IsInitialized)
+            {
+                PythonEngine.Initialize();
+                _isInitialized = true;
+                _logger.LogInformation("Python initialized successfully");
+            }
         }
         catch (Exception ex)
         {
@@ -147,21 +154,18 @@ public class TestPythonNet : IDisposable
                     try
                     {
                         var paths = new List<string>();
-                        dynamic sysModule = Py.Import("sys"); // Renamed variable
-                        using var sysPath = sysModule.GetAttr("path"); // Proper disposal
+                        dynamic sysModule = Py.Import("sys");
+                        using var sysPath = sysModule.GetAttr("path");
                         
-                        // Get iterator using PyObject's GetIterator()
-                        using (var iter = sysPath.GetIterator())
+                        // Convert Python list to C# list safely
+                        foreach (PyObject item in sysPath)
                         {
-                            while (iter.MoveNext())
+                            if (item != null)
                             {
-                                using (var item = iter.Current)
+                                string pathStr = item.ToString();
+                                if (!string.IsNullOrEmpty(pathStr))
                                 {
-                                    string pathStr = item.As<string>();
-                                    if (!string.IsNullOrEmpty(pathStr))
-                                    {
-                                        paths.Add(pathStr);
-                                    }
+                                    paths.Add(pathStr);
                                 }
                             }
                         }
@@ -169,7 +173,7 @@ public class TestPythonNet : IDisposable
                         // Add current directory if not present
                         if (!paths.Contains(currentDir))
                         {
-                            sysPath.InvokeMethod("insert", new PyInt(0), new PyString(currentDir));
+                            sysPath.InvokeMethod("insert", new PyObject[] { new PyInt(0), new PyString(currentDir) });
                             paths.Insert(0, currentDir);
                         }
 
@@ -240,9 +244,10 @@ public class TestPythonNet : IDisposable
                 }
             }
         }
-        catch (Exception )
+        catch (Exception ex)
         {
-            _logger.LogWarning("Error during Python module cleanup");
+            _logger.LogWarning(ex, "Error during Python module cleanup");
+            throw ex; // Changed to throw with argument
         }
         {
             // If we hit a critical error, try to clean up
@@ -384,15 +389,46 @@ public class TestPythonNet : IDisposable
             try
             {
                 _logger.LogInformation("Stopping test and cleaning up resources...");
+                
+                // Check if Python engine is still available
+                if (!PythonEngine.IsInitialized)
+                {
+                    _logger.LogWarning("Python engine already shut down, skipping cleanup");
+                    return;
+                }
+
                 using (Py.GIL())
                 {
-                    _testModule.cleanup();
+                    // Check if module still exists
+                    if (_testModule != null)
+                    {
+                        // Use TryInvoke to avoid exceptions if module was unloaded
+                        // Use proper Python.NET API for attribute checking
+                        if (_testModule is PyObject module)
+                        {
+                            if (module.HasAttr("cleanup"))
+                            {
+                                using (var cleanup = module.GetAttr("cleanup"))
+                                {
+                                    cleanup.Invoke();
+                                }
+                            }
+                        }
+                    }
                 }
                 _logger.LogInformation("Test stopped and resources cleaned up");
+            }
+            catch (PythonException pex) when (pex.Message == "0") // Handle sys.exit(0)
+            {
+                _logger.LogDebug("Ignoring Python exit exception during cleanup");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error stopping test");
+            }
+            finally
+            {
+                _testModule = null;
             }
         }
     }

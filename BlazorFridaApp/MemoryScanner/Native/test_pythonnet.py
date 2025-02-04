@@ -90,7 +90,6 @@ def setup_signal_handlers():
 
         cleanup()
         print("Exiting Python process gracefully...")
-        sys.exit(0)
 
     print("Setting up signal handlers...")
     # Set up handlers for both SIGINT (Ctrl+C) and SIGTERM
