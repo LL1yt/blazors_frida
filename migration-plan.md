@@ -16,6 +16,8 @@
 
 ## 2. Migration Components
 
+The main thing is that the new functionality should work. old implementations can be simply deleted if they interfere with the launch of the new implementation
+
 ### 2.1 Feature Flag System
 
 - Implement feature flags for each memory operation type
@@ -73,9 +75,8 @@ message AttachRequest {
 ### Phase 3: Hybrid Mode (Week 3)
 
 1. Implement feature flag routing
-2. Add compatibility layer
+2. The main thing is that the new functionality should work. old implementations can be simply deleted if they interfere with the launch of the new implementation
 3. Deploy monitoring
-4. Test both paths
 
 ### Phase 4: Gradual Migration (Weeks 4-6)
 
@@ -87,9 +88,7 @@ message AttachRequest {
 ### Phase 5: Cleanup (Week 7)
 
 1. Remove Python.NET code
-2. Clean up compatibility layer
-3. Update documentation
-4. Performance optimization
+2. Performance optimization
 
 ## 4. Testing Strategy
 

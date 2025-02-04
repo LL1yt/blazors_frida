@@ -1,1 +1,140 @@
- 
+syntax = "proto3";
+
+package memory_scanner;
+
+// Service definition
+service MemoryScanner {
+  // Process operations
+  rpc ListProcesses (Empty) returns (ProcessList);
+  rpc AttachToProcess (ProcessRequest) returns (AttachResponse);
+  rpc DetachFromProcess (ProcessRequest) returns (Empty);
+
+  // Memory scanning operations
+  rpc ScanMemory (ScanRequest) returns (ScanResponse);
+  rpc ReadMemory (ReadRequest) returns (ReadResponse);
+  rpc WriteMemory (WriteRequest) returns (WriteResponse);
+
+  // Value freezing operations
+  rpc FreezeValue (FreezeRequest) returns (stream FreezeStatus);
+  rpc UnfreezeValue (UnfreezeRequest) returns (Empty);
+
+  // State synchronization
+  rpc GetState (StateRequest) returns (StateResponse);
+  rpc SyncState (SyncRequest) returns (SyncResponse);
+}
+
+// Common messages
+message Empty {}
+
+message ProcessInfo {
+  int32 pid = 1;
+  string name = 2;
+  string path = 3;
+}
+
+message ProcessList {
+  repeated ProcessInfo processes = 1;
+}
+
+message ProcessRequest {
+  int32 pid = 1;
+}
+
+message AttachResponse {
+  bool success = 1;
+  string error_message = 2;
+  string session_id = 3;
+}
+
+// Scanning messages
+message ScanRequest {
+  string session_id = 1;
+  string value_type = 2;
+  bytes value = 3;
+  string comparison_type = 4;
+  repeated AddressRange ranges = 5;
+}
+
+message AddressRange {
+  uint64 start = 1;
+  uint64 end = 2;
+}
+
+message ScanResponse {
+  repeated ScanResult results = 1;
+  string checkpoint_id = 2;
+}
+
+message ScanResult {
+  uint64 address = 1;
+  bytes value = 2;
+}
+
+// Memory access messages
+message ReadRequest {
+  string session_id = 1;
+  uint64 address = 2;
+  int32 size = 3;
+  string value_type = 4;
+}
+
+message ReadResponse {
+  bytes value = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message WriteRequest {
+  string session_id = 1;
+  uint64 address = 2;
+  bytes value = 3;
+  string value_type = 4;
+}
+
+message WriteResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+// Freezing messages
+message FreezeRequest {
+  string session_id = 1;
+  uint64 address = 2;
+  bytes value = 3;
+  string value_type = 4;
+}
+
+message FreezeStatus {
+  bool active = 1;
+  string error_message = 2;
+  bytes current_value = 3;
+  string correlation_id = 4;
+}
+
+message UnfreezeRequest {
+  string session_id = 1;
+  uint64 address = 2;
+}
+
+// State synchronization messages
+message StateRequest {
+  string session_id = 1;
+  string checkpoint_id = 2;
+}
+
+message StateResponse {
+  map<string, bytes> state = 1;
+  string version = 2;
+}
+
+message SyncRequest {
+  string session_id = 1;
+  map<string, bytes> state_updates = 2;
+  string version = 3;
+}
+
+message SyncResponse {
+  bool success = 1;
+  string error_message = 2;
+  string new_version = 3;
+}

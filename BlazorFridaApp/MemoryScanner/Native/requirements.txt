@@ -1,2 +1,9 @@
-frida>=16.1.4
-frida-tools>=12.3.0
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=4.25.1
+frida>=16.1.10
+psutil>=5.9.7
+opentelemetry-api>=1.21.0
+opentelemetry-sdk>=1.21.0
+opentelemetry-instrumentation-grpc>=0.42b0
+python-json-logger>=2.0.7
