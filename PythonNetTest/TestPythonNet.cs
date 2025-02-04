@@ -160,13 +160,10 @@ public class TestPythonNet : IDisposable
                         // Convert Python list to C# list safely
                         foreach (PyObject item in sysPath)
                         {
-                            if (item != null)
+                            string pathStr = item?.ToString() ?? string.Empty;
+                            if (!string.IsNullOrEmpty(pathStr))
                             {
-                                string pathStr = item.ToString();
-                                if (!string.IsNullOrEmpty(pathStr))
-                                {
-                                    paths.Add(pathStr);
-                                }
+                                paths.Add(pathStr);
                             }
                         }
 
@@ -247,7 +244,7 @@ public class TestPythonNet : IDisposable
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error during Python module cleanup");
-            throw ex; // Changed to throw with argument
+            throw; // Use throw without argument to preserve stack trace
         }
         {
             // If we hit a critical error, try to clean up
