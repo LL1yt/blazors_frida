@@ -9,66 +9,102 @@ namespace BlazorFridaApp.MemoryScanner.Services.Adapters
 {
     public class MemoryReaderServiceAdapter : IMemoryReaderService
     {
-        private readonly MemoryScannerService.MemoryScannerServiceClient _grpcClient;
+        private readonly MemoryScanner.MemoryScannerClient _grpcClient;
         private readonly ILogger<MemoryReaderServiceAdapter> _logger;
+        private string _sessionId;
+        private int _processId;
+
+        public nint ProcessHandle => (nint)_processId;
 
         public MemoryReaderServiceAdapter(
-            MemoryScannerService.MemoryScannerServiceClient grpcClient,
+            MemoryScanner.MemoryScannerClient grpcClient,
             ILogger<MemoryReaderServiceAdapter> logger)
         {
             _grpcClient = grpcClient;
             _logger = logger;
         }
 
-        public async Task<MemoryReadResult> ReadMemoryAsync(ReadRequest request)
+        public async void OpenProcess(int processId)
         {
             try
             {
-                var response = await _grpcClient.ReadMemoryAsync(new ReadRequestProto
+                var response = await _grpcClient.AttachToProcessAsync(new ProcessRequest { Pid = processId });
+                if (!response.Success)
                 {
-                    ProcessId = request.ProcessId,
-                    Address = request.Address.ToString("X16"),
-                    Size = (uint)request.Size,
-                    CorrelationId = request.CorrelationId,
-                    Version = request.Version
-                });
-
-                return new MemoryReadResult(
-                    data: response.Data.ToByteArray(),
-                    version: response.Version);
+                    throw new MemoryOperationException($"Failed to attach to process: {response.ErrorMessage}", null);
+                }
+                _processId = processId;
+                _sessionId = response.SessionId;
             }
             catch (RpcException ex)
             {
-                _logger.LogError(ex, "[gRPC Error] ReadMemory failed for {Address} (PID: {ProcessId})", 
-                    request.Address, request.ProcessId);
+                _logger.LogError(ex, "[gRPC Error] Failed to attach to process {ProcessId}", processId);
+                throw new MemoryOperationException("Failed to attach to process via gRPC", ex);
+            }
+        }
+
+        public async Task<byte[]> ReadMemoryBytes(nint address, int length)
+        {
+            try
+            {
+                var response = await _grpcClient.ReadMemoryAsync(new ReadRequest
+                {
+                    SessionId = _sessionId,
+                    Address = (ulong)address,
+                    Size = length,
+                    ValueType = "bytes"
+                });
+
+                if (!response.Success)
+                {
+                    throw new MemoryOperationException($"Failed to read memory: {response.ErrorMessage}", null);
+                }
+
+                return response.Value.ToByteArray();
+            }
+            catch (RpcException ex)
+            {
+                _logger.LogError(ex, "[gRPC Error] ReadMemory failed for address {Address}", address);
                 throw new MemoryOperationException("Failed to read memory via gRPC", ex);
             }
         }
 
-        public async Task<MemoryScanResult> ScanMemoryAsync(ScanRequest request)
+        public async Task WriteMemoryBytes(nint address, byte[] value)
         {
             try
             {
-                var response = await _grpcClient.ScanMemoryAsync(new ScanRequestProto
+                var response = await _grpcClient.WriteMemoryAsync(new WriteRequest
                 {
-                    ProcessId = request.ProcessId,
-                    StartAddress = request.StartAddress.ToString("X16"),
-                    EndAddress = request.EndAddress.ToString("X16"),
-                    Pattern = request.Pattern,
-                    Mask = request.Mask ?? string.Empty,
-                    CorrelationId = request.CorrelationId,
-                    Version = request.Version
+                    SessionId = _sessionId,
+                    Address = (ulong)address,
+                    Value = Google.Protobuf.ByteString.CopyFrom(value),
+                    ValueType = "bytes"
                 });
 
-                return new MemoryScanResult(
-                    addresses: response.Addresses.ConvertAll(a => ulong.Parse(a, System.Globalization.NumberStyles.HexNumber)),
-                    version: response.Version);
+                if (!response.Success)
+                {
+                    throw new MemoryOperationException($"Failed to write memory: {response.ErrorMessage}", null);
+                }
             }
             catch (RpcException ex)
             {
-                _logger.LogError(ex, "[gRPC Error] ScanMemory failed in range {Start}-{End} (PID: {ProcessId})",
-                    request.StartAddress, request.EndAddress, request.ProcessId);
-                throw new MemoryOperationException("Failed to scan memory via gRPC", ex);
+                _logger.LogError(ex, "[gRPC Error] WriteMemory failed for address {Address}", address);
+                throw new MemoryOperationException("Failed to write memory via gRPC", ex);
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (!string.IsNullOrEmpty(_sessionId))
+            {
+                try
+                {
+                    await _grpcClient.DetachFromProcessAsync(new ProcessRequest { Pid = _processId });
+                }
+                catch (RpcException ex)
+                {
+                    _logger.LogError(ex, "[gRPC Error] Failed to detach from process {ProcessId}", _processId);
+                }
             }
         }
     }

@@ -15,6 +15,9 @@ from pythonjsonlogger import jsonlogger
 
 import memory_scanner_pb2
 import memory_scanner_pb2_grpc
+import health_pb2
+import health_pb2_grpc
+from health_service import HealthServicer
 from frida_module import FridaModule
 from process_list import get_process_list
 from scanner import MemoryScanner
@@ -317,16 +320,43 @@ async def serve(port: int = 50051):
         ],
     )
 
+    # Create services
+    memory_scanner_service = MemoryScannerService()
+    health_service = HealthServicer()
+
+    # Add services to server
     memory_scanner_pb2_grpc.add_MemoryScannerServicer_to_server(
-        MemoryScannerService(), server
+        memory_scanner_service, server
     )
+    health_pb2_grpc.add_HealthServicer_to_server(health_service, server)
 
     listen_addr = f"[::]:{port}"
     server.add_insecure_port(listen_addr)
 
     logger.info(f"Starting server on {listen_addr}")
     await server.start()
-    await server.wait_for_termination()
+
+    try:
+        # Set initial health status
+        health_service.set_status(
+            "", health_pb2.HealthCheckResponse.ServingStatus.SERVING
+        )
+        health_service.set_status(
+            "memory_scanner.MemoryScanner",
+            health_pb2.HealthCheckResponse.ServingStatus.SERVING,
+        )
+
+        await server.wait_for_termination()
+    except Exception as e:
+        logger.error("Server error", exc_info=e)
+        health_service.set_status(
+            "", health_pb2.HealthCheckResponse.ServingStatus.NOT_SERVING
+        )
+        health_service.set_status(
+            "memory_scanner.MemoryScanner",
+            health_pb2.HealthCheckResponse.ServingStatus.NOT_SERVING,
+        )
+        raise
 
 
 if __name__ == "__main__":

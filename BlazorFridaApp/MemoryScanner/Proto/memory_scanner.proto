@@ -1,44 +1,8 @@
 syntax = "proto3";
 
-import "google/protobuf/empty.proto";
+package memory_scanner;
 
 option csharp_namespace = "BlazorFridaApp.MemoryScanner.Proto";
-
-service MemoryScannerService {
-    rpc ReadMemory (ReadRequestProto) returns (ReadResponseProto);
-    rpc ScanMemory (ScanRequestProto) returns (ScanResponseProto);
-}
-
-message ReadRequestProto {
-    int32 process_id = 1;
-    string address = 2;
-    uint32 size = 3;
-    string correlation_id = 4;
-    int32 version = 5;
-}
-
-message ReadResponseProto {
-    bytes data = 1;
-    int32 version = 2;
-}
-
-message ScanRequestProto {
-    int32 process_id = 1;
-    string start_address = 2;
-    string end_address = 3;
-    string pattern = 4;
-    string mask = 5;
-    string correlation_id = 6;
-    int32 version = 7;
-}
-
-message ScanResponseProto {
-    repeated string addresses = 1;
-    int32 version = 2;
-}
-syntax = "proto3";
-
-package memory_scanner;
 
 // Service definition
 service MemoryScanner {

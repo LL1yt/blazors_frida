@@ -103,6 +103,13 @@ try
     // Add memory cleanup service
     builder.Services.AddScoped<IMemoryCleanupService, MemoryCleanupService>();
 
+    // Add feature flag service
+    builder.Services.AddSingleton<IFeatureFlagService, FeatureFlagService>();
+
+    // Add health checks
+    builder.Services.AddHealthChecks()
+        .AddCheck<GrpcHealthCheck>("grpc_health_check", tags: new[] { "grpc" });
+
 var app = builder.Build();
 
 // Configure ProcessInfo logger
@@ -133,6 +140,27 @@ await using (var scope = app.Services.CreateAsyncScope())
 
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
+
+    // Map health checks
+    app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        ResponseWriter = async (context, report) =>
+        {
+            context.Response.ContentType = "application/json";
+            var result = new
+            {
+                status = report.Status.ToString(),
+                checks = report.Entries.Select(e => new
+                {
+                    name = e.Key,
+                    status = e.Value.Status.ToString(),
+                    description = e.Value.Description,
+                    duration = e.Value.Duration.ToString()
+                })
+            };
+            await System.Text.Json.JsonSerializer.SerializeAsync(context.Response.Body, result);
+        }
+    });
 
     // Global exception handler
     AppDomain.CurrentDomain.UnhandledException += (sender, error) =>
