@@ -8,7 +8,10 @@ from typing import Dict, Optional
 import grpc
 from grpc import aio
 from opentelemetry import trace
-from opentelemetry.instrumentation.grpc import GrpcInstrumentor
+from opentelemetry.instrumentation.grpc import (
+    GrpcInstrumentorClient,
+    GrpcInstrumentorServer,
+)
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 from pythonjsonlogger import jsonlogger
@@ -42,8 +45,11 @@ trace.get_tracer_provider().add_span_processor(
 )
 
 # Initialize gRPC instrumentation
-grpc_instrumentor = GrpcInstrumentor()
-grpc_instrumentor.instrument()
+grpc_server_instrumentor = GrpcInstrumentorServer()
+grpc_server_instrumentor.instrument()
+
+grpc_client_instrumentor = GrpcInstrumentorClient()
+grpc_client_instrumentor.instrument()
 
 
 class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):

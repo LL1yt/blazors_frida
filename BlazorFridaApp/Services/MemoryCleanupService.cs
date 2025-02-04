@@ -6,17 +6,17 @@ namespace BlazorFridaApp.Services
 {
     public class MemoryCleanupService : IMemoryCleanupService
     {
-        private readonly IFridaInteropService _fridaInterop;
-        private readonly IPythonRuntimeService _pythonRuntime;
+        private readonly IMemoryReaderService _memoryReader;
+        private readonly IProcessService _processService;
         private readonly ILogger<MemoryCleanupService> _logger;
 
         public MemoryCleanupService(
-            IFridaInteropService fridaInterop,
-            IPythonRuntimeService pythonRuntime,
+            IMemoryReaderService memoryReader,
+            IProcessService processService,
             ILogger<MemoryCleanupService> logger)
         {
-            _fridaInterop = fridaInterop;
-            _pythonRuntime = pythonRuntime;
+            _memoryReader = memoryReader;
+            _processService = processService;
             _logger = logger;
         }
 
@@ -24,8 +24,15 @@ namespace BlazorFridaApp.Services
         {
             try
             {
-                await _fridaInterop.DetachAsync();
-                _pythonRuntime.ReleaseGIL();
+                if (_memoryReader is IAsyncDisposable memoryReaderDisposable)
+                {
+                    await memoryReaderDisposable.DisposeAsync();
+                }
+
+                if (_processService is IAsyncDisposable processServiceDisposable)
+                {
+                    await processServiceDisposable.DisposeAsync();
+                }
             }
             catch (Exception ex)
             {
