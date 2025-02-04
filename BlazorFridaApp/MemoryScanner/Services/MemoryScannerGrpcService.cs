@@ -5,6 +5,7 @@ using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
+using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
@@ -28,6 +29,10 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
     private readonly IPythonProcessManager _processManager;
     private readonly ConcurrentDictionary<string, GrpcChannel> _channels = new();
     private static readonly TextMapPropagator Propagator = new TraceContextPropagator();
+    private string _currentSessionId;
+    private nint _processHandle;
+
+    public nint ProcessHandle => _processHandle;
 
     public MemoryScannerGrpcService(
         ILogger<MemoryScannerGrpcService> logger,
@@ -65,13 +70,48 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
-            return new List<Models.ProcessInfo>();
+            var processes = await ListProcessesInternalAsync();
+            return processes;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to list processes");
+            throw;
+        }
+    }
+
+    private async Task<List<ProcessInfo>> ListProcessesInternalAsync()
+    {
+        var processes = await GetAccessibleProcessesAsync();
+        return processes;
+    }
+
+    public async Task<List<ProcessInfo>> GetAccessibleProcessesAsync()
+    {
+        try
+        {
+            var channel = await GetChannelAsync();
+            // TODO: Replace placeholder with actual gRPC call
+            return new List<ProcessInfo>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get accessible processes");
+            throw;
+        }
+    }
+
+    public async Task<ProcessInfo> GetTargetProcessAsync()
+    {
+        try
+        {
+            var channel = await GetChannelAsync();
+            // TODO: Replace placeholder with actual gRPC call
+            return new ProcessInfo();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get target process");
             throw;
         }
     }
@@ -81,9 +121,9 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
-            return (true, Guid.NewGuid().ToString());
+            _currentSessionId = Guid.NewGuid().ToString();
+            OpenProcess(pid);
+            return (true, _currentSessionId);
         }
         catch (Exception ex)
         {
@@ -92,13 +132,23 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         }
     }
 
+    public void OpenProcess(int processId)
+    {
+        // In the gRPC version, we don't actually need to open a process handle
+        // as the Python server handles the process interaction
+        _processHandle = new nint(processId);
+    }
+
     public async Task DetachFromProcessAsync(string sessionId)
     {
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
+            if (sessionId == _currentSessionId)
+            {
+                _currentSessionId = null;
+                _processHandle = 0;
+            }
         }
         catch (Exception ex)
         {
@@ -117,13 +167,39 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
+            // TODO: Replace placeholder with actual gRPC call
             return new List<Models.ScanResult>();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to scan memory for session {SessionId}", sessionId);
+            throw;
+        }
+    }
+
+    public async Task<byte[]> ReadMemoryBytes(nint address, int length)
+    {
+        try
+        {
+            var result = await ReadMemoryAsync(_currentSessionId, (ulong)address, length, "bytes");
+            return result.value;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to read memory bytes at {Address}", address);
+            throw;
+        }
+    }
+
+    public async Task WriteMemoryBytes(nint address, byte[] value)
+    {
+        try
+        {
+            await WriteMemoryAsync(_currentSessionId, (ulong)address, value, "bytes");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to write memory bytes at {Address}", address);
             throw;
         }
     }
@@ -137,9 +213,8 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
-            return (new byte[0], true, string.Empty);
+            // TODO: Replace placeholder with actual gRPC call
+            return (new byte[size], true, string.Empty);
         }
         catch (Exception ex)
         {
@@ -157,8 +232,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
+            // TODO: Replace placeholder with actual gRPC call
             return (true, string.Empty);
         }
         catch (Exception ex)
@@ -176,7 +250,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var channel = await GetChannelAsync();
-        // TODO: Replace with actual gRPC streaming call once code is generated
+        // TODO: Replace placeholder with actual gRPC streaming call
         while (!cancellationToken.IsCancellationRequested)
         {
             await Task.Delay(100, cancellationToken);
@@ -199,8 +273,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
+            // TODO: Replace placeholder with actual gRPC call
         }
         catch (Exception ex)
         {
@@ -216,8 +289,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
+            // TODO: Replace placeholder with actual gRPC call
             return (new Dictionary<string, byte[]>(), Guid.NewGuid().ToString());
         }
         catch (Exception ex)
@@ -235,8 +307,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace with actual gRPC call once code is generated
-            await Task.Delay(100);
+            // TODO: Replace placeholder with actual gRPC call
             return (true, string.Empty, Guid.NewGuid().ToString());
         }
         catch (Exception ex)
@@ -246,6 +317,75 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         }
     }
 
+    public async Task<IEnumerable<string>> ScanAsync(ProcessInfo process, string searchPattern, int scanType, ScanProfile profile)
+    {
+        try
+        {
+            var channel = await GetChannelAsync();
+            // TODO: Replace placeholder with actual gRPC call
+            return new List<string>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to scan process {ProcessId}", process.Id);
+            throw;
+        }
+    }
+
+    public async Task<List<nint>> ScanForPattern(int processId, byte[] pattern, string mask)
+    {
+        try
+        {
+            var channel = await GetChannelAsync();
+            // TODO: Replace placeholder with actual gRPC call
+            return new List<nint>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to scan for pattern in process {ProcessId}", processId);
+            throw;
+        }
+    }
+
+    public async Task<List<nint>> ScanForValue(int processId, int value, MemoryValueType valueType)
+    {
+        try
+        {
+            var channel = await GetChannelAsync();
+            // TODO: Replace placeholder with actual gRPC call
+            return new List<nint>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to scan for value in process {ProcessId}", processId);
+            throw;
+        }
+    }
+
+    public async Task<List<nint>> GetAllAddresses(int processId, MemoryValueType valueType)
+    {
+        try
+        {
+            var channel = await GetChannelAsync();
+            // TODO: Replace placeholder with actual gRPC call
+            return new List<nint>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get all addresses for process {ProcessId}", processId);
+            throw;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var channel in _channels.Values)
+        {
+            await channel.ShutdownAsync();
+        }
+        _channels.Clear();
+    }
+
     public void Dispose()
     {
         foreach (var channel in _channels.Values)
@@ -253,5 +393,6 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
             channel.Dispose();
         }
         _channels.Clear();
+        GC.SuppressFinalize(this);
     }
 }

@@ -8,7 +8,7 @@ from typing import Dict, Optional
 import grpc
 from grpc import aio
 from opentelemetry import trace
-from opentelemetry.instrumentation.grpc import GrpcInstrumentatorServer
+from opentelemetry.instrumentation.grpc import GrpcInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 from pythonjsonlogger import jsonlogger
@@ -42,7 +42,7 @@ trace.get_tracer_provider().add_span_processor(
 )
 
 # Initialize gRPC instrumentation
-grpc_instrumentor = GrpcInstrumentatorServer()
+grpc_instrumentor = GrpcInstrumentor()
 grpc_instrumentor.instrument()
 
 
