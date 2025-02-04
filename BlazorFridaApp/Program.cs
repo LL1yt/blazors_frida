@@ -6,14 +6,20 @@ using BlazorFridaApp.Persistence;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.Services.Interfaces;
 using BlazorFridaApp.Components.Pages;
+using Grpc.Net.Client;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Logs;
 using Radzen;
 using Serilog;
 using Serilog.Events;
 using BlazorFridaApp.MemoryScanner.Base;
+using Microsoft.Extensions.Http;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -48,12 +54,37 @@ try
     // Add notification service
     builder.Services.AddScoped<INotificationService, AppNotificationService>();
 
+    // Configure OpenTelemetry
+    builder.Services.AddOpenTelemetry()
+        .WithTracing(tracerProvider =>
+        {
+            tracerProvider
+                .AddSource("BlazorFridaApp")
+                .SetResourceBuilder(ResourceBuilder.CreateDefault()
+                    .AddService("BlazorFridaApp"))
+                .AddGrpcClientInstrumentation();
+        })
+        .WithMetrics(metricsProvider =>
+        {
+            metricsProvider
+                .AddMeter("BlazorFridaApp")
+                .SetResourceBuilder(ResourceBuilder.CreateDefault()
+                    .AddService("BlazorFridaApp"));
+        });
+
+    // Add Python process manager
+    builder.Services.AddSingleton<IPythonProcessManager, PythonProcessManager>();
+
+    // Add gRPC service
+    builder.Services.AddScoped<IMemoryScannerGrpcService, MemoryScannerGrpcService>();
+
     // Add memory scanner services
-    builder.Services.AddSingleton<IPythonRuntimeService, PythonRuntimeService>(); // Python runtime singleton
-    builder.Services.AddSingleton<IFridaInteropService, FridaInteropService>(); // Frida interop service
-    builder.Services.AddScoped<IProcessService, FridaProcessService>();
-    builder.Services.AddScoped<IMemoryReaderService, FridaMemoryService>();
-    builder.Services.AddScoped<IMemoryScannerService, FridaMemoryScannerService>();
+    builder.Services.AddScoped<IProcessService>(sp =>
+        new ProcessServiceAdapter(sp.GetRequiredService<IMemoryScannerGrpcService>()));
+    builder.Services.AddScoped<IMemoryReaderService>(sp =>
+        new MemoryReaderServiceAdapter(sp.GetRequiredService<IMemoryScannerGrpcService>()));
+    builder.Services.AddScoped<IMemoryScannerService>(sp =>
+        new MemoryScannerServiceAdapter(sp.GetRequiredService<IMemoryScannerGrpcService>()));
     builder.Services.AddScoped<IValueFreezerService, ValueFreezerService>();
     builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
 

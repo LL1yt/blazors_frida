@@ -22,7 +22,7 @@ public interface IMemoryScannerGrpcService
     Task<(bool success, string error, string newVersion)> SyncStateAsync(string sessionId, Dictionary<string, byte[]> stateUpdates, string version);
 }
 
-public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IDisposable
+public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessService, IMemoryReaderService, IMemoryScannerService, IDisposable
 {
     private readonly ILogger<MemoryScannerGrpcService> _logger;
     private readonly IPythonProcessManager _processManager;
