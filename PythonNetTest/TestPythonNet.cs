@@ -1,10 +1,6 @@
-using System;
-using System.Diagnostics;
-using Python.Runtime;
 using Microsoft.Extensions.Logging;
-using System.IO;
-using System.Threading;
-using System.Collections.Generic;
+using Python.Runtime;
+using System;
 
 namespace PythonNetTest;
 
@@ -15,45 +11,13 @@ public class TestPythonNet : IDisposable
     private bool _isDisposing;
     private dynamic? _testModule;
     private readonly ManualResetEventSlim _cleanupEvent;
-    private readonly CancellationTokenSource _cancellationTokenSource;
+    private bool _forceStopCalled;
 
     public TestPythonNet(ILogger logger)
     {
         _logger = logger;
         _cleanupEvent = new ManualResetEventSlim(false);
-        _cancellationTokenSource = new CancellationTokenSource();
-        
-        // Set up Ctrl+C handler
-        Console.CancelKeyPress += (sender, e) =>
-        {
-            e.Cancel = true; // Prevent the process from terminating immediately
-            _logger.LogInformation("Ctrl+C received, initiating shutdown...");
-            _cancellationTokenSource.Cancel();
-            
-            // Clean up Python resources
-            try
-            {
-                if (_isInitialized && PythonEngine.IsInitialized)
-                {
-                    using (Py.GIL())
-                    {
-                        _testModule = null;
-                    }
-                    PythonEngine.Shutdown();
-                    _isInitialized = false;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during Python cleanup on Ctrl+C");
-            }
-            
-            // Signal completion
-            _cleanupEvent.Set();
-            
-            // Now we can exit
-            Environment.Exit(0);
-        };
+        _forceStopCalled = false;
     }
 
     public void Initialize()
@@ -105,47 +69,25 @@ public class TestPythonNet : IDisposable
 
             // Run long running function test
             _logger.LogInformation("Press Enter to start long running function test...");
-            if (Console.ReadLine() == null || _cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                return;
-            }
-            
+            Console.ReadLine();
             RunSingleTest("Long running function test", () => {
                 InitializePython();
                 if (_testModule == null) throw new InvalidOperationException("Test module not initialized");
                 return _testModule.run_long_running_test();
             });
 
-            if (_cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                return;
-            }
-
             // Run GIL test
             _logger.LogInformation("Press Enter to start GIL test...");
-            if (Console.ReadLine() == null || _cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                return;
-            }
-            
+            Console.ReadLine();
             RunSingleTest("GIL test", () => {
                 InitializePython();
                 if (_testModule == null) throw new InvalidOperationException("Test module not initialized");
                 return _testModule.run_gil_test();
             });
 
-            if (_cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                return;
-            }
-
             // Run Frida test
             _logger.LogInformation("Press Enter to start Frida test...");
-            if (Console.ReadLine() == null || _cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                return;
-            }
-            
+            Console.ReadLine();
             RunSingleTest("Frida test", () => {
                 InitializePython();
                 if (_testModule == null) throw new InvalidOperationException("Test module not initialized");
@@ -153,17 +95,6 @@ public class TestPythonNet : IDisposable
             });
 
             _logger.LogInformation("All tests completed successfully");
-            _logger.LogInformation("Tests completed. Press Ctrl+C to exit...");
-            
-            // Wait for cancellation
-            try
-            {
-                _cancellationTokenSource.Token.WaitHandle.WaitOne();
-            }
-            catch (OperationCanceledException)
-            {
-                // Expected when cancelled
-            }
         }
         catch (Exception ex)
         {
@@ -385,7 +316,11 @@ public class TestPythonNet : IDisposable
                         dataField.SetValue(null, null);
                     }
                     
-                    PythonEngine.Shutdown();
+                    if (PythonEngine.IsInitialized) 
+                    {
+                        PythonEngine.BeginAllowThreads();
+                        PythonEngine.Shutdown();
+                    }
                     _isInitialized = false;
                     _testModule = null;
                     _logger.LogInformation("Python engine shut down successfully");
@@ -448,27 +383,93 @@ public class TestPythonNet : IDisposable
 
     public void StopTest()
     {
-        // If we're already cleaned up, just return
-        if (_testModule == null || !PythonEngine.IsInitialized)
+        if (_testModule != null)
         {
-            return;
+            try
+            {
+                _logger.LogInformation("Stopping test and cleaning up resources...");
+                
+                // Check if Python engine is still available
+                if (!PythonEngine.IsInitialized)
+                {
+                    _logger.LogWarning("Python engine already shut down, skipping cleanup");
+                    return;
+                }
+
+                using (Py.GIL())
+                {
+                    // Check if module still exists
+                    if (_testModule != null)
+                    {
+                        // Use TryInvoke to avoid exceptions if module was unloaded
+                        // Use proper Python.NET API for attribute checking
+                        if (_testModule is PyObject module)
+                        {
+                            if (module.HasAttr("cleanup"))
+                            {
+                                using (var cleanup = module.GetAttr("cleanup"))
+                                {
+                                    cleanup.Invoke();
+                                }
+                            }
+                        }
+                    }
+                }
+                _logger.LogInformation("Test stopped and resources cleaned up");
+            }
+            catch (PythonException pex) when (pex.Message == "0") // Handle sys.exit(0)
+            {
+                _logger.LogDebug("Ignoring Python exit exception during cleanup");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error stopping test");
+            }
+            finally
+            {
+                _testModule = null;
+            }
         }
+    }
+
+    public void ForceStop()
+    {
+        if (_forceStopCalled) return;
+        _forceStopCalled = true;
 
         try
         {
-            _logger.LogInformation("Stopping test and cleaning up resources...");
+            _logger.LogInformation("Force stopping Python processes...");
             
-            using (Py.GIL())
+            if (_testModule != null && PythonEngine.IsInitialized)
             {
-                // Clear the module reference
-                _testModule = null;
+                using (Py.GIL())
+                {
+                    try
+                    {
+                        bool result = _testModule.force_stop();
+                        if (result)
+                        {
+                            _logger.LogInformation("Python processes force stopped successfully");
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Force stop returned false");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error during force stop");
+                    }
+                }
             }
             
-            _logger.LogInformation("Test stopped and resources cleaned up");
+            // Force cleanup regardless of force_stop result
+            Dispose();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error stopping test");
+            _logger.LogError(ex, "Error during force stop");
         }
     }
 
@@ -479,13 +480,58 @@ public class TestPythonNet : IDisposable
 
         try
         {
-            _cancellationTokenSource.Cancel();
-            _cancellationTokenSource.Dispose();
-            _cleanupEvent.Dispose();
+            // Only call StopTest if force stop hasn't been called
+            if (!_forceStopCalled)
+            {
+                StopTest();
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during disposal");
+            _logger.LogError(ex, "Error during test cleanup");
         }
+
+        if (_isInitialized && PythonEngine.IsInitialized)
+        {
+            try
+            {
+                _logger.LogDebug("Shutting down Python engine...");
+                // Attempt to force cleanup
+                using (Py.GIL())
+                {
+                    try
+                    {
+                        dynamic sys = Py.Import("sys");
+                        dynamic gc = Py.Import("gc");
+                        gc.collect();
+                        sys.modules.clear();
+                    }
+                    catch { }
+                }
+                
+                // Force shutdown without serialization
+                var runtimeType = typeof(Runtime);
+                var dataField = runtimeType.GetField("data", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                if (dataField != null)
+                {
+                    dataField.SetValue(null, null);
+                }
+                
+                if (PythonEngine.IsInitialized) 
+                {
+                    PythonEngine.BeginAllowThreads();
+                    PythonEngine.Shutdown();
+                }
+                _isInitialized = false;
+                _logger.LogInformation("Python engine shut down successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during Python engine shutdown");
+            }
+        }
+
+        _cleanupEvent.Dispose();
     }
 }

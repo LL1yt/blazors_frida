@@ -13,6 +13,7 @@ __all__ = [
     "run_long_running_test",
     "run_gil_test",
     "run_frida_test",
+    "force_stop",
 ]
 
 # Global state to track resources
@@ -235,6 +236,40 @@ def test_gil():
     return True
 
 
+def force_stop():
+    """Force stop all Python processes and cleanup"""
+    print("Force stopping all Python processes...")
+
+    # Signal all operations to stop immediately
+    _resources["stop_event"].set()
+
+    # Aggressively cleanup threads
+    for thread in _resources["threads"]:
+        if thread.is_alive():
+            print(f"Force stopping thread {thread.name}...")
+            try:
+                # Try to join with a very short timeout
+                thread.join(timeout=0.5)
+            except:
+                pass  # Ignore any errors during force stop
+
+    # Clear thread list
+    _resources["threads"].clear()
+
+    # Aggressively cleanup Frida sessions
+    for session in _resources["frida_sessions"]:
+        try:
+            session.detach()
+        except:
+            pass  # Ignore any errors during force stop
+
+    # Clear session list
+    _resources["frida_sessions"].clear()
+
+    print("Force stop completed")
+    return True
+
+
 # Initialize module
 print("Initializing Python test module...")
 setup_signal_handlers()
@@ -244,6 +279,7 @@ sys.modules[__name__].set_dotnet_callback = set_dotnet_callback
 sys.modules[__name__].run_long_running_test = run_long_running_test
 sys.modules[__name__].run_gil_test = run_gil_test
 sys.modules[__name__].run_frida_test = run_frida_test
+sys.modules[__name__].force_stop = force_stop
 
 print("Python test module initialized")
 
