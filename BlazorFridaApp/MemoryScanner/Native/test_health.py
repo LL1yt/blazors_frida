@@ -7,6 +7,10 @@ import memory_scanner_pb2
 import memory_scanner_pb2_grpc
 import requests
 import sys
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+# Suppress only the single warning from urllib3 needed.
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 async def test_health_check():
@@ -54,7 +58,8 @@ def test_dotnet_health_endpoint():
     print("\nTesting .NET Health Check Endpoint...")
 
     try:
-        response = requests.get("http://localhost:5000/health")
+        # Disable SSL verification for development environment
+        response = requests.get("https://localhost:7235/health", verify=False)
         response.raise_for_status()
         health_data = response.json()
 
