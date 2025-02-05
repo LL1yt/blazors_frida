@@ -33,18 +33,63 @@ public class PythonProcessManager : IPythonProcessManager
         _pythonPath = "python"; // Use system Python
         _serverScript = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
             "MemoryScanner", "Native", "memory_scanner_server.py");
+        _logger.LogInformation("Initialized PythonProcessManager with port {Port} and script path {ScriptPath}", _port, _serverScript);
     }
 
     public async Task EnsureServerRunning()
     {
-        if (_isRunning) return;
+        if (_isRunning)
+        {
+            _logger.LogDebug("Server already running on port {Port}, checking process state...", _port);
+            if (_pythonProcess?.HasExited ?? true)
+            {
+                _logger.LogWarning("Process has exited unexpectedly, will restart");
+                _isRunning = false;
+            }
+            else
+            {
+                return;
+            }
+        }
 
         await _lock.WaitAsync();
         try
         {
-            if (_isRunning) return;
+            if (_isRunning)
+            {
+                _logger.LogDebug("Server already running on port {Port} (after lock)", _port);
+                return;
+            }
 
-            _logger.LogInformation("Starting Python gRPC server...");
+            _logger.LogInformation("Starting Python gRPC server on port {Port}...", _port);
+
+            // Kill any existing Python processes that might be using our port
+            try
+            {
+                var existingProcess = System.Diagnostics.Process.GetProcessesByName("python")
+                    .FirstOrDefault(p => 
+                    {
+                        try 
+                        {
+                            return p.MainModule?.FileName == _pythonPath;
+                        }
+                        catch 
+                        {
+                            return false;
+                        }
+                    });
+
+                if (existingProcess != null)
+                {
+                    _logger.LogWarning("Found existing Python process, attempting to kill it");
+                    existingProcess.Kill(true);
+                    await existingProcess.WaitForExitAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while trying to kill existing Python process");
+            }
 
             // Install requirements if needed
             await InstallRequirements();
@@ -57,8 +102,11 @@ public class PythonProcessManager : IPythonProcessManager
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(_serverScript) ?? string.Empty
             };
+
+            _logger.LogDebug("Starting process with command: {Command} {Args}", startInfo.FileName, startInfo.Arguments);
 
             _pythonProcess = new Process { StartInfo = startInfo };
 
@@ -81,7 +129,8 @@ public class PythonProcessManager : IPythonProcessManager
 
             _pythonProcess.Exited += (sender, e) =>
             {
-                _logger.LogWarning("Python server process exited unexpectedly");
+                var exitCode = _pythonProcess?.ExitCode ?? -1;
+                _logger.LogWarning("Python server process exited unexpectedly with code {ExitCode}", exitCode);
                 _isRunning = false;
             };
 
@@ -91,6 +140,7 @@ public class PythonProcessManager : IPythonProcessManager
             _pythonProcess.BeginErrorReadLine();
 
             // Wait for the server to be ready
+            _logger.LogDebug("Waiting for server to be ready on port {Port}...", _port);
             await WaitForServerReady();
 
             _isRunning = true;
@@ -98,8 +148,9 @@ public class PythonProcessManager : IPythonProcessManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to start Python gRPC server");
-            throw new PythonServerException("Failed to start Python gRPC server", ex);
+            _isRunning = false;
+            _logger.LogError(ex, "Failed to start Python gRPC server on port {Port}", _port);
+            throw new PythonServerException($"Failed to start Python gRPC server on port {_port}", ex);
         }
         finally
         {

@@ -25,8 +25,16 @@ echo Waiting for .NET application to start...
 timeout /t 10
 
 echo.
-echo Running health check tests...
-python test_health.py
+echo Running health check tests with .NET...
+python test_health.py --with-dotnet
+
+echo.
+echo Running server stability test with Frida...
+python test_health.py --stability
+
+echo.
+echo Running health check tests after Frida with .NET...
+python test_health.py --with-dotnet
 
 echo.
 echo Test complete. Check the output above for results.
