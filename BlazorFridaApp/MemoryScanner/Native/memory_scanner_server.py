@@ -13,7 +13,7 @@ from opentelemetry.instrumentation.grpc import (
     GrpcInstrumentorServer,
 )
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 from pythonjsonlogger import jsonlogger
 
 import memory_scanner_pb2
@@ -41,7 +41,7 @@ logger.setLevel(logging.INFO)
 trace.set_tracer_provider(TracerProvider())
 tracer = trace.get_tracer(__name__)
 trace.get_tracer_provider().add_span_processor(
-    trace.sdk.trace.export.SimpleSpanProcessor(ConsoleSpanExporter())
+    SimpleSpanProcessor(ConsoleSpanExporter())
 )
 
 # Initialize gRPC instrumentation

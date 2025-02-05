@@ -4,6 +4,14 @@ import sys
 import threading
 from threading import Event
 import traceback
+from dataclasses import dataclass
+
+
+@dataclass
+class ProcessInfo:
+    pid: int
+    name: str
+    path: str = ""  # Default empty string for path if not available
 
 
 def get_process_list():
@@ -29,8 +37,14 @@ def get_process_list():
                 print("Enumerating processes...", file=sys.stderr)
                 processes = []
                 for process in device.enumerate_processes():
-                    processes.append({"name": process.name, "pid": process.pid})
-                result = sorted(processes, key=lambda x: x["name"].lower())
+                    processes.append(
+                        ProcessInfo(
+                            pid=process.pid,
+                            name=process.name,
+                            path=getattr(process, "path", "") or "",
+                        )
+                    )
+                result = sorted(processes, key=lambda x: x.name.lower())
                 print(f"Found {len(processes)} processes", file=sys.stderr)
             except Exception as e:
                 error = f"Error in worker thread: {str(e)}\n{traceback.format_exc()}"
@@ -47,7 +61,7 @@ def get_process_list():
 
         # Wait for completion with timeout
         print("Waiting for worker thread...", file=sys.stderr)
-        if not done.wait(timeout=10.0):  # Увеличиваем таймаут до 10 секунд
+        if not done.wait(timeout=10.0):
             error_msg = "Operation timed out waiting for process list"
             print(error_msg, file=sys.stderr)
             raise TimeoutError(error_msg)
@@ -57,8 +71,8 @@ def get_process_list():
             raise Exception(error)
 
         print("Successfully got process list", file=sys.stderr)
-        return json.dumps(result)
+        return result
     except Exception as e:
         error_msg = f"Error in get_process_list: {str(e)}\n{traceback.format_exc()}"
         print(error_msg, file=sys.stderr)
-        return "[]"
+        return []
