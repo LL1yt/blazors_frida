@@ -22,13 +22,13 @@
 
 The main thing is that the new functionality should work. old implementations can be simply deleted if they interfere with the launch of the new implementation
 
-### 2.1 Feature Flag System
+### 2.1 Feature Flag System ✅
 
 - Implement feature flags for each memory operation type
 - Configuration in appsettings.json for granular control
 - Runtime toggle capability via admin interface
 
-### 2.2 Python Microservice
+### 2.2 Python Microservice ✅
 
 - Standalone Python process exposing gRPC endpoints
 - Protocol Buffers schema for all operations
@@ -36,7 +36,31 @@ The main thing is that the new functionality should work. old implementations ca
 - Automatic process recovery
 - Structured logging with correlation IDs
 
-### 2.3 Pattern Scanner Implementation
+### 2.3 Core State Management ✅
+
+- Versioned state payloads
+- Checkpointing system for process state
+- State synchronization protocol
+- Rollback capability
+
+### 2.4 IPC Layer ✅
+
+```protobuf
+service MemoryScanner {
+    rpc AttachToProcess (AttachRequest) returns (AttachResponse);
+    rpc ReadMemory (ReadRequest) returns (ReadResponse);
+    rpc WriteMemory (WriteRequest) returns (WriteResponse);
+    rpc Detach (DetachRequest) returns (DetachResponse);
+}
+
+message AttachRequest {
+    string process_name = 1;
+    string correlation_id = 2;
+}
+// ... other message definitions
+```
+
+### 2.5 Pattern Scanner Implementation
 
 - Goal: Enable finding dynamic values (e.g., "health") based on signatures
 - Details:
@@ -45,7 +69,7 @@ The main thing is that the new functionality should work. old implementations ca
   - Store potential addresses in intermediate data structure
 - Reasoning: Signature scanning is a classic technique used in tools like Cheat Engine. Python integration enables rapid pattern search code development.
 
-### 2.4 Value Freeze and Modification System
+### 2.6 Value Freeze and Modification System
 
 - Goal: Implement "Freeze/Unfreeze" functionality similar to Cheat Engine
 - Details:
@@ -55,7 +79,7 @@ The main thing is that the new functionality should work. old implementations ca
   - Support one-time modification (WriteOnce) without locking
 - Reasoning: Freeze functionality is essential for maintaining constant memory values, often needed for "immortality" and other game tricks
 
-### 2.5 Scan Results Caching
+### 2.7 Scan Results Caching
 
 - Goal: Avoid repeated full scans on each launch using "offset caching"
 - Details:
@@ -63,8 +87,6 @@ The main thing is that the new functionality should work. old implementations ca
   - Load saved offsets on next launch and verify validity (via signature or Frida hooks)
   - Trigger re-scan if signature mismatch
 - Reasoning: Offset caching significantly speeds up subsequent launches by avoiding repeated memory section searches
-
-### 2.6 IPC Layer
 
 ```protobuf
 service MemoryScanner {
@@ -157,102 +179,59 @@ message AttachRequest {
 
 ## 3. Implementation Phases
 
-### Phase 1: Infrastructure Setup (Week 1) [COMPLETED]
+### Phase 1: Complete Migration of Existing Features (Week 1-2)
 
-1. ✅ Set up feature flag system
+1. 🔄 Finalize C# gRPC Client [90% -> 100%]
 
-   - Implemented feature flags in appsettings.json for granular control of migration
-   - Created FeatureFlagService for managing flags
-   - Added flags for each operation type with traffic percentages
-   - Configured runtime toggle capability
+   - Complete connection management implementation
+   - Add connection pooling
+   - Implement retry policies
+   - Add circuit breaker pattern
 
-2. ✅ Create Python service scaffold
+2. Implement Feature Flag Routing
 
-   - Utilizing existing Python gRPC server
-   - Enhanced with proper error handling and logging
-   - Added correlation IDs for request tracking
-   - Implemented OpenTelemetry integration
+   - Add routing logic in MemoryScannerCoordinator
+   - Implement graceful fallback mechanisms
+   - Add monitoring for routing decisions
+   - Configure traffic splitting rules
 
-3. ✅ Implement gRPC contracts
+3. Deploy Monitoring for Existing Features
 
-   - Defined memory scanner service contracts in memory_scanner.proto
-   - Added health service contracts in health.proto
-   - Implemented versioned state management
-   - Added proper error responses and status codes
+   - Set up Prometheus metrics
+   - Configure OpenTelemetry collectors
+   - Create monitoring dashboards
+   - Set up alerting rules
 
-4. ✅ Add health monitoring
-   - Created GrpcHealthCheck service in C#
-   - Implemented HealthServicer in Python
-   - Added health check endpoint at /health
-   - Configured health status management
-   - Added grpcio-health-checking package
+4. Validate Existing Feature Migration
+   - Test process attachment
+   - Verify memory reading operations
+   - Validate memory writing operations
+   - Confirm process detachment
+   - Monitor error rates and performance
 
-### Phase 2: Core Service Implementation (Week 2) [IN PROGRESS]
+### Phase 2: Pattern Scanner Implementation (Week 3)
 
-1. ✅ Port Frida functionality to standalone service
+1. Implement Core Scanner
 
-   - Implemented reader.py for memory reading operations
-   - Created writer.py for memory writing operations
-   - Added scanner.py for memory scanning functionality
-   - Developed process_list.py for process management
-   - Integrated Frida core functionality in frida_module.py
-
-2. ✅ Implement state management [100% Complete]
-
-   - ✅ Created state_manager.py for state persistence
-   - ✅ Added versioned state payloads
-   - ✅ Implemented checkpointing system
-   - ✅ Added state cleanup and rollback mechanisms
-
-3. ✅ Add logging and telemetry [100% Complete]
-
-   - ✅ Implemented structured logging with correlation IDs
-   - ✅ Added OpenTelemetry integration
-   - ✅ Created GrpcHealthCheck service
-   - ✅ Added performance metrics
-     - Session count tracking via active_sessions_counter
-     - Operation latencies with operation_duration histogram
-     - Operation counts with operation_counter
-     - Error tracking with error_counter
-     - Implemented metrics collection in memory operations (read/write/scan)
-     - Added proper error attribution and status codes
-     - Integrated with OpenTelemetry console exporter
-
-4. 🔄 Create C# gRPC client [90% Complete]
-
-   - ✅ Implemented service adapters
-   - ✅ Added error handling
-   - ✅ Created retry policies
-   - 🔄 Finalizing connection management
-
-5. ⏳ Implement Pattern Scanner [0% Complete]
-
-   - Create signature generation module in Python
+   - Create signature generation module
    - Implement block-based memory scanning
    - Add pattern matching algorithms
    - Integrate with existing scanner.py
 
-6. ⏳ Add Value Freeze System [0% Complete]
+2. Add Value Freeze System
 
    - Implement FreezeValue and UnfreezeValue methods
    - Create background value update thread
    - Add one-time modification support
    - Integrate with writer.py
 
-7. ⏳ Implement Scan Caching [0% Complete]
-
+3. Implement Scan Caching
    - Set up SQLite tables for offset storage
    - Add offset calculation relative to module base
    - Implement signature validation on load
    - Create cache invalidation logic
 
-8. ⏳ Setup IL2CPP Support [0% Complete]
-   - Integrate frida-il2cpp-bridge
-   - Add Il2CppDumper support
-   - Implement Unity game class discovery
-   - Create BepInEx integration foundation
-
-### Phase 3: Hybrid Mode (Week 3)
+### Phase 3: UI Modernization (Week 4)
 
 1. Implement feature flag routing
 
