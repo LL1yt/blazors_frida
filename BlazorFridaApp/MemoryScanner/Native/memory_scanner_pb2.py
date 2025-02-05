@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14memory_scanner.proto\x12\x0ememory_scanner\"\x07\n\x05\x45mpty\"6\n\x0bProcessInfo\x12\x0b\n\x03pid\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"=\n\x0bProcessList\x12.\n\tprocesses\x18\x01 \x03(\x0b\x32\x1b.memory_scanner.ProcessInfo\"\x1d\n\x0eProcessRequest\x12\x0b\n\x03pid\x18\x01 \x01(\x05\"L\n\x0e\x41ttachResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\t\"\x8b\x01\n\x0bScanRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x12\n\nvalue_type\x18\x02 \x01(\t\x12\r\n\x05value\x18\x03 \x01(\x0c\x12\x17\n\x0f\x63omparison_type\x18\x04 \x01(\t\x12,\n\x06ranges\x18\x05 \x03(\x0b\x32\x1c.memory_scanner.AddressRange\"*\n\x0c\x41\x64\x64ressRange\x12\r\n\x05start\x18\x01 \x01(\x04\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x04\"R\n\x0cScanResponse\x12+\n\x07results\x18\x01 \x03(\x0b\x32\x1a.memory_scanner.ScanResult\x12\x15\n\rcheckpoint_id\x18\x02 \x01(\t\",\n\nScanResult\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\x04\x12\r\n\x05value\x18\x02 \x01(\x0c\"T\n\x0bReadRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x04\x12\x0c\n\x04size\x18\x03 \x01(\x05\x12\x12\n\nvalue_type\x18\x04 \x01(\t\"E\n\x0cReadResponse\x12\r\n\x05value\x18\x01 \x01(\x0c\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x15\n\rerror_message\x18\x03 \x01(\t\"V\n\x0cWriteRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x04\x12\r\n\x05value\x18\x03 \x01(\x0c\x12\x12\n\nvalue_type\x18\x04 \x01(\t\"7\n\rWriteResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\"W\n\rFreezeRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x04\x12\r\n\x05value\x18\x03 \x01(\x0c\x12\x12\n\nvalue_type\x18\x04 \x01(\t\"d\n\x0c\x46reezeStatus\x12\x0e\n\x06\x61\x63tive\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x15\n\rcurrent_value\x18\x03 \x01(\x0c\x12\x16\n\x0e\x63orrelation_id\x18\x04 \x01(\t\"6\n\x0fUnfreezeRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x04\"9\n\x0cStateRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x15\n\rcheckpoint_id\x18\x02 \x01(\t\"\x87\x01\n\rStateResponse\x12\x37\n\x05state\x18\x01 \x03(\x0b\x32(.memory_scanner.StateResponse.StateEntry\x12\x0f\n\x07version\x18\x02 \x01(\t\x1a,\n\nStateEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x0c:\x02\x38\x01\"\xad\x01\n\x0bSyncRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x44\n\rstate_updates\x18\x02 \x03(\x0b\x32-.memory_scanner.SyncRequest.StateUpdatesEntry\x12\x0f\n\x07version\x18\x03 \x01(\t\x1a\x33\n\x11StateUpdatesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x0c:\x02\x38\x01\"K\n\x0cSyncResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x13\n\x0bnew_version\x18\x03 \x01(\t2\xf9\x05\n\rMemoryScanner\x12\x43\n\rListProcesses\x12\x15.memory_scanner.Empty\x1a\x1b.memory_scanner.ProcessList\x12Q\n\x0f\x41ttachToProcess\x12\x1e.memory_scanner.ProcessRequest\x1a\x1e.memory_scanner.AttachResponse\x12J\n\x11\x44\x65tachFromProcess\x12\x1e.memory_scanner.ProcessRequest\x1a\x15.memory_scanner.Empty\x12G\n\nScanMemory\x12\x1b.memory_scanner.ScanRequest\x1a\x1c.memory_scanner.ScanResponse\x12G\n\nReadMemory\x12\x1b.memory_scanner.ReadRequest\x1a\x1c.memory_scanner.ReadResponse\x12J\n\x0bWriteMemory\x12\x1c.memory_scanner.WriteRequest\x1a\x1d.memory_scanner.WriteResponse\x12L\n\x0b\x46reezeValue\x12\x1d.memory_scanner.FreezeRequest\x1a\x1c.memory_scanner.FreezeStatus0\x01\x12G\n\rUnfreezeValue\x12\x1f.memory_scanner.UnfreezeRequest\x1a\x15.memory_scanner.Empty\x12G\n\x08GetState\x12\x1c.memory_scanner.StateRequest\x1a\x1d.memory_scanner.StateResponse\x12\x46\n\tSyncState\x12\x1b.memory_scanner.SyncRequest\x1a\x1c.memory_scanner.SyncResponseB%\xaa\x02\"BlazorFridaApp.MemoryScanner.Protob\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14memory_scanner.proto\x12\x0ememory_scanner\"\x07\n\x05\x45mpty\"6\n\x0bProcessInfo\x12\x0b\n\x03pid\x18\x01 \x01(\x05\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"=\n\x0bProcessList\x12.\n\tprocesses\x18\x01 \x03(\x0b\x32\x1b.memory_scanner.ProcessInfo\"\x1d\n\x0eProcessRequest\x12\x0b\n\x03pid\x18\x01 \x01(\x05\"L\n\x0e\x41ttachResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x12\n\nsession_id\x18\x03 \x01(\t\"#\n\rDetachRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\"\x8b\x01\n\x0bScanRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x12\n\nvalue_type\x18\x02 \x01(\t\x12\r\n\x05value\x18\x03 \x01(\x0c\x12\x17\n\x0f\x63omparison_type\x18\x04 \x01(\t\x12,\n\x06ranges\x18\x05 \x03(\x0b\x32\x1c.memory_scanner.AddressRange\"*\n\x0c\x41\x64\x64ressRange\x12\r\n\x05start\x18\x01 \x01(\x04\x12\x0b\n\x03\x65nd\x18\x02 \x01(\x04\"R\n\x0cScanResponse\x12+\n\x07results\x18\x01 \x03(\x0b\x32\x1a.memory_scanner.ScanResult\x12\x15\n\rcheckpoint_id\x18\x02 \x01(\t\",\n\nScanResult\x12\x0f\n\x07\x61\x64\x64ress\x18\x01 \x01(\x04\x12\r\n\x05value\x18\x02 \x01(\x0c\"T\n\x0bReadRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x04\x12\x0c\n\x04size\x18\x03 \x01(\x05\x12\x12\n\nvalue_type\x18\x04 \x01(\t\"E\n\x0cReadResponse\x12\r\n\x05value\x18\x01 \x01(\x0c\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x15\n\rerror_message\x18\x03 \x01(\t\"V\n\x0cWriteRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x04\x12\r\n\x05value\x18\x03 \x01(\x0c\x12\x12\n\nvalue_type\x18\x04 \x01(\t\"7\n\rWriteResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\"W\n\rFreezeRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x04\x12\r\n\x05value\x18\x03 \x01(\x0c\x12\x12\n\nvalue_type\x18\x04 \x01(\t\"d\n\x0c\x46reezeStatus\x12\x0e\n\x06\x61\x63tive\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x15\n\rcurrent_value\x18\x03 \x01(\x0c\x12\x16\n\x0e\x63orrelation_id\x18\x04 \x01(\t\"6\n\x0fUnfreezeRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\x04\"9\n\x0cStateRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x15\n\rcheckpoint_id\x18\x02 \x01(\t\"\x87\x01\n\rStateResponse\x12\x37\n\x05state\x18\x01 \x03(\x0b\x32(.memory_scanner.StateResponse.StateEntry\x12\x0f\n\x07version\x18\x02 \x01(\t\x1a,\n\nStateEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x0c:\x02\x38\x01\"\xad\x01\n\x0bSyncRequest\x12\x12\n\nsession_id\x18\x01 \x01(\t\x12\x44\n\rstate_updates\x18\x02 \x03(\x0b\x32-.memory_scanner.SyncRequest.StateUpdatesEntry\x12\x0f\n\x07version\x18\x03 \x01(\t\x1a\x33\n\x11StateUpdatesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x0c:\x02\x38\x01\"K\n\x0cSyncResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x13\n\x0bnew_version\x18\x03 \x01(\t2\xf8\x05\n\rMemoryScanner\x12\x43\n\rListProcesses\x12\x15.memory_scanner.Empty\x1a\x1b.memory_scanner.ProcessList\x12Q\n\x0f\x41ttachToProcess\x12\x1e.memory_scanner.ProcessRequest\x1a\x1e.memory_scanner.AttachResponse\x12I\n\x11\x44\x65tachFromProcess\x12\x1d.memory_scanner.DetachRequest\x1a\x15.memory_scanner.Empty\x12G\n\nScanMemory\x12\x1b.memory_scanner.ScanRequest\x1a\x1c.memory_scanner.ScanResponse\x12G\n\nReadMemory\x12\x1b.memory_scanner.ReadRequest\x1a\x1c.memory_scanner.ReadResponse\x12J\n\x0bWriteMemory\x12\x1c.memory_scanner.WriteRequest\x1a\x1d.memory_scanner.WriteResponse\x12L\n\x0b\x46reezeValue\x12\x1d.memory_scanner.FreezeRequest\x1a\x1c.memory_scanner.FreezeStatus0\x01\x12G\n\rUnfreezeValue\x12\x1f.memory_scanner.UnfreezeRequest\x1a\x15.memory_scanner.Empty\x12G\n\x08GetState\x12\x1c.memory_scanner.StateRequest\x1a\x1d.memory_scanner.StateResponse\x12\x46\n\tSyncState\x12\x1b.memory_scanner.SyncRequest\x1a\x1c.memory_scanner.SyncResponseB%\xaa\x02\"BlazorFridaApp.MemoryScanner.Protob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -46,40 +46,42 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_PROCESSREQUEST']._serialized_end=197
   _globals['_ATTACHRESPONSE']._serialized_start=199
   _globals['_ATTACHRESPONSE']._serialized_end=275
-  _globals['_SCANREQUEST']._serialized_start=278
-  _globals['_SCANREQUEST']._serialized_end=417
-  _globals['_ADDRESSRANGE']._serialized_start=419
-  _globals['_ADDRESSRANGE']._serialized_end=461
-  _globals['_SCANRESPONSE']._serialized_start=463
-  _globals['_SCANRESPONSE']._serialized_end=545
-  _globals['_SCANRESULT']._serialized_start=547
-  _globals['_SCANRESULT']._serialized_end=591
-  _globals['_READREQUEST']._serialized_start=593
-  _globals['_READREQUEST']._serialized_end=677
-  _globals['_READRESPONSE']._serialized_start=679
-  _globals['_READRESPONSE']._serialized_end=748
-  _globals['_WRITEREQUEST']._serialized_start=750
-  _globals['_WRITEREQUEST']._serialized_end=836
-  _globals['_WRITERESPONSE']._serialized_start=838
-  _globals['_WRITERESPONSE']._serialized_end=893
-  _globals['_FREEZEREQUEST']._serialized_start=895
-  _globals['_FREEZEREQUEST']._serialized_end=982
-  _globals['_FREEZESTATUS']._serialized_start=984
-  _globals['_FREEZESTATUS']._serialized_end=1084
-  _globals['_UNFREEZEREQUEST']._serialized_start=1086
-  _globals['_UNFREEZEREQUEST']._serialized_end=1140
-  _globals['_STATEREQUEST']._serialized_start=1142
-  _globals['_STATEREQUEST']._serialized_end=1199
-  _globals['_STATERESPONSE']._serialized_start=1202
-  _globals['_STATERESPONSE']._serialized_end=1337
-  _globals['_STATERESPONSE_STATEENTRY']._serialized_start=1293
-  _globals['_STATERESPONSE_STATEENTRY']._serialized_end=1337
-  _globals['_SYNCREQUEST']._serialized_start=1340
-  _globals['_SYNCREQUEST']._serialized_end=1513
-  _globals['_SYNCREQUEST_STATEUPDATESENTRY']._serialized_start=1462
-  _globals['_SYNCREQUEST_STATEUPDATESENTRY']._serialized_end=1513
-  _globals['_SYNCRESPONSE']._serialized_start=1515
-  _globals['_SYNCRESPONSE']._serialized_end=1590
-  _globals['_MEMORYSCANNER']._serialized_start=1593
-  _globals['_MEMORYSCANNER']._serialized_end=2354
+  _globals['_DETACHREQUEST']._serialized_start=277
+  _globals['_DETACHREQUEST']._serialized_end=312
+  _globals['_SCANREQUEST']._serialized_start=315
+  _globals['_SCANREQUEST']._serialized_end=454
+  _globals['_ADDRESSRANGE']._serialized_start=456
+  _globals['_ADDRESSRANGE']._serialized_end=498
+  _globals['_SCANRESPONSE']._serialized_start=500
+  _globals['_SCANRESPONSE']._serialized_end=582
+  _globals['_SCANRESULT']._serialized_start=584
+  _globals['_SCANRESULT']._serialized_end=628
+  _globals['_READREQUEST']._serialized_start=630
+  _globals['_READREQUEST']._serialized_end=714
+  _globals['_READRESPONSE']._serialized_start=716
+  _globals['_READRESPONSE']._serialized_end=785
+  _globals['_WRITEREQUEST']._serialized_start=787
+  _globals['_WRITEREQUEST']._serialized_end=873
+  _globals['_WRITERESPONSE']._serialized_start=875
+  _globals['_WRITERESPONSE']._serialized_end=930
+  _globals['_FREEZEREQUEST']._serialized_start=932
+  _globals['_FREEZEREQUEST']._serialized_end=1019
+  _globals['_FREEZESTATUS']._serialized_start=1021
+  _globals['_FREEZESTATUS']._serialized_end=1121
+  _globals['_UNFREEZEREQUEST']._serialized_start=1123
+  _globals['_UNFREEZEREQUEST']._serialized_end=1177
+  _globals['_STATEREQUEST']._serialized_start=1179
+  _globals['_STATEREQUEST']._serialized_end=1236
+  _globals['_STATERESPONSE']._serialized_start=1239
+  _globals['_STATERESPONSE']._serialized_end=1374
+  _globals['_STATERESPONSE_STATEENTRY']._serialized_start=1330
+  _globals['_STATERESPONSE_STATEENTRY']._serialized_end=1374
+  _globals['_SYNCREQUEST']._serialized_start=1377
+  _globals['_SYNCREQUEST']._serialized_end=1550
+  _globals['_SYNCREQUEST_STATEUPDATESENTRY']._serialized_start=1499
+  _globals['_SYNCREQUEST_STATEUPDATESENTRY']._serialized_end=1550
+  _globals['_SYNCRESPONSE']._serialized_start=1552
+  _globals['_SYNCRESPONSE']._serialized_end=1627
+  _globals['_MEMORYSCANNER']._serialized_start=1630
+  _globals['_MEMORYSCANNER']._serialized_end=2390
 # @@protoc_insertion_point(module_scope)

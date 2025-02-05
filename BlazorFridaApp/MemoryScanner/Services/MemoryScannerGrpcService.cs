@@ -144,11 +144,22 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
+            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+            
+            var request = new Proto.DetachRequest
+            {
+                SessionId = sessionId
+            };
+            
+            await client.DetachFromProcessAsync(request, CreateMetadata());
+            
             if (sessionId == _currentSessionId)
             {
                 _currentSessionId = string.Empty;
                 _processHandle = 0;
             }
+            
+            _logger.LogInformation("Successfully detached from process for session {SessionId}", sessionId);
         }
         catch (Exception ex)
         {

@@ -47,7 +47,7 @@ class MemoryScannerStub(object):
                 _registered_method=True)
         self.DetachFromProcess = channel.unary_unary(
                 '/memory_scanner.MemoryScanner/DetachFromProcess',
-                request_serializer=memory__scanner__pb2.ProcessRequest.SerializeToString,
+                request_serializer=memory__scanner__pb2.DetachRequest.SerializeToString,
                 response_deserializer=memory__scanner__pb2.Empty.FromString,
                 _registered_method=True)
         self.ScanMemory = channel.unary_unary(
@@ -170,7 +170,7 @@ def add_MemoryScannerServicer_to_server(servicer, server):
             ),
             'DetachFromProcess': grpc.unary_unary_rpc_method_handler(
                     servicer.DetachFromProcess,
-                    request_deserializer=memory__scanner__pb2.ProcessRequest.FromString,
+                    request_deserializer=memory__scanner__pb2.DetachRequest.FromString,
                     response_serializer=memory__scanner__pb2.Empty.SerializeToString,
             ),
             'ScanMemory': grpc.unary_unary_rpc_method_handler(
@@ -289,7 +289,7 @@ class MemoryScanner(object):
             request,
             target,
             '/memory_scanner.MemoryScanner/DetachFromProcess',
-            memory__scanner__pb2.ProcessRequest.SerializeToString,
+            memory__scanner__pb2.DetachRequest.SerializeToString,
             memory__scanner__pb2.Empty.FromString,
             options,
             channel_credentials,
