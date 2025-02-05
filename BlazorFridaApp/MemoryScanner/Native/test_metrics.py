@@ -2,12 +2,19 @@
 import asyncio
 import logging
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 import grpc
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
 import memory_scanner_pb2
 from memory_scanner_server import MemoryScannerService
+import argparse
+import sqlite3
+import os
+import time
+from scanner import MemoryScanner
+from writer import MemoryWriter
+from state_manager import StateManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -215,6 +222,171 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         self.operation_duration.record.assert_called_once()
         self.assertIsNotNone(response.checkpoint_id)
 
+    async def test_pattern_scanner(self):
+        """Test pattern scanning functionality"""
+        # Arrange
+        session_id = "test_session"
+        scanner_mock = MagicMock()
+        pattern = "48 8B ? ? 45 85"  # Test pattern
+
+        async def mock_scan(*args, **kwargs):
+            current_span = trace.get_current_span()
+            current_span.set_attribute("pattern.value", pattern)
+            return [{"address": 0x1000, "value": pattern}]
+
+        scanner_mock.scan = mock_scan
+        self.service.scanners[session_id] = scanner_mock
+        request = memory_scanner_pb2.ScanRequest(
+            session_id=session_id,
+            value_type="pattern",
+            value=pattern.encode(),
+            comparison_type="pattern",
+            ranges=[],
+        )
+
+        # Act
+        response = await self.service.ScanMemory(request, self.context)
+
+        # Assert
+        self.operation_counter.add.assert_called_once_with(
+            1, {"operation": "pattern_scan"}
+        )
+        self.operation_duration.record.assert_called_once()
+        self.assertTrue(len(response.results) > 0)
+
+    async def test_value_freezer(self):
+        """Test value freezing functionality"""
+        # Arrange
+        session_id = "test_session"
+        writer_mock = MagicMock()
+        address = 0x1000
+        value = 100
+
+        async def mock_freeze(*args, **kwargs):
+            current_span = trace.get_current_span()
+            current_span.set_attribute("freeze.address", address)
+            current_span.set_attribute("freeze.value", value)
+            return True
+
+        writer_mock.freeze_value = mock_freeze
+        self.service.writers[session_id] = writer_mock
+        request = memory_scanner_pb2.FreezeRequest(
+            session_id=session_id,
+            address=address,
+            value=value.to_bytes(4, "little"),
+            value_type="int32",
+        )
+
+        # Act
+        response = await self.service.FreezeValue(request, self.context)
+
+        # Assert
+        self.operation_counter.add.assert_called_once_with(1, {"operation": "freeze"})
+        self.operation_duration.record.assert_called_once()
+        self.assertTrue(response.success)
+
+    async def test_cache_system(self):
+        """Test scan caching functionality"""
+        # Arrange
+        session_id = "test_session"
+        state_manager = StateManager(session_id)
+        module_name = "test_module"
+        address = 0x1000
+        base_address = 0x500
+        value_type = "int32"
+        signature = "test_signature"
+
+        # Act
+        # Cache an offset
+        await state_manager.cache_offset(
+            module_name, address, base_address, value_type, signature
+        )
+
+        # Get cached offsets
+        cached_offsets = await state_manager.get_cached_offsets(module_name)
+
+        # Assert
+        self.assertEqual(len(cached_offsets), 1)
+        self.assertEqual(cached_offsets[0].module_name, module_name)
+        self.assertEqual(cached_offsets[0].relative_offset, address - base_address)
+        self.assertEqual(cached_offsets[0].value_type, value_type)
+
+    async def test_integrated_functionality(self):
+        """Test integration of pattern scanning, freezing, and caching"""
+        # Arrange
+        session_id = "test_session"
+        scanner = MemoryScanner(MagicMock(), session_id)
+        writer = MemoryWriter(MagicMock())
+        state_manager = StateManager(session_id)
+
+        # Mock Frida session
+        session_mock = MagicMock()
+        session_mock.execute_script = AsyncMock(return_value=[{"address": 0x1000}])
+
+        # Act & Assert
+        # 1. Pattern scan
+        results = await scanner.scan(
+            value_type="pattern",
+            value="48 8B ? ? 45 85",
+            comparison_type="pattern",
+            ranges=[],
+        )
+        self.assertTrue(len(results) > 0)
+
+        # 2. Freeze value
+        address = results[0]["address"]
+        freeze_success = await writer.freeze_value(address, 100, "int32")
+        self.assertTrue(freeze_success)
+
+        # 3. Cache result
+        await state_manager.cache_offset(
+            "test_module", address, 0x500, "int32", "test_signature"
+        )
+        cached = await state_manager.get_cached_offsets("test_module")
+        self.assertTrue(len(cached) > 0)
+
+        # Cleanup
+        writer.cleanup()
+        state_manager.cleanup_old_states()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--pattern-scanner", action="store_true", help="Run pattern scanner tests"
+    )
+    parser.add_argument(
+        "--value-freezer", action="store_true", help="Run value freezer tests"
+    )
+    parser.add_argument(
+        "--cache-system", action="store_true", help="Run cache system tests"
+    )
+    parser.add_argument(
+        "--integrated", action="store_true", help="Run integrated functionality tests"
+    )
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
-    asyncio.run(unittest.main())
+    args = parse_args()
+
+    # Create test suite
+    suite = unittest.TestSuite()
+
+    # Add tests based on arguments
+    if args.pattern_scanner:
+        suite.addTest(TestMetricsCollection("test_pattern_scanner"))
+    if args.value_freezer:
+        suite.addTest(TestMetricsCollection("test_value_freezer"))
+    if args.cache_system:
+        suite.addTest(TestMetricsCollection("test_cache_system"))
+    if args.integrated:
+        suite.addTest(TestMetricsCollection("test_integrated_functionality"))
+
+    # If no specific tests selected, run all tests
+    if not any(vars(args).values()):
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestMetricsCollection)
+
+    # Run tests
+    runner = unittest.TextTestRunner()
+    asyncio.run(runner.run(suite))
