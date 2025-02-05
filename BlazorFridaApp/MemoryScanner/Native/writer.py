@@ -11,6 +11,27 @@ import time
 logger = logging.getLogger(__name__)
 
 
+async def write_memory(
+    session, address: int, value: Any, value_type: str = "bytes"
+) -> bool:
+    """Write value to memory at the specified address.
+
+    Args:
+        session: Frida session
+        address: Memory address to write to
+        value: Value to write
+        value_type: Type of value ('int8', 'uint8', etc.)
+
+    Returns:
+        Boolean indicating success
+    """
+    writer = MemoryWriter(session)
+    try:
+        return await writer.write(address, value, value_type)
+    finally:
+        writer.cleanup()
+
+
 @dataclass
 class FrozenValue:
     address: int

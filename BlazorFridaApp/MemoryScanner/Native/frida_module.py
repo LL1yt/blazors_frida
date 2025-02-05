@@ -34,12 +34,18 @@ class FridaMemoryScanner:
         except Exception as e:
             raise Exception(f"Failed to read memory at {address}: {str(e)}")
 
-    async def write_memory(self, address, data):
-        """Write memory at the specified address."""
+    async def write_memory(self, address, value, value_type="bytes"):
+        """Write memory at the specified address.
+
+        Args:
+            address: Memory address to write to
+            value: Value to write
+            value_type: Type of value ('int8', 'uint8', etc.)
+        """
         if not self.attacher.session:
             raise Exception("Not attached to any process")
         try:
-            return await write_memory(self.attacher.session, address, data)
+            return await write_memory(self.attacher.session, address, value, value_type)
         except Exception as e:
             raise Exception(f"Failed to write memory at {address}: {str(e)}")
 

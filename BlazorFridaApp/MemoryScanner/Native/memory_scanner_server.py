@@ -245,7 +245,9 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 checkpoint_id = str(uuid.uuid4())
                 return memory_scanner_pb2.ScanResponse(
                     results=[
-                        memory_scanner_pb2.ScanResult(address=r.address, value=r.value)
+                        memory_scanner_pb2.ScanResult(
+                            address=r["address"], value=r["value"]
+                        )
                         for r in results
                     ],
                     checkpoint_id=checkpoint_id,
