@@ -1,5 +1,9 @@
 from executor import execute_script
 from typing import List, Tuple, Optional, Dict, Any
+from state_manager import StateManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 SCAN_SCRIPT = """
 rpc.exports = {
@@ -24,10 +28,11 @@ rpc.exports = {
 
 
 class MemoryScanner:
-    def __init__(self, frida_scanner):
+    def __init__(self, frida_scanner, session_id: str):
         self.frida_scanner = frida_scanner
-        self.scan_history = {}
-        self.current_state = {}
+        self.session_id = session_id
+        self.state_manager = StateManager(session_id)
+        logger.info(f"MemoryScanner initialized for session {session_id}")
 
     async def scan(
         self,
@@ -54,35 +59,60 @@ class MemoryScanner:
                 addr = int(addr, 16)  # Convert hex string to int
             results.append({"address": addr, "value": value})
 
-        # Store scan results in history
-        checkpoint_id = len(self.scan_history)
-        self.scan_history[checkpoint_id] = results
+        # Create checkpoint and save state
+        metadata = {
+            "value_type": value_type,
+            "comparison_type": comparison_type,
+            "ranges": ranges,
+        }
+        checkpoint_id = await self.state_manager.create_checkpoint(results, metadata)
+        logger.info(f"Created checkpoint {checkpoint_id} for scan results")
 
         return results
 
     async def get_state(self, checkpoint_id: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Get the current scanner state or state at a specific checkpoint
-        """
-        if checkpoint_id and checkpoint_id in self.scan_history:
-            return {
-                "checkpoint_id": checkpoint_id,
-                "results": self.scan_history[checkpoint_id],
-                **self.current_state,
-            }
-        return self.current_state
+        """Get the current scanner state or state at a specific checkpoint"""
+        try:
+            state = await self.state_manager.load_state()
+            if not state:
+                logger.warning("No state found")
+                return {}
+
+            if checkpoint_id:
+                checkpoint_state = await self.state_manager.restore_checkpoint(
+                    checkpoint_id
+                )
+                if checkpoint_state:
+                    return asdict(checkpoint_state)
+                logger.warning(f"Checkpoint {checkpoint_id} not found")
+                return {}
+
+            return asdict(state)
+        except Exception as e:
+            logger.error(f"Failed to get state: {e}")
+            return {}
 
     async def update_state(self, state_updates: Dict[str, Any]) -> None:
-        """
-        Update the scanner state with the provided updates
-        """
-        self.current_state.update(state_updates)
+        """Update the scanner state with the provided updates"""
+        try:
+            current_state = await self.state_manager.load_state()
+            if current_state:
+                metadata = current_state.metadata
+                metadata.update(state_updates)
+                await self.state_manager.save_state(
+                    current_state.checkpoint_id, current_state.scan_results, metadata
+                )
+                logger.info("State updated successfully")
+            else:
+                logger.warning("No state to update")
+        except Exception as e:
+            logger.error(f"Failed to update state: {e}")
+            raise
 
-
-def scan_memory(session, value_type, value):
-    """
-    Legacy function maintained for compatibility
-    """
-    if not session:
-        return []
-    return execute_script(session, SCAN_SCRIPT, "scan_memory", value_type, value)
+    def cleanup(self):
+        """Cleanup old state files"""
+        try:
+            self.state_manager.cleanup_old_states()
+            logger.info("Old states cleaned up")
+        except Exception as e:
+            logger.error(f"Failed to cleanup states: {e}")

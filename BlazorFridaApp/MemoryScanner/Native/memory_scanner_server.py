@@ -120,9 +120,12 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 await frida_scanner.attach_to_process(request.pid)
 
                 self.sessions[session_id] = frida_scanner
-                self.scanners[session_id] = MemoryScanner(frida_scanner)
+                self.scanners[session_id] = MemoryScanner(frida_scanner, session_id)
                 self.state_versions[session_id] = str(uuid.uuid4())
 
+                logger.info(
+                    f"Successfully attached to process {request.pid} with session {session_id}"
+                )
                 return memory_scanner_pb2.AttachResponse(
                     success=True, session_id=session_id
                 )
@@ -141,11 +144,18 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
             try:
                 session_id = request.session_id
                 if session_id in self.sessions:
+                    # Cleanup state before detaching
+                    scanner = self.scanners[session_id]
+                    scanner.cleanup()  # Clean up state files
+
                     await self.sessions[session_id].detach_from_process()
                     del self.sessions[session_id]
                     del self.scanners[session_id]
                     del self.state_versions[session_id]
-                    logger.info(f"Successfully detached from session {session_id}")
+
+                    logger.info(
+                        f"Successfully detached and cleaned up session {session_id}"
+                    )
                     return memory_scanner_pb2.DetachResponse(success=True)
                 else:
                     logger.warning(f"Session {session_id} not found")

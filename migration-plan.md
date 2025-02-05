@@ -1,5 +1,6 @@
 # Python.NET to Standalone Python Process Migration Plan
 
+note what has been done with details and improve the plan if necessary.
 Prioritize atomic transitions of individual features while maintaining full system observability through each migration phase.
 
 ## 1. Architecture Overview

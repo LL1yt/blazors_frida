@@ -37,5 +37,9 @@ echo Running health check tests after Frida with .NET...
 python test_health.py --with-dotnet
 
 echo.
+echo Running state management tests...
+python test_state.py
+
+echo.
 echo Test complete. Check the output above for results.
 pause
