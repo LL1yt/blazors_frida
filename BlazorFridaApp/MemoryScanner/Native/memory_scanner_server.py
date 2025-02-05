@@ -136,7 +136,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         self,
         request: memory_scanner_pb2.DetachRequest,
         context: grpc.aio.ServicerContext,
-    ) -> memory_scanner_pb2.Empty:
+    ) -> memory_scanner_pb2.DetachResponse:
         with tracer.start_as_current_span("detach_from_process") as span:
             try:
                 session_id = request.session_id
@@ -146,14 +146,18 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     del self.scanners[session_id]
                     del self.state_versions[session_id]
                     logger.info(f"Successfully detached from session {session_id}")
+                    return memory_scanner_pb2.DetachResponse(success=True)
                 else:
                     logger.warning(f"Session {session_id} not found")
-                return memory_scanner_pb2.Empty()
+                    return memory_scanner_pb2.DetachResponse(
+                        success=False, error_message=f"Session {session_id} not found"
+                    )
             except Exception as e:
+                error_msg = str(e)
                 logger.error(f"Failed to detach from process", exc_info=e)
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
-                return memory_scanner_pb2.Empty()
+                return memory_scanner_pb2.DetachResponse(
+                    success=False, error_message=error_msg
+                )
 
     async def ScanMemory(
         self, request: memory_scanner_pb2.ScanRequest, context: grpc.aio.ServicerContext

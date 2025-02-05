@@ -91,13 +91,16 @@ async def check_grpc_health(test_frida: bool = False, retry_count: int = 0):
                     await asyncio.sleep(1)
                     logger.info("Attempting to detach from process...")
                     detach_response = await memory_scanner_stub.DetachFromProcess(
-                        memory_scanner_pb2.ProcessRequest(pid=notepad.pid)
-                    )
-                    if not getattr(detach_response, "success", False):
-                        logger.warning(
-                            "Detach response doesn't indicate success, but continuing..."
+                        memory_scanner_pb2.DetachRequest(
+                            session_id=attach_response.session_id
                         )
-                    logger.info("Successfully detached from process")
+                    )
+                    if not detach_response.success:
+                        logger.warning(
+                            f"Failed to detach from process: {detach_response.error_message}"
+                        )
+                    else:
+                        logger.info("Successfully detached from process")
                 except Exception as detach_error:
                     logger.error(f"Error during detach: {detach_error}")
                     # Don't raise here, as we want to continue with other tests

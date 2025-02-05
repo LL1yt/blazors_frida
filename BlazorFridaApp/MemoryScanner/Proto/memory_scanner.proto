@@ -9,7 +9,7 @@ service MemoryScanner {
   // Process operations
   rpc ListProcesses (Empty) returns (ProcessList);
   rpc AttachToProcess (ProcessRequest) returns (AttachResponse);
-  rpc DetachFromProcess (DetachRequest) returns (Empty);
+  rpc DetachFromProcess (DetachRequest) returns (DetachResponse);
 
   // Memory scanning operations
   rpc ScanMemory (ScanRequest) returns (ScanResponse);
@@ -50,6 +50,11 @@ message AttachResponse {
 
 message DetachRequest {
   string session_id = 1;
+}
+
+message DetachResponse {
+  bool success = 1;
+  string error_message = 2;
 }
 
 // Scanning messages
