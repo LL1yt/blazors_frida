@@ -2,6 +2,7 @@ import json
 import os
 import asyncio
 import logging
+import aiofiles
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -51,8 +52,8 @@ class StateManager:
 
             try:
                 state_path = self._get_state_path(self.current_version)
-                async with open(state_path, "w") as f:
-                    f.write(json.dumps(asdict(snapshot), indent=2))
+                async with aiofiles.open(state_path, "w") as f:
+                    await f.write(json.dumps(asdict(snapshot), indent=2))
                 logger.info(f"State saved: version={self.current_version}")
                 return self.current_version
             except Exception as e:
@@ -83,8 +84,8 @@ class StateManager:
                 if not os.path.exists(state_path):
                     return None
 
-                async with open(state_path, "r") as f:
-                    content = f.read()
+                async with aiofiles.open(state_path, "r") as f:
+                    content = await f.read()
                     state_dict = json.loads(content)
                     return StateSnapshot(**state_dict)
             except Exception as e:
@@ -117,8 +118,8 @@ class StateManager:
                         continue
 
                     state_path = os.path.join(session_dir, filename)
-                    async with open(state_path, "r") as f:
-                        content = f.read()
+                    async with aiofiles.open(state_path, "r") as f:
+                        content = await f.read()
                         state_dict = json.loads(content)
                         if state_dict.get("checkpoint_id") == checkpoint_id:
                             return StateSnapshot(**state_dict)

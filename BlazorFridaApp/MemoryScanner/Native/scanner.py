@@ -1,9 +1,30 @@
 from executor import execute_script
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Union
 from state_manager import StateManager
+from dataclasses import asdict
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+async def scan_memory(session, value_type: str, value: Any) -> List[str]:
+    """
+    Scan process memory for a specific value
+    Args:
+        session: Frida session object
+        value_type: Type of value to scan for ('string', 'number', etc)
+        value: The actual value to search for
+    Returns:
+        List of memory addresses where the value was found
+    """
+    try:
+        return await execute_script(
+            session, SCAN_SCRIPT, "scanMemory", value_type, value
+        )
+    except Exception as e:
+        logger.error(f"Memory scan failed: {e}")
+        raise
+
 
 SCAN_SCRIPT = """
 rpc.exports = {
@@ -49,7 +70,7 @@ class MemoryScanner:
 
         # Execute the Frida script to scan memory
         addresses = await execute_script(
-            self.frida_scanner.session, SCAN_SCRIPT, "scan_memory", value_type, value
+            self.frida_scanner.session, SCAN_SCRIPT, "scanMemory", value_type, value
         )
 
         # Convert addresses to scan results

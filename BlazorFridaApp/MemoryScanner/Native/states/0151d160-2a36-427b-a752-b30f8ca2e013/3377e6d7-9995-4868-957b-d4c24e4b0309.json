@@ -1,0 +1,25 @@
+{
+  "version": "3377e6d7-9995-4868-957b-d4c24e4b0309",
+  "timestamp": "2025-02-05T03:41:07.524854",
+  "checkpoint_id": "001990e3-fbdc-4a3a-82ab-0a449aefe462",
+  "scan_results": [
+    {
+      "address": 4096,
+      "value": 42
+    },
+    {
+      "address": 8192,
+      "value": 84
+    }
+  ],
+  "metadata": {
+    "value_type": "int32",
+    "comparison_type": "exact",
+    "ranges": [
+      [
+        4096,
+        12288
+      ]
+    ]
+  }
+}
