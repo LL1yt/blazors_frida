@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -8,8 +7,8 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
-
   <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore.Server.ClientFactory" Version="2.67.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -28,55 +27,47 @@
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.11.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.GrpcNetClient" Version="1.11.0-beta.1" />
   </ItemGroup>
-
   <!-- Proto Files -->
   <ItemGroup>
+    <Protobuf Include="MemoryScanner\Proto\health.proto" GrpcServices="Client" />
     <Protobuf Include="MemoryScanner\Proto\memory_scanner.proto" GrpcServices="Client" />
   </ItemGroup>
-
   <!-- Global Usings and Program -->
   <ItemGroup>
     <Compile Include="GlobalUsings.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>
-
   <!-- Memory Scanner -->
   <ItemGroup>
     <Compile Include="MemoryScanner\**\*.cs" />
     <Content Include="MemoryScanner\**\*.razor" />
   </ItemGroup>
-
   <!-- Services -->
   <ItemGroup>
     <Compile Include="Services\**\*.cs" />
   </ItemGroup>
-
   <!-- Components -->
   <ItemGroup>
     <Compile Include="Components\**\*.cs" />
     <Content Include="Components\**\*.razor" />
   </ItemGroup>
-
   <!-- Persistence -->
   <ItemGroup>
     <Compile Include="Persistence\**\*.cs" />
     <Compile Include="Migrations\**\*.cs" />
   </ItemGroup>
-
   <!-- Static Web Content -->
   <ItemGroup>
     <Content Include="wwwroot\**\*" />
     <Content Include="appsettings.json" />
     <Content Include="appsettings.Development.json" />
   </ItemGroup>
-
   <!-- SQLite Database -->
   <ItemGroup>
     <None Update="gamememory.db">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
   <!-- Python Files -->
   <ItemGroup>
     <Content Include="MemoryScanner\Native\**\*.py">
@@ -89,5 +80,4 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
 </Project>

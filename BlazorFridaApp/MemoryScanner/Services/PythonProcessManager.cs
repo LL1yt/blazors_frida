@@ -166,19 +166,27 @@ public class PythonProcessManager : IPythonProcessManager
         {
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
                 using var channel = Grpc.Net.Client.GrpcChannel.ForAddress($"http://localhost:{_port}");
+                var client = new Proto.Health.Health.HealthClient(channel);
                 
-                // TODO: Replace with actual gRPC health check once code is generated
-                await Task.Delay(100, cts.Token);
-                return;
+                var request = new Proto.Health.HealthCheckRequest { Service = "memory_scanner.MemoryScanner" };
+                var response = await client.CheckAsync(request, cancellationToken: cts.Token);
+                
+                if (response.Status == Proto.Health.HealthCheckResponse.Types.ServingStatus.Serving)
+                {
+                    return;
+                }
+                
+                throw new PythonServerException($"Server reported non-serving status: {response.Status}");
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogDebug(ex, "Server not ready yet (attempt {RetryCount} of {MaxRetries})", retryCount + 1, maxRetries);
                 retryCount++;
                 if (retryCount >= maxRetries)
                 {
-                    throw new PythonServerException("Server failed to start within the expected timeframe");
+                    throw new PythonServerException("Server failed to start within the expected timeframe", ex);
                 }
                 await Task.Delay(retryDelayMs);
             }

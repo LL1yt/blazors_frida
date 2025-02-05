@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using Grpc.Net.Client;
+using BlazorFridaApp.MemoryScanner.Proto.Health;
 
 namespace BlazorFridaApp.Services;
 
@@ -16,29 +18,47 @@ public class GrpcHealthCheck : IHealthCheck
         _featureFlagService = featureFlagService;
     }
 
-    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         try
         {
             if (!_featureFlagService.IsGrpcServiceEnabled())
             {
-                return Task.FromResult(HealthCheckResult.Healthy("gRPC service is not enabled"));
+                return HealthCheckResult.Healthy("gRPC service is not enabled");
             }
 
             var isRunning = _pythonProcessManager.IsRunning;
             if (!isRunning)
             {
-                return Task.FromResult(HealthCheckResult.Unhealthy("Python gRPC server is not running"));
+                return HealthCheckResult.Unhealthy("Python gRPC server is not running");
             }
 
-            // Add additional checks here as needed
-            // For example, try to make a simple gRPC call
+            // Perform actual gRPC health check
+            using var channel = GrpcChannel.ForAddress($"http://localhost:{_pythonProcessManager.Port}");
+            var client = new Health.HealthClient(channel);
+            
+            try
+            {
+                var request = new HealthCheckRequest { Service = "memory_scanner.MemoryScanner" };
+                var response = await client.CheckAsync(request, cancellationToken: cancellationToken);
 
-            return Task.FromResult(HealthCheckResult.Healthy("gRPC service is healthy"));
+                if (response.Status == HealthCheckResponse.Types.ServingStatus.Serving)
+                {
+                    return HealthCheckResult.Healthy("gRPC service is healthy");
+                }
+                else
+                {
+                    return HealthCheckResult.Unhealthy($"gRPC service reported non-serving status: {response.Status}");
+                }
+            }
+            catch (Exception ex)
+            {
+                return HealthCheckResult.Unhealthy("Failed to connect to gRPC service", ex);
+            }
         }
         catch (Exception ex)
         {
-            return Task.FromResult(HealthCheckResult.Unhealthy("Health check failed", ex));
+            return HealthCheckResult.Unhealthy("Health check failed", ex);
         }
     }
 }
