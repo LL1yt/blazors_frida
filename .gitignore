@@ -33,3 +33,4 @@ venv/
 *.db
 logs
 *.log
+states

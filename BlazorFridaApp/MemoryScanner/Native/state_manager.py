@@ -42,8 +42,9 @@ class StateManager:
     ) -> str:
         """Save the current state to disk with versioning"""
         async with self.state_lock:
+            new_version = str(uuid.uuid4())
             snapshot = StateSnapshot(
-                version=self.current_version,
+                version=new_version,
                 timestamp=datetime.utcnow().isoformat(),
                 checkpoint_id=checkpoint_id,
                 scan_results=scan_results,
@@ -51,11 +52,12 @@ class StateManager:
             )
 
             try:
-                state_path = self._get_state_path(self.current_version)
+                state_path = self._get_state_path(new_version)
                 async with aiofiles.open(state_path, "w") as f:
                     await f.write(json.dumps(asdict(snapshot), indent=2))
-                logger.info(f"State saved: version={self.current_version}")
-                return self.current_version
+                logger.info(f"State saved: version={new_version}")
+                self.current_version = new_version
+                return new_version
             except Exception as e:
                 logger.error(f"Failed to save state: {e}")
                 raise
@@ -97,11 +99,7 @@ class StateManager:
     ) -> str:
         """Create a new checkpoint"""
         checkpoint_id = str(uuid.uuid4())
-        new_version = str(uuid.uuid4())
-
         await self.save_state(checkpoint_id, scan_results, metadata)
-        self.current_version = new_version
-
         return checkpoint_id
 
     async def restore_checkpoint(self, checkpoint_id: str) -> Optional[StateSnapshot]:

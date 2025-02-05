@@ -23,13 +23,13 @@ async def test_state_persistence():
         # Test 1: Basic state save and load
         logger.info("Test 1: Basic state operations")
         test_results = [
-            {"address": 0x1000, "value": 42},
-            {"address": 0x2000, "value": 84},
+            {"address": 4096, "value": 42},  # 0x1000
+            {"address": 8192, "value": 84},  # 0x2000
         ]
         test_metadata = {
             "value_type": "int32",
             "comparison_type": "exact",
-            "ranges": [(0x1000, 0x3000)],
+            "ranges": [[4096, 12288]],  # [0x1000, 0x3000]
         }
 
         checkpoint_id = await scanner.state_manager.create_checkpoint(

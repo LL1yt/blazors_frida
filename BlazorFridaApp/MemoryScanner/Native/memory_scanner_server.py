@@ -9,13 +9,18 @@ import sys
 
 import grpc
 from grpc import aio
-from opentelemetry import trace
+from opentelemetry import trace, metrics
 from opentelemetry.instrumentation.grpc import (
     GrpcInstrumentorClient,
     GrpcInstrumentorServer,
 )
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import (
+    ConsoleMetricExporter,
+    PeriodicExportingMetricReader,
+)
 from pythonjsonlogger import jsonlogger
 
 import memory_scanner_pb2
@@ -39,11 +44,42 @@ logHandler.setFormatter(formatter)
 logger.addHandler(logHandler)
 logger.setLevel(logging.INFO)
 
-# Configure OpenTelemetry
+# Configure OpenTelemetry tracing
 trace.set_tracer_provider(TracerProvider())
 tracer = trace.get_tracer(__name__)
 trace.get_tracer_provider().add_span_processor(
     SimpleSpanProcessor(ConsoleSpanExporter())
+)
+
+# Configure OpenTelemetry metrics
+metrics.set_meter_provider(
+    MeterProvider(
+        metric_readers=[
+            PeriodicExportingMetricReader(
+                ConsoleMetricExporter(), export_interval_millis=5000
+            )
+        ]
+    )
+)
+meter = metrics.get_meter(__name__)
+
+# Create metrics
+active_sessions_counter = meter.create_up_down_counter(
+    "memory_scanner_active_sessions", description="Number of active scanning sessions"
+)
+
+operation_counter = meter.create_counter(
+    "memory_scanner_operations", description="Number of memory operations performed"
+)
+
+operation_duration = meter.create_histogram(
+    "memory_scanner_operation_duration",
+    description="Duration of memory operations",
+    unit="ms",
+)
+
+error_counter = meter.create_counter(
+    "memory_scanner_errors", description="Number of errors encountered"
 )
 
 # Initialize gRPC instrumentation
