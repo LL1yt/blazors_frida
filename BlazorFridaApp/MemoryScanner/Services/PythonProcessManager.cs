@@ -20,10 +20,11 @@ public class PythonProcessManager : IPythonProcessManager
     private readonly string _serverScript;
     private readonly int _port;
     private bool _isRunning;
+    private int? _serverProcessId;
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly CancellationTokenSource _processTokenSource = new();
 
-    public bool IsRunning => _isRunning;
+    public bool IsRunning => _isRunning && _pythonProcess?.HasExited == false;
     public int Port => _port;
 
     public PythonProcessManager(ILogger<PythonProcessManager> logger)
@@ -63,38 +64,32 @@ public class PythonProcessManager : IPythonProcessManager
 
             _logger.LogInformation("Starting Python gRPC server on port {Port}...", _port);
 
-            // Kill any existing Python processes that might be using our port
-            try
+            // Kill existing server process if we have its ID
+            if (_serverProcessId.HasValue)
             {
-                var existingProcess = System.Diagnostics.Process.GetProcessesByName("python")
-                    .FirstOrDefault(p => 
-                    {
-                        try 
-                        {
-                            return p.MainModule?.FileName == _pythonPath;
-                        }
-                        catch 
-                        {
-                            return false;
-                        }
-                    });
-
-                if (existingProcess != null)
+                try
                 {
-                    _logger.LogWarning("Found existing Python process, attempting to kill it");
+                    var existingProcess = Process.GetProcessById(_serverProcessId.Value);
+                    _logger.LogWarning("Found existing server process (PID: {Pid}), attempting to kill it", _serverProcessId.Value);
                     existingProcess.Kill(true);
                     await existingProcess.WaitForExitAsync();
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error while trying to kill existing Python process");
+                catch (ArgumentException)
+                {
+                    _logger.LogInformation("No process found with PID {Pid}", _serverProcessId.Value);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error while trying to kill existing server process");
+                }
+                _serverProcessId = null;
             }
 
             // Install requirements if needed
             await InstallRequirements();
 
-            // Start the Python process
+            // Start the Python process with unique identifier in arguments
+            var processId = Process.GetCurrentProcess().Id;
             var startInfo = new ProcessStartInfo
             {
                 FileName = _pythonPath,
@@ -134,17 +129,18 @@ public class PythonProcessManager : IPythonProcessManager
                 _isRunning = false;
             };
 
-            // Start the process
+            // Start the process and store its ID
             _pythonProcess.Start();
+            _serverProcessId = _pythonProcess.Id;
             _pythonProcess.BeginOutputReadLine();
             _pythonProcess.BeginErrorReadLine();
 
             // Wait for the server to be ready
-            _logger.LogDebug("Waiting for server to be ready on port {Port}...", _port);
+            _logger.LogDebug("Waiting for server to be ready on port {Port} (PID: {Pid})...", _port, _serverProcessId);
             await WaitForServerReady();
 
             _isRunning = true;
-            _logger.LogInformation("Python gRPC server started successfully on port {Port}", _port);
+            _logger.LogInformation("Python gRPC server started successfully on port {Port} (PID: {Pid})", _port, _serverProcessId);
         }
         catch (Exception ex)
         {
@@ -210,64 +206,99 @@ public class PythonProcessManager : IPythonProcessManager
     private async Task WaitForServerReady()
     {
         var retryCount = 0;
-        const int maxRetries = 30;
-        const int retryDelayMs = 100;
+        const int maxRetries = 50;  // Increased max retries
+        const int retryDelayMs = 200; // Increased delay between retries
+        const int timeoutMs = 1000;   // Increased timeout for each attempt
 
         while (retryCount < maxRetries)
         {
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+                using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(timeoutMs));
                 using var channel = Grpc.Net.Client.GrpcChannel.ForAddress($"http://localhost:{_port}");
                 var client = new Proto.Health.Health.HealthClient(channel);
                 
-                var request = new Proto.Health.HealthCheckRequest { Service = "memory_scanner.MemoryScanner" };
+                // Use empty string to check overall service health
+                var request = new Proto.Health.HealthCheckRequest { Service = "" };
                 var response = await client.CheckAsync(request, cancellationToken: cts.Token);
                 
                 if (response.Status == Proto.Health.HealthCheckResponse.Types.ServingStatus.Serving)
                 {
+                    _logger.LogInformation("Server health check passed after {Attempts} attempts", retryCount + 1);
                     return;
                 }
                 
+                _logger.LogWarning("Server reported non-serving status: {Status}", response.Status);
                 throw new PythonServerException($"Server reported non-serving status: {response.Status}");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is RpcException or TimeoutException)
             {
-                _logger.LogDebug(ex, "Server not ready yet (attempt {RetryCount} of {MaxRetries})", retryCount + 1, maxRetries);
+                _logger.LogDebug("Server not ready yet (attempt {RetryCount} of {MaxRetries})", retryCount + 1, maxRetries);
                 retryCount++;
                 if (retryCount >= maxRetries)
                 {
+                    _logger.LogError(ex, "Server failed to start after {MaxRetries} attempts", maxRetries);
                     throw new PythonServerException("Server failed to start within the expected timeframe", ex);
                 }
                 await Task.Delay(retryDelayMs);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error while waiting for server");
+                throw;
             }
         }
     }
 
     public async Task StopServer()
     {
-        if (!_isRunning) return;
+        if (!_isRunning && !_serverProcessId.HasValue) return;
 
         await _lock.WaitAsync();
         try
         {
-            if (!_isRunning) return;
+            if (!_isRunning && !_serverProcessId.HasValue) return;
 
-            _logger.LogInformation("Stopping Python gRPC server...");
+            _logger.LogInformation("Stopping Python gRPC server (PID: {Pid})...", _serverProcessId);
+
+            if (_serverProcessId.HasValue)
+            {
+                try
+                {
+                    var process = Process.GetProcessById(_serverProcessId.Value);
+                    if (!process.HasExited)
+                    {
+                        process.Kill(true);
+                        await process.WaitForExitAsync();
+                        _logger.LogInformation("Successfully killed process {Pid}", _serverProcessId.Value);
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    _logger.LogInformation("Process {Pid} no longer exists", _serverProcessId.Value);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error killing process {Pid}", _serverProcessId.Value);
+                }
+                _serverProcessId = null;
+            }
 
             if (_pythonProcess != null && !_pythonProcess.HasExited)
             {
-                _pythonProcess.Kill(true);
-                await _pythonProcess.WaitForExitAsync();
+                try
+                {
+                    _pythonProcess.Kill(true);
+                    await _pythonProcess.WaitForExitAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error stopping Python process");
+                }
             }
 
             _isRunning = false;
             _logger.LogInformation("Python gRPC server stopped");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error stopping Python gRPC server");
-            throw;
         }
         finally
         {
