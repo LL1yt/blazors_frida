@@ -459,25 +459,33 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 # Record the freeze operation metric
                 self.operation_counter.add(1, {"operation": "freeze"})
 
-                # Directly yield from the generator
-                async for status in self._freeze_value_task(
+                # Create and store the freeze task
+                freeze_task = asyncio.create_task(self._freeze_value_task(
                     session_id,
                     request.address,
                     request.value,
                     request.value_type,
-                    context,
-                ):
-                    yield status
+                    context))
+                    
+                self.freezer_tasks[freeze_key] = freeze_task
 
-            except asyncio.CancelledError:
-                logger.info(f"Freeze task cancelled for {freeze_key}")
-                yield memory_scanner_pb2.FreezeStatus(
-                    active=False, error_message="Task cancelled"
-                )
+                try:
+                    async for status in freeze_task:
+                        yield status
+                except asyncio.CancelledError:
+                    logger.info(f"Freeze task cancelled for {freeze_key}")
+                    if freeze_key in self.freezer_tasks:
+                        del self.freezer_tasks[freeze_key]
+                    yield memory_scanner_pb2.FreezeStatus(
+                        active=False,
+                        error_message="Task cancelled"
+                    )
+
             except Exception as e:
                 logger.error(f"Error setting up freeze task: {e}", exc_info=e)
                 yield memory_scanner_pb2.FreezeStatus(
-                    active=False, error_message=str(e)
+                    active=False,
+                    error_message=str(e)
                 )
 
     async def UnfreezeValue(
@@ -492,7 +500,12 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 if freeze_key in self.freezer_tasks:
                     logger.info(f"Cancelling freeze task for {freeze_key}")
-                    self.freezer_tasks[freeze_key].cancel()
+                    task = self.freezer_tasks[freeze_key]
+                    task.cancel()
+                    try:
+                        await task  # Wait for task to properly cleanup
+                    except asyncio.CancelledError:
+                        pass  # Expected when cancelling
                     del self.freezer_tasks[freeze_key]
                 else:
                     logger.warning(f"No active freeze task found for {freeze_key}")

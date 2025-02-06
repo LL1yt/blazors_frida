@@ -3,6 +3,7 @@
 0.1 mark what has been done with details and improve the plan if necessary.
 0.2 Prioritize atomic transitions of individual features while maintaining full system observability through each migration phase.
 0.3 implementing functionality step by step
+0.4 test each step to make sure they work properly
 
 ## 1. Architecture Overview
 
@@ -451,7 +452,7 @@ message AttachRequest {
    - Process manipulation
    - State persistence improvements
 
-2. Testing Infrastructure (first we will implement the simplest testing, and we will see what happens next)
+2. Testing Infrastructure
    - Unit test framework
    - Integration test suite
    - Performance benchmarks

@@ -257,7 +257,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
     async def test_value_freezer(self):
         """Test value freezing functionality"""
         # Arrange
-        session_id = "test_session"
+        session_id = "test_session_4096"  # Updated to match expected session ID format
         address = 0x1000
         value = b"test_value"
         value_type = "bytes"
@@ -289,8 +289,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         status_count = 0
         
         # Start duration recording
-        self.operation_duration.start_recording = AsyncMock()
-        self.operation_duration.record = AsyncMock()
+        self.operation_duration.record = AsyncMock(return_value=None)
         
         try:
             async for status in self.service.FreezeValue(request, self.context):
@@ -303,7 +302,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
             self.fail(f"FreezeValue failed: {str(e)}")
         finally:
             # Ensure duration is recorded even if there's an error
-            self.operation_duration.record()
+            await self.operation_duration.record()
 
         # Verify that we got at least one status update
         self.assertGreater(status_count, 0)
@@ -319,7 +318,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
 
         # Verify metrics
         self.operation_counter.add.assert_called_with(1, {"operation": "freeze"})
-        self.operation_duration.record.assert_called()
+        self.operation_duration.record.assert_awaited()  # Remove await here since assert_awaited() is synchronous
 
     async def test_cache_system(self):
         """Test scan caching functionality"""
