@@ -363,32 +363,67 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         if session_id not in self.writers or session_id not in self.readers:
             logger.error(f"No reader/writer found for session {session_id}")
             yield memory_scanner_pb2.FreezeStatus(
-                active=False, error_message="Session not found"
+                active=False,
+                error_message="Session not found",
+                current_value=b"",
+                correlation_id="",
             )
             return
 
         writer = self.writers[session_id]
         reader = self.readers[session_id]
 
+        # Yield initial status immediately
+        try:
+            current_value = await reader.read(address, len(value), value_type)
+            # Ensure current_value is bytes
+            if not isinstance(current_value, bytes):
+                current_value = str(current_value).encode("utf-8")
+
+            span_context = context.get_active_span().get_span_context()
+            trace_id = str(span_context.trace_id) if span_context else ""
+
+            yield memory_scanner_pb2.FreezeStatus(
+                active=True,
+                error_message="",
+                current_value=current_value,
+                correlation_id=trace_id,
+            )
+        except Exception as e:
+            logger.error(f"Error in initial freeze status: {e}", exc_info=e)
+            yield memory_scanner_pb2.FreezeStatus(
+                active=False, error_message=str(e), current_value=b"", correlation_id=""
+            )
+            return
+
         while not context.done():
             try:
                 current_value = await reader.read(address, len(value), value_type)
+                # Ensure current_value is bytes
+                if not isinstance(current_value, bytes):
+                    current_value = str(current_value).encode("utf-8")
+
                 if current_value != value:
                     await writer.write(address, value, value_type)
                     logger.debug(f"Updated frozen value at address {address}")
 
+                span_context = context.get_active_span().get_span_context()
+                trace_id = str(span_context.trace_id) if span_context else ""
+
                 yield memory_scanner_pb2.FreezeStatus(
                     active=True,
+                    error_message="",
                     current_value=current_value,
-                    correlation_id=context.get_active_span()
-                    .get_span_context()
-                    .trace_id,
+                    correlation_id=trace_id,
                 )
                 await asyncio.sleep(0.1)
             except Exception as e:
                 logger.error(f"Error in freeze task: {e}", exc_info=e)
                 yield memory_scanner_pb2.FreezeStatus(
-                    active=False, error_message=str(e)
+                    active=False,
+                    error_message=str(e),
+                    current_value=b"",
+                    correlation_id="",
                 )
                 break
 
@@ -409,35 +444,23 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 if freeze_key in self.freezer_tasks:
                     logger.info(f"Cancelling existing freeze task for {freeze_key}")
                     self.freezer_tasks[freeze_key].cancel()
+                    del self.freezer_tasks[freeze_key]
 
-                # Create and store the freeze task
-                freeze_task = asyncio.create_task(
-                    self._freeze_value_task(
-                        session_id,
-                        request.address,
-                        request.value,
-                        request.value_type,
-                        context,
-                    )
+                # Directly yield from the generator
+                async for status in self._freeze_value_task(
+                    session_id,
+                    request.address,
+                    request.value,
+                    request.value_type,
+                    context,
+                ):
+                    yield status
+
+            except asyncio.CancelledError:
+                logger.info(f"Freeze task cancelled for {freeze_key}")
+                yield memory_scanner_pb2.FreezeStatus(
+                    active=False, error_message="Task cancelled"
                 )
-                self.freezer_tasks[freeze_key] = freeze_task
-
-                try:
-                    async for status in freeze_task:
-                        yield status
-                except asyncio.CancelledError:
-                    logger.info(f"Freeze task cancelled for {freeze_key}")
-                    yield memory_scanner_pb2.FreezeStatus(
-                        active=False, error_message="Task cancelled"
-                    )
-                except Exception as e:
-                    logger.error(f"Error in freeze task: {e}", exc_info=e)
-                    yield memory_scanner_pb2.FreezeStatus(
-                        active=False, error_message=str(e)
-                    )
-                finally:
-                    if freeze_key in self.freezer_tasks:
-                        del self.freezer_tasks[freeze_key]
             except Exception as e:
                 logger.error(f"Error setting up freeze task: {e}", exc_info=e)
                 yield memory_scanner_pb2.FreezeStatus(

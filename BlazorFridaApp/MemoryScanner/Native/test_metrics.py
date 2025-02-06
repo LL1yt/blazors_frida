@@ -289,15 +289,17 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         status_count = 0
         try:
             async for status in self.service.FreezeValue(request, self.context):
-                status_count += 1
+                self.assertIsNotNone(status)
                 self.assertTrue(status.active)
+                status_count += 1
                 if status_count >= 2:  # Check a few iterations
                     break
         except Exception as e:
             self.fail(f"FreezeValue failed: {str(e)}")
 
-        # Verify that we got at least some status updates
+        # Verify that we got at least one status update
         self.assertGreater(status_count, 0)
+        self.assertTrue(reader_mock.read.called)
 
         # Test unfreezing
         unfreeze_request = memory_scanner_pb2.UnfreezeRequest(
