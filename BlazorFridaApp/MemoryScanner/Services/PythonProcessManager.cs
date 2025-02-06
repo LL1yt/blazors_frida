@@ -33,7 +33,7 @@ public class PythonProcessManager : IPythonProcessManager
         _port = 50051; // Default gRPC port
         _pythonPath = "python"; // Use system Python
         _serverScript = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
-            "MemoryScanner", "Native", "memory_scanner_server.py");
+            "MemoryScanner", "Server", "main.py");
         _logger.LogInformation("Initialized PythonProcessManager with port {Port} and script path {ScriptPath}", _port, _serverScript);
     }
 

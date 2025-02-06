@@ -7,15 +7,20 @@ from grpc import aio
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
 
-from ..Proto import memory_scanner_pb2
-from ..Proto import memory_scanner_pb2_grpc
-from ..Proto import health_pb2
-from .metrics import active_sessions_counter, operation_counter, operation_duration, error_counter
-from ..Base.frida_module import FridaMemoryScanner
-from ..Base.process_list import get_process_list
-from ..Operations.scanner import MemoryScanner
-from ..Operations.reader import MemoryReader
-from ..Operations.writer import MemoryWriter
+import sys
+sys.path.append('../Proto')
+sys.path.append('../Base')
+sys.path.append('../Operations')
+
+import memory_scanner_pb2
+import memory_scanner_pb2_grpc
+import health_pb2
+from metrics import active_sessions_counter, operation_counter, operation_duration, error_counter
+from frida_module import FridaMemoryScanner
+from process_list import get_process_list
+from scanner import MemoryScanner
+from reader import MemoryReader
+from writer import MemoryWriter
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -314,3 +319,31 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     needs_sync=True,
                     error_message=str(e)
                 )
+
+    async def ScanPattern(self, request: memory_scanner_pb2.PatternScanRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.ScanResponse:
+        with tracer.start_as_current_span("scan_pattern") as span:
+            try:
+                session_id = request.session_id
+                if session_id not in self.sessions:
+                    raise ValueError(f"Invalid session ID: {session_id}")
+
+                scanner = self.scanners[session_id]
+                span.set_attribute("pattern", request.pattern)
+
+                with self.operation_duration.time({"operation": "pattern_scan"}):
+                    results = await scanner.pattern_scan(request.pattern)
+
+                self.operation_counter.add(1, {"operation": "pattern_scan"})
+                self.state_versions[session_id] = str(uuid.uuid4())
+
+                logger.info(f"Pattern scan completed for session {session_id}, found {len(results)} results")
+                return memory_scanner_pb2.ScanResponse(
+                    addresses=[memory_scanner_pb2.MemoryRegion(address=addr, size=size)
+                              for addr, size in results]
+                )
+            except Exception as e:
+                self.error_counter.add(1, {"operation": "pattern_scan", "error": str(e)})
+                logger.error(f"Failed to perform pattern scan for session {session_id}", exc_info=e)
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return memory_scanner_pb2.ScanResponse()

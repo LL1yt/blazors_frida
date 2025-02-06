@@ -5,14 +5,16 @@ import signal
 import sys
 from concurrent import futures
 from grpc import aio
+
+sys.path.append('../Proto')
+sys.path.append('../Native')
+
 import health_pb2
 import health_pb2_grpc
 import memory_scanner_pb2_grpc
-from .memory_scanner_service import MemoryScannerService
-from .health_service import HealthServicer
-from . import telemetry
-
-logger = logging.getLogger(__name__)
+from memory_scanner_service import MemoryScannerService
+from health_service import HealthServicer
+from telemetry import setup_telemetry
 
 # Global server reference
 server = None
@@ -86,5 +88,5 @@ async def serve(port: int = 50051):
         logger.info("Server shutdown complete")
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logger = setup_telemetry()
     asyncio.run(serve())

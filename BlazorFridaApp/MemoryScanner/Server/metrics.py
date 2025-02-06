@@ -3,7 +3,6 @@ from opentelemetry import metrics
 # Configure metrics
 meter = metrics.get_meter(__name__)
 
-# Core metrics
 active_sessions_counter = meter.create_counter(
     "active_sessions",
     description="Number of active scanning sessions",

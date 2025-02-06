@@ -6,8 +6,13 @@ from unittest.mock import MagicMock, patch, AsyncMock
 import grpc
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
+
+import sys
+sys.path.append('../Server')
+sys.path.append('../Proto')
+
 import memory_scanner_pb2
-from memory_scanner_server import MemoryScannerService
+from memory_scanner_service import MemoryScannerService
 import argparse
 import sqlite3
 import os
@@ -31,12 +36,12 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         # Create patches for metrics
         self.patches = [
             patch(
-                "memory_scanner_server.active_sessions_counter",
+                "metrics.active_sessions_counter",  # Updated path
                 self.active_sessions_counter,
             ),
-            patch("memory_scanner_server.operation_counter", self.operation_counter),
-            patch("memory_scanner_server.operation_duration", self.operation_duration),
-            patch("memory_scanner_server.error_counter", self.error_counter),
+            patch("metrics.operation_counter", self.operation_counter),  # Updated path
+            patch("metrics.operation_duration", self.operation_duration),  # Updated path
+            patch("metrics.error_counter", self.error_counter),  # Updated path
         ]
 
         # Start all patches
@@ -62,7 +67,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         request = memory_scanner_pb2.ProcessRequest(pid=1234)
 
         # Act
-        with patch("memory_scanner_server.FridaMemoryScanner") as mock_frida:
+        with patch("memory_scanner_service.FridaMemoryScanner") as mock_frida:
             instance = mock_frida.return_value
 
             async def mock_attach(pid):
@@ -85,7 +90,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         request = memory_scanner_pb2.ProcessRequest(pid=1234)
 
         # Act
-        with patch("memory_scanner_server.FridaMemoryScanner") as mock_frida:
+        with patch("memory_scanner_service.FridaMemoryScanner") as mock_frida:
             instance = mock_frida.return_value
 
             async def mock_attach(pid):
@@ -113,7 +118,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        with patch("memory_scanner_server.MemoryWriter") as mock_writer:
+        with patch("memory_scanner_service.MemoryWriter") as mock_writer:
             instance = mock_writer.return_value
 
             async def mock_write(address, value, value_type):
@@ -140,7 +145,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        with patch("memory_scanner_server.MemoryWriter") as mock_writer:
+        with patch("memory_scanner_service.MemoryWriter") as mock_writer:
             instance = mock_writer.return_value
 
             async def mock_write(address, value, value_type):
@@ -169,7 +174,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        with patch("memory_scanner_server.MemoryReader") as mock_reader:
+        with patch("memory_scanner_service.MemoryReader") as mock_reader:
             instance = mock_reader.return_value
 
             async def mock_read(address, size, value_type):
