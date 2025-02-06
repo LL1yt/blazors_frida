@@ -52,6 +52,26 @@ trace.get_tracer_provider().add_span_processor(
     SimpleSpanProcessor(ConsoleSpanExporter())
 )
 
+# Configure metrics
+meter = metrics.get_meter(__name__)
+active_sessions_counter = meter.create_counter(
+    "active_sessions",
+    description="Number of active scanning sessions",
+)
+operation_counter = meter.create_counter(
+    "operations",
+    description="Number of operations performed",
+)
+operation_duration = meter.create_histogram(
+    "operation_duration",
+    description="Duration of operations",
+    unit="ms",
+)
+error_counter = meter.create_counter(
+    "errors",
+    description="Number of errors encountered",
+)
+
 # Configure OpenTelemetry metrics
 metrics.set_meter_provider(
     MeterProvider(
@@ -61,26 +81,6 @@ metrics.set_meter_provider(
             )
         ]
     )
-)
-meter = metrics.get_meter(__name__)
-
-# Create metrics
-active_sessions_counter = meter.create_up_down_counter(
-    "memory_scanner_active_sessions", description="Number of active scanning sessions"
-)
-
-operation_counter = meter.create_counter(
-    "memory_scanner_operations", description="Number of memory operations performed"
-)
-
-operation_duration = meter.create_histogram(
-    "memory_scanner_operation_duration",
-    description="Duration of memory operations",
-    unit="ms",
-)
-
-error_counter = meter.create_counter(
-    "memory_scanner_errors", description="Number of errors encountered"
 )
 
 # Initialize gRPC instrumentation
@@ -123,6 +123,10 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         self.writers: Dict[str, MemoryWriter] = {}
         self.freezer_tasks: Dict[str, asyncio.Task] = {}
         self.state_versions: Dict[str, str] = {}
+        self.operation_counter = operation_counter
+        self.operation_duration = operation_duration
+        self.error_counter = error_counter
+        self.active_sessions_counter = active_sessions_counter
         logger.info("MemoryScannerService initialized")
 
     async def ListProcesses(
@@ -166,8 +170,8 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 self.state_versions[session_id] = str(uuid.uuid4())
 
                 # Update metrics
-                active_sessions_counter.add(1)
-                operation_counter.add(1, {"operation": "attach"})
+                self.active_sessions_counter.add(1)
+                self.operation_counter.add(1, {"operation": "attach"})
 
                 logger.info(
                     f"Successfully attached to process {request.pid} with session {session_id}"
@@ -176,7 +180,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     success=True, session_id=session_id
                 )
             except Exception as e:
-                error_counter.add(1, {"operation": "attach", "error": str(e)})
+                self.error_counter.add(1, {"operation": "attach", "error": str(e)})
                 logger.error(f"Failed to attach to process {request.pid}", exc_info=e)
                 return memory_scanner_pb2.AttachResponse(
                     success=False, error_message=str(e)
@@ -209,15 +213,15 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     del self.state_versions[session_id]
 
                     # Update metrics
-                    active_sessions_counter.add(-1)
-                    operation_counter.add(1, {"operation": "detach"})
+                    self.active_sessions_counter.add(-1)
+                    self.operation_counter.add(1, {"operation": "detach"})
 
                     logger.info(
                         f"Successfully detached and cleaned up session {session_id}"
                     )
                     return memory_scanner_pb2.DetachResponse(success=True)
                 else:
-                    error_counter.add(
+                    self.error_counter.add(
                         1, {"operation": "detach", "error": "session_not_found"}
                     )
                     logger.warning(f"Session {session_id} not found")
@@ -225,7 +229,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                         success=False, error_message=f"Session {session_id} not found"
                     )
             except Exception as e:
-                error_counter.add(1, {"operation": "detach", "error": str(e)})
+                self.error_counter.add(1, {"operation": "detach", "error": str(e)})
                 logger.error(f"Failed to detach from process", exc_info=e)
                 return memory_scanner_pb2.DetachResponse(
                     success=False, error_message=str(e)
@@ -254,8 +258,8 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 operation_type = (
                     "pattern_scan" if request.value_type == "pattern" else "scan"
                 )
-                operation_counter.add(1, {"operation": operation_type})
-                operation_duration.record(duration_ms, {"operation": operation_type})
+                self.operation_counter.add(1, {"operation": operation_type})
+                self.operation_duration.record(duration_ms, {"operation": operation_type})
 
                 checkpoint_id = str(uuid.uuid4())
 
@@ -277,7 +281,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     checkpoint_id=checkpoint_id,
                 )
             except Exception as e:
-                error_counter.add(1, {"operation": "scan", "error": str(e)})
+                self.error_counter.add(1, {"operation": "scan", "error": str(e)})
                 logger.error("Failed to scan memory", exc_info=e)
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
@@ -302,12 +306,12 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
 
                 # Update metrics
-                operation_counter.add(1, {"operation": "read"})
-                operation_duration.record(duration_ms, {"operation": "read"})
+                self.operation_counter.add(1, {"operation": "read"})
+                self.operation_duration.record(duration_ms, {"operation": "read"})
 
                 return memory_scanner_pb2.ReadResponse(value=value, success=True)
             except Exception as e:
-                error_counter.add(1, {"operation": "read", "error": str(e)})
+                self.error_counter.add(1, {"operation": "read", "error": str(e)})
                 logger.error("Failed to read memory", exc_info=e)
                 return memory_scanner_pb2.ReadResponse(
                     success=False, error_message=str(e)
@@ -339,12 +343,12 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
 
                 # Update metrics
-                operation_counter.add(1, {"operation": "write"})
-                operation_duration.record(duration_ms, {"operation": "write"})
+                self.operation_counter.add(1, {"operation": "write"})
+                self.operation_duration.record(duration_ms, {"operation": "write"})
 
                 return memory_scanner_pb2.WriteResponse(success=True)
             except Exception as e:
-                error_counter.add(1, {"operation": "write", "error": str(e)})
+                self.error_counter.add(1, {"operation": "write", "error": str(e)})
                 logger.error("Failed to write memory", exc_info=e)
                 # Set error status on span
                 span.set_status(Status(StatusCode.ERROR, str(e)))
@@ -372,6 +376,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
         writer = self.writers[session_id]
         reader = self.readers[session_id]
+        start_time = asyncio.get_event_loop().time()
 
         # Yield initial status immediately
         try:
@@ -410,6 +415,10 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 span_context = context.get_active_span().get_span_context()
                 trace_id = str(span_context.trace_id) if span_context else ""
 
+                # Record duration for each iteration
+                duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+                self.operation_duration.record(duration_ms, {"operation": "freeze"})
+
                 yield memory_scanner_pb2.FreezeStatus(
                     active=True,
                     error_message="",
@@ -417,6 +426,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     correlation_id=trace_id,
                 )
                 await asyncio.sleep(0.1)
+                start_time = asyncio.get_event_loop().time()  # Reset start time for next iteration
             except Exception as e:
                 logger.error(f"Error in freeze task: {e}", exc_info=e)
                 yield memory_scanner_pb2.FreezeStatus(
@@ -445,6 +455,9 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     logger.info(f"Cancelling existing freeze task for {freeze_key}")
                     self.freezer_tasks[freeze_key].cancel()
                     del self.freezer_tasks[freeze_key]
+
+                # Record the freeze operation metric
+                self.operation_counter.add(1, {"operation": "freeze"})
 
                 # Directly yield from the generator
                 async for status in self._freeze_value_task(

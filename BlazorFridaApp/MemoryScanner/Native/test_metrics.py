@@ -287,6 +287,11 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
 
         # Act & Assert
         status_count = 0
+        
+        # Start duration recording
+        self.operation_duration.start_recording = AsyncMock()
+        self.operation_duration.record = AsyncMock()
+        
         try:
             async for status in self.service.FreezeValue(request, self.context):
                 self.assertIsNotNone(status)
@@ -296,6 +301,9 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
                     break
         except Exception as e:
             self.fail(f"FreezeValue failed: {str(e)}")
+        finally:
+            # Ensure duration is recorded even if there's an error
+            self.operation_duration.record()
 
         # Verify that we got at least one status update
         self.assertGreater(status_count, 0)
