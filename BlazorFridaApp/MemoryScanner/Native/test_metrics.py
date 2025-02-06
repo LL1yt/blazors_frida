@@ -258,32 +258,58 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         """Test value freezing functionality"""
         # Arrange
         session_id = "test_session"
-        writer_mock = MagicMock()
         address = 0x1000
-        value = 100
+        value = b"test_value"
+        value_type = "bytes"
 
-        async def mock_freeze(*args, **kwargs):
-            current_span = trace.get_current_span()
-            current_span.set_attribute("freeze.address", address)
-            current_span.set_attribute("freeze.value", value)
-            return True
+        # Setup mocks
+        frida_mock = AsyncMock()
+        reader_mock = AsyncMock()
+        writer_mock = AsyncMock()
 
-        writer_mock.freeze_value = mock_freeze
-        self.service.writers[session_id] = writer_mock
-        request = memory_scanner_pb2.FreezeRequest(
-            session_id=session_id,
-            address=address,
-            value=value.to_bytes(4, "little"),
-            value_type="int32",
+        # Configure reader mock to return different values to simulate value changes
+        reader_mock.read = AsyncMock(
+            side_effect=[b"old_value", value, b"changed_value", value]
         )
 
-        # Act
-        response = await self.service.FreezeValue(request, self.context)
+        # Configure writer mock
+        writer_mock.write = AsyncMock()
 
-        # Assert
-        self.operation_counter.add.assert_called_once_with(1, {"operation": "freeze"})
-        self.operation_duration.record.assert_called_once()
-        self.assertTrue(response.success)
+        # Add mocks to service
+        self.service.sessions[session_id] = frida_mock
+        self.service.readers[session_id] = reader_mock
+        self.service.writers[session_id] = writer_mock
+
+        # Create freeze request
+        request = memory_scanner_pb2.FreezeRequest(
+            session_id=session_id, address=address, value=value, value_type=value_type
+        )
+
+        # Act & Assert
+        status_count = 0
+        try:
+            async for status in self.service.FreezeValue(request, self.context):
+                status_count += 1
+                self.assertTrue(status.active)
+                if status_count >= 2:  # Check a few iterations
+                    break
+        except Exception as e:
+            self.fail(f"FreezeValue failed: {str(e)}")
+
+        # Verify that we got at least some status updates
+        self.assertGreater(status_count, 0)
+
+        # Test unfreezing
+        unfreeze_request = memory_scanner_pb2.UnfreezeRequest(
+            session_id=session_id, address=address
+        )
+
+        response = await self.service.UnfreezeValue(unfreeze_request, self.context)
+        self.assertIsNotNone(response)
+
+        # Verify metrics
+        self.operation_counter.add.assert_called_with(1, {"operation": "freeze"})
+        self.operation_duration.record.assert_called()
 
     async def test_cache_system(self):
         """Test scan caching functionality"""
