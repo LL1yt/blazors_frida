@@ -121,7 +121,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         self.scanners: Dict[str, MemoryScanner] = {}
         self.readers: Dict[str, MemoryReader] = {}
         self.writers: Dict[str, MemoryWriter] = {}
-        self.freezer_tasks: Dict[str, asyncio.Task] = {}
+        self.freezer_tasks: Dict[str, tuple] = {}
         self.state_versions: Dict[str, str] = {}
         self.operation_counter = operation_counter
         self.operation_duration = operation_duration
@@ -202,7 +202,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     # Cancel any active freeze tasks
                     for freeze_key in list(self.freezer_tasks.keys()):
                         if freeze_key.startswith(f"{session_id}_"):
-                            self.freezer_tasks[freeze_key].cancel()
+                            self.freezer_tasks[freeze_key][0].cancel()
                             del self.freezer_tasks[freeze_key]
 
                     await self.sessions[session_id].detach_from_process()
@@ -376,7 +376,6 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
         writer = self.writers[session_id]
         reader = self.readers[session_id]
-        start_time = asyncio.get_event_loop().time()
 
         # Initial value set and verification
         try:
@@ -412,8 +411,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
             span_context = context.get_active_span().get_span_context()
             trace_id = str(span_context.trace_id) if span_context else ""
 
-            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            await asyncio.create_task(self.operation_duration.record(duration_ms, {"operation": "freeze"}))
+            self.operation_counter.add(1, {"operation": "freeze"})
             yield memory_scanner_pb2.FreezeStatus(
                 active=True,
                 error_message="",
@@ -432,6 +430,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
             return
 
         # Main freeze loop
+        start_time = asyncio.get_event_loop().time()
         while not context.done():
             try:
                 current_value = await reader.read(address, len(value), value_type)
@@ -461,8 +460,10 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 span_context = context.get_active_span().get_span_context()
                 trace_id = str(span_context.trace_id) if span_context else ""
 
+                # Record operation duration
                 duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-                await asyncio.create_task(self.operation_duration.record(duration_ms, {"operation": "freeze"}))
+                self.operation_counter.add(1, {"operation": "freeze_monitor"})
+                
                 yield memory_scanner_pb2.FreezeStatus(
                     active=True,
                     error_message="",
@@ -471,6 +472,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 )
 
                 await asyncio.sleep(0.1)
+                # Reset timer for next iteration
                 start_time = asyncio.get_event_loop().time()
 
             except Exception as e:
@@ -501,7 +503,9 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 if freeze_key in self.freezer_tasks:
                     logger.info(f"Cancelling existing freeze task for {freeze_key}")
                     try:
-                        self.freezer_tasks[freeze_key].cancel()
+                        task, event = self.freezer_tasks[freeze_key]
+                        event.set()  # Signal cancellation
+                        await task  # Wait for task to complete
                         self.operation_counter.add(1, {"operation": "freeze_cancel"})
                     except Exception as e:
                         logger.warning(f"Error cancelling existing task: {e}")
@@ -511,48 +515,58 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 # Record the freeze operation metric after validating session and cancelling any existing task
                 self.operation_counter.add(1, {"operation": "freeze"})
 
-                # Create an async generator to handle the freeze task
-                freeze_gen = self._freeze_value_task(
-                    session_id,
-                    request.address,
-                    request.value,
-                    request.value_type,
-                    context)
-
                 cancellation_event = asyncio.Event()
 
-                async def monitor_cancellation():
-                    await cancellation_event.wait()
-                    logger.info(f"Freeze task for {freeze_key} received cancellation signal")
+                async def run_freeze_task():
+                    try:
+                        freeze_gen = self._freeze_value_task(
+                            session_id,
+                            request.address,
+                            request.value,
+                            request.value_type,
+                            context)
 
-                # Store cancellation event for cleanup
-                self.freezer_tasks[freeze_key] = cancellation_event
+                        async for status in freeze_gen:
+                            if cancellation_event.is_set():
+                                logger.info(f"Cancellation detected for {freeze_key}")
+                                break
+                            yield status
+                    except asyncio.CancelledError:
+                        logger.info(f"Freeze task cancelled for {freeze_key}")
+                        yield memory_scanner_pb2.FreezeStatus(
+                            active=False,
+                            error_message="Task cancelled"
+                        )
+                    except Exception as e:
+                        logger.error(f"Error in freeze task: {e}", exc_info=e)
+                        yield memory_scanner_pb2.FreezeStatus(
+                            active=False,
+                            error_message=str(e)
+                        )
+                    finally:
+                        if freeze_key in self.freezer_tasks:
+                            del self.freezer_tasks[freeze_key]
+
+                # Create task runner
+                freeze_runner = run_freeze_task()
                 
-                cancel_task = asyncio.create_task(monitor_cancellation())
-                try:
-                    async for status in freeze_gen:
-                        if cancellation_event.is_set():
-                            logger.info(f"Cancellation detected for {freeze_key}")
-                            break
-                        yield status
+                # Create and store the freeze task (storing the first yielded value task)
+                first_status_task = asyncio.create_task(freeze_runner.__anext__())
+                self.freezer_tasks[freeze_key] = (first_status_task, cancellation_event)
 
-                except asyncio.CancelledError:
-                    logger.info(f"Freeze task cancelled for {freeze_key}")
-                    yield memory_scanner_pb2.FreezeStatus(
-                        active=False,
-                        error_message="Task cancelled"
-                    )
+                # Continue yielding values
+                try:
+                    first_status = await first_status_task
+                    yield first_status
+
+                    async for status in freeze_runner:
+                        yield status
                 except Exception as e:
                     logger.error(f"Error in freeze task: {e}", exc_info=e)
                     yield memory_scanner_pb2.FreezeStatus(
                         active=False,
                         error_message=str(e)
                     )
-                finally:
-                    if not cancel_task.done():
-                        cancel_task.cancel()
-                    if freeze_key in self.freezer_tasks:
-                        del self.freezer_tasks[freeze_key]
 
             except Exception as e:
                 logger.error(f"Error setting up freeze task: {e}", exc_info=e)
@@ -575,11 +589,12 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 if freeze_key in self.freezer_tasks:
                     logger.info(f"Signaling cancellation for freeze task {freeze_key}")
-                    cancellation_event = self.freezer_tasks[freeze_key]
+                    cancellation_event = self.freezer_tasks[freeze_key][1]
                     if isinstance(cancellation_event, asyncio.Event):
                         cancellation_event.set()
                     del self.freezer_tasks[freeze_key]
                     self.operation_counter.add(1, {"operation": "unfreeze"})
+
                 else:
                     logger.info(f"No active freeze task found for {freeze_key} - may have already been unfrozen")
                     self.operation_counter.add(1, {"operation": "unfreeze_not_found"})
