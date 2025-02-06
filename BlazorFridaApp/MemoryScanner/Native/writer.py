@@ -47,40 +47,95 @@ rpc.exports = {
     writeMemory: function(address, value, valueType) {
         try {
             const ptr = new NativePointer(address);
+            console.log(`Writing to ${ptr} with type ${valueType}`);
             
             switch(valueType) {
+                case 'int32':
+                    // Handle both Buffer and number inputs for int32
+                    if (Buffer.isBuffer(value)) {
+                        console.log(`Writing buffer value: ${value.toString('hex')}`);
+                        // Use DataView to handle endianness correctly
+                        const view = new DataView(ArrayBuffer.from(value));
+                        const intValue = view.getInt32(0, true); // true for little-endian
+                        console.log(`Converted to int32: ${intValue}`);
+                        Memory.writeS32(ptr, intValue);
+                    } else {
+                        console.log(`Writing direct value: ${value}`);
+                        Memory.writeS32(ptr, value);
+                    }
+                    // Verify write
+                    const readBack = Memory.readS32(ptr);
+                    console.log(`Read back value: ${readBack}`);
+                    if (Buffer.isBuffer(value)) {
+                        const expected = new DataView(ArrayBuffer.from(value)).getInt32(0, true);
+                        console.log(`Write verification - Expected: ${expected}, Got: ${readBack}`);
+                    }
+                    break;
+                    
                 case 'int8':
-                    Memory.writeS8(ptr, value);
+                    Memory.writeS8(ptr, Buffer.isBuffer(value) ? value[0] : value);
                     break;
                 case 'uint8':
-                    Memory.writeU8(ptr, value);
+                    Memory.writeU8(ptr, Buffer.isBuffer(value) ? value[0] : value);
                     break;
                 case 'int16':
-                    Memory.writeS16(ptr, value);
+                    if (Buffer.isBuffer(value)) {
+                        const view = new DataView(ArrayBuffer.from(value));
+                        Memory.writeS16(ptr, view.getInt16(0, true));
+                    } else {
+                        Memory.writeS16(ptr, value);
+                    }
                     break;
                 case 'uint16':
-                    Memory.writeU16(ptr, value);
-                    break;
-                case 'int32':
-                    Memory.writeS32(ptr, value);
+                    if (Buffer.isBuffer(value)) {
+                        const view = new DataView(ArrayBuffer.from(value));
+                        Memory.writeU16(ptr, view.getUint16(0, true));
+                    } else {
+                        Memory.writeU16(ptr, value);
+                    }
                     break;
                 case 'uint32':
-                    Memory.writeU32(ptr, value);
+                    if (Buffer.isBuffer(value)) {
+                        const view = new DataView(ArrayBuffer.from(value));
+                        Memory.writeU32(ptr, view.getUint32(0, true));
+                    } else {
+                        Memory.writeU32(ptr, value);
+                    }
                     break;
                 case 'int64':
-                    Memory.writeS64(ptr, value);
+                    if (Buffer.isBuffer(value)) {
+                        const view = new DataView(ArrayBuffer.from(value));
+                        Memory.writeS64(ptr, view.getBigInt64(0, true));
+                    } else {
+                        Memory.writeS64(ptr, value);
+                    }
                     break;
                 case 'uint64':
-                    Memory.writeU64(ptr, value);
+                    if (Buffer.isBuffer(value)) {
+                        const view = new DataView(ArrayBuffer.from(value));
+                        Memory.writeU64(ptr, view.getBigUint64(0, true));
+                    } else {
+                        Memory.writeU64(ptr, value);
+                    }
                     break;
                 case 'float':
-                    Memory.writeFloat(ptr, value);
+                    if (Buffer.isBuffer(value)) {
+                        const view = new DataView(ArrayBuffer.from(value));
+                        Memory.writeFloat(ptr, view.getFloat32(0, true));
+                    } else {
+                        Memory.writeFloat(ptr, value);
+                    }
                     break;
                 case 'double':
-                    Memory.writeDouble(ptr, value);
+                    if (Buffer.isBuffer(value)) {
+                        const view = new DataView(ArrayBuffer.from(value));
+                        Memory.writeDouble(ptr, view.getFloat64(0, true));
+                    } else {
+                        Memory.writeDouble(ptr, value);
+                    }
                     break;
                 case 'string':
-                    Memory.writeUtf8String(ptr, value);
+                    Memory.writeUtf8String(ptr, value.toString());
                     break;
                 case 'bytes':
                     Memory.writeByteArray(ptr, value);
@@ -90,7 +145,7 @@ rpc.exports = {
             }
             return true;
         } catch(e) {
-            console.log('Write error:', e);
+            console.log('Write error:', e.stack || e);
             return false;
         }
     },
@@ -141,16 +196,20 @@ class MemoryWriter:
             Boolean indicating success
         """
         try:
+            # Debug logging for value details
+            logger.debug(f"Writing {value_type} value to {hex(address)}")
+            logger.debug(f"Value type: {type(value)}, Length: {len(value)}, Raw bytes: {value.hex() if isinstance(value, bytes) else value}")
+
             result = await execute_script(
                 self.session, WRITE_SCRIPT, "writeMemory", address, value, value_type
             )
             if result:
-                logger.debug(f"Successfully wrote {value} to {hex(address)}")
+                logger.debug(f"Successfully wrote {value_type} value to {hex(address)}")
             else:
-                logger.error(f"Failed to write to {hex(address)}")
+                logger.error(f"Failed to write {value_type} value to {hex(address)}")
             return result
         except Exception as e:
-            logger.error(f"Write error: {e}")
+            logger.error(f"Write error at {hex(address)}: {e}", exc_info=True)
             return False
 
     async def write_batch(

@@ -378,15 +378,42 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         reader = self.readers[session_id]
         start_time = asyncio.get_event_loop().time()
 
-        # Yield initial status immediately
+        # Initial value set and verification
         try:
+            # Write initial value
+            logger.debug(f"Writing initial value at {hex(address)}")
+            success = await writer.write(address, value, value_type)
+            if not success:
+                raise ValueError("Initial write operation failed")
+
+            await asyncio.sleep(0.1)  # Ensure write completes
+
+            # Read back and verify
             current_value = await reader.read(address, len(value), value_type)
-            # Ensure current_value is bytes
-            if not isinstance(current_value, bytes):
-                current_value = str(current_value).encode("utf-8")
+            
+            # Compare values based on type
+            if value_type == "int32":
+                try:
+                    current_int = int.from_bytes(current_value, byteorder='little', signed=True)
+                    expected_int = int.from_bytes(value, byteorder='little', signed=True)
+                    logger.debug(f"Read int32: {current_int}, Expected: {expected_int}")
+                    
+                    if current_int != expected_int:
+                        raise ValueError(f"Value mismatch: got {current_int}, expected {expected_int}")
+                except Exception as e:
+                    logger.error(f"Value conversion error: {e}")
+                    raise
+            else:
+                # For other types, compare raw bytes
+                if current_value != value:
+                    logger.error(f"Value mismatch - Got: {current_value.hex()}, Expected: {value.hex()}")
+                    raise ValueError("Failed to verify initial value")
 
             span_context = context.get_active_span().get_span_context()
             trace_id = str(span_context.trace_id) if span_context else ""
+
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            self.operation_duration.record(duration_ms, {"operation": "freeze"})
 
             yield memory_scanner_pb2.FreezeStatus(
                 active=True,
@@ -394,28 +421,47 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 current_value=current_value,
                 correlation_id=trace_id,
             )
+
         except Exception as e:
-            logger.error(f"Error in initial freeze status: {e}", exc_info=e)
+            logger.error(f"Error in initial freeze operation: {e}", exc_info=True)
             yield memory_scanner_pb2.FreezeStatus(
-                active=False, error_message=str(e), current_value=b"", correlation_id=""
+                active=False,
+                error_message=str(e),
+                current_value=b"",
+                correlation_id="",
             )
             return
 
+        # Main freeze loop
         while not context.done():
             try:
                 current_value = await reader.read(address, len(value), value_type)
-                # Ensure current_value is bytes
-                if not isinstance(current_value, bytes):
-                    current_value = str(current_value).encode("utf-8")
+                should_update = False
 
-                if current_value != value:
-                    await writer.write(address, value, value_type)
-                    logger.debug(f"Updated frozen value at address {address}")
+                if value_type == "int32":
+                    try:
+                        current_int = int.from_bytes(current_value, byteorder='little', signed=True)
+                        expected_int = int.from_bytes(value, byteorder='little', signed=True)
+                        should_update = current_int != expected_int
+                        logger.debug(f"Monitoring int32 - Current: {current_int}, Expected: {expected_int}")
+                    except Exception as e:
+                        logger.error(f"Value conversion error in monitor loop: {e}")
+                        should_update = True
+                else:
+                    should_update = current_value != value
+                    if should_update:
+                        logger.debug(f"Value changed - Current: {current_value.hex()}, Target: {value.hex()}")
+
+                if should_update:
+                    success = await writer.write(address, value, value_type)
+                    if not success:
+                        raise ValueError("Failed to restore value")
+                    # Re-read to get the current value after update
+                    current_value = await reader.read(address, len(value), value_type)
 
                 span_context = context.get_active_span().get_span_context()
                 trace_id = str(span_context.trace_id) if span_context else ""
 
-                # Record duration for each iteration
                 duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
                 self.operation_duration.record(duration_ms, {"operation": "freeze"})
 
@@ -425,10 +471,12 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     current_value=current_value,
                     correlation_id=trace_id,
                 )
+
                 await asyncio.sleep(0.1)
-                start_time = asyncio.get_event_loop().time()  # Reset start time for next iteration
+                start_time = asyncio.get_event_loop().time()
+
             except Exception as e:
-                logger.error(f"Error in freeze task: {e}", exc_info=e)
+                logger.error(f"Error in freeze task: {e}", exc_info=True)
                 yield memory_scanner_pb2.FreezeStatus(
                     active=False,
                     error_message=str(e),
@@ -453,33 +501,58 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 if freeze_key in self.freezer_tasks:
                     logger.info(f"Cancelling existing freeze task for {freeze_key}")
-                    self.freezer_tasks[freeze_key].cancel()
-                    del self.freezer_tasks[freeze_key]
+                    try:
+                        self.freezer_tasks[freeze_key].cancel()
+                    except Exception as e:
+                        logger.warning(f"Error cancelling existing task: {e}")
+                    finally:
+                        del self.freezer_tasks[freeze_key]
 
                 # Record the freeze operation metric
                 self.operation_counter.add(1, {"operation": "freeze"})
 
-                # Create and store the freeze task
-                freeze_task = asyncio.create_task(self._freeze_value_task(
+                # Create an async generator to handle the freeze task
+                freeze_gen = self._freeze_value_task(
                     session_id,
                     request.address,
                     request.value,
                     request.value_type,
-                    context))
-                    
-                self.freezer_tasks[freeze_key] = freeze_task
+                    context)
 
+                cancellation_event = asyncio.Event()
+
+                async def monitor_cancellation():
+                    await cancellation_event.wait()
+                    logger.info(f"Freeze task for {freeze_key} received cancellation signal")
+
+                # Store cancellation event for cleanup
+                self.freezer_tasks[freeze_key] = cancellation_event
+                
+                cancel_task = asyncio.create_task(monitor_cancellation())
                 try:
-                    async for status in freeze_task:
+                    async for status in freeze_gen:
+                        if cancellation_event.is_set():
+                            logger.info(f"Cancellation detected for {freeze_key}")
+                            break
                         yield status
+
                 except asyncio.CancelledError:
                     logger.info(f"Freeze task cancelled for {freeze_key}")
-                    if freeze_key in self.freezer_tasks:
-                        del self.freezer_tasks[freeze_key]
                     yield memory_scanner_pb2.FreezeStatus(
                         active=False,
                         error_message="Task cancelled"
                     )
+                except Exception as e:
+                    logger.error(f"Error in freeze task: {e}", exc_info=e)
+                    yield memory_scanner_pb2.FreezeStatus(
+                        active=False,
+                        error_message=str(e)
+                    )
+                finally:
+                    if not cancel_task.done():
+                        cancel_task.cancel()
+                    if freeze_key in self.freezer_tasks:
+                        del self.freezer_tasks[freeze_key]
 
             except Exception as e:
                 logger.error(f"Error setting up freeze task: {e}", exc_info=e)
@@ -499,13 +572,10 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 freeze_key = f"{session_id}_{request.address}"
 
                 if freeze_key in self.freezer_tasks:
-                    logger.info(f"Cancelling freeze task for {freeze_key}")
-                    task = self.freezer_tasks[freeze_key]
-                    task.cancel()
-                    try:
-                        await task  # Wait for task to properly cleanup
-                    except asyncio.CancelledError:
-                        pass  # Expected when cancelling
+                    logger.info(f"Signaling cancellation for freeze task {freeze_key}")
+                    cancellation_event = self.freezer_tasks[freeze_key]
+                    if isinstance(cancellation_event, asyncio.Event):
+                        cancellation_event.set()
                     del self.freezer_tasks[freeze_key]
                 else:
                     logger.warning(f"No active freeze task found for {freeze_key}")
