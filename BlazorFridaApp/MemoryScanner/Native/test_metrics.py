@@ -350,5 +350,49 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         state_manager.cleanup_old_states()
 
 
+def create_test_suite(args):
+    """Create a test suite based on command line arguments"""
+    suite = unittest.TestSuite()
+    loader = unittest.TestLoader()
+    test_class = TestMetricsCollection
+
+    if args.pattern_scanner:
+        suite.addTest(loader.loadTestsFromName("test_pattern_scanner", test_class))
+    elif args.value_freezer:
+        suite.addTest(loader.loadTestsFromName("test_value_freezer", test_class))
+    elif args.cache_system:
+        suite.addTest(loader.loadTestsFromName("test_cache_system", test_class))
+    elif args.integrated:
+        suite.addTest(
+            loader.loadTestsFromName("test_integrated_functionality", test_class)
+        )
+    else:
+        # If no specific tests are requested, run all tests
+        suite.addTests(loader.loadTestsFromTestCase(test_class))
+
+    return suite
+
+
 if __name__ == "__main__":
-    unittest.main()
+    parser = argparse.ArgumentParser(description="Run memory scanner tests")
+    parser.add_argument(
+        "--pattern-scanner", action="store_true", help="Run pattern scanner tests only"
+    )
+    parser.add_argument(
+        "--value-freezer", action="store_true", help="Run value freezer tests only"
+    )
+    parser.add_argument(
+        "--cache-system", action="store_true", help="Run cache system tests only"
+    )
+    parser.add_argument(
+        "--integrated",
+        action="store_true",
+        help="Run integrated functionality tests only",
+    )
+
+    args, remaining = parser.parse_known_args()
+
+    # Create and run the test suite
+    suite = create_test_suite(args)
+    runner = unittest.TextTestRunner()
+    runner.run(suite)
