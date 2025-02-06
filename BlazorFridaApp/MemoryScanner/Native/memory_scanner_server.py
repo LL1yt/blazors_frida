@@ -239,17 +239,30 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
 
                 # Update metrics
-                operation_counter.add(1, {"operation": "scan"})
-                operation_duration.record(duration_ms, {"operation": "scan"})
+                operation_type = "pattern_scan" if request.value_type == "pattern" else "scan"
+                operation_counter.add(1, {"operation": operation_type})
+                operation_duration.record(duration_ms, {"operation": operation_type})
 
                 checkpoint_id = str(uuid.uuid4())
-                return memory_scanner_pb2.ScanResponse(
-                    results=[
+                
+                # Ensure each result value is in bytes format
+                scan_results = []
+                for r in results:
+                    value = r["value"]
+                    if not isinstance(value, bytes):
+                        if isinstance(value, str):
+                            value = value.encode('utf-8')
+                        else:
+                            value = str(value).encode('utf-8')
+                    scan_results.append(
                         memory_scanner_pb2.ScanResult(
-                            address=r["address"], value=r["value"]
+                            address=r["address"],
+                            value=value
                         )
-                        for r in results
-                    ],
+                    )
+                
+                return memory_scanner_pb2.ScanResponse(
+                    results=scan_results,
                     checkpoint_id=checkpoint_id,
                 )
             except Exception as e:

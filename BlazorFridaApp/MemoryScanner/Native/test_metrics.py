@@ -350,43 +350,5 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         state_manager.cleanup_old_states()
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--pattern-scanner", action="store_true", help="Run pattern scanner tests"
-    )
-    parser.add_argument(
-        "--value-freezer", action="store_true", help="Run value freezer tests"
-    )
-    parser.add_argument(
-        "--cache-system", action="store_true", help="Run cache system tests"
-    )
-    parser.add_argument(
-        "--integrated", action="store_true", help="Run integrated functionality tests"
-    )
-    return parser.parse_args()
-
-
 if __name__ == "__main__":
-    args = parse_args()
-
-    # Create test suite
-    suite = unittest.TestSuite()
-
-    # Add tests based on arguments
-    if args.pattern_scanner:
-        suite.addTest(TestMetricsCollection("test_pattern_scanner"))
-    if args.value_freezer:
-        suite.addTest(TestMetricsCollection("test_value_freezer"))
-    if args.cache_system:
-        suite.addTest(TestMetricsCollection("test_cache_system"))
-    if args.integrated:
-        suite.addTest(TestMetricsCollection("test_integrated_functionality"))
-
-    # If no specific tests selected, run all tests
-    if not any(vars(args).values()):
-        suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestMetricsCollection)
-
-    # Run tests
-    runner = unittest.TextTestRunner()
-    asyncio.run(runner.run(suite))
+    unittest.main()

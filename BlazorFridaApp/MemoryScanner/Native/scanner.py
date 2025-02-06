@@ -38,13 +38,19 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
     Args:
         session: Frida session object
         value_type: Type of value to scan for ('string', 'number', 'pattern')
-        value: The actual value to search for
+        value: The actual value to search for (can be bytes, str, or any other type)
     Returns:
         List of memory addresses where the value was found
     """
     try:
         if value_type == "pattern":
+            if isinstance(value, bytes):
+                value = value.decode('utf-8')  # Convert bytes to string for pattern optimization
             value = optimize_pattern(value)
+        elif isinstance(value, bytes) and value_type != "bytes":
+            # If we got bytes but it's not meant to be raw bytes, decode it
+            value = value.decode('utf-8')
+            
         return await execute_script(
             session, SCAN_SCRIPT, "scanMemory", value_type, value
         )
@@ -148,9 +154,17 @@ class MemoryScanner:
             return []
 
         try:
+            # Ensure value is in correct format for scanning
+            scan_value = value
+            if isinstance(value, bytes):
+                if value_type == "pattern":
+                    scan_value = value.decode('utf-8')
+                elif value_type != "bytes":
+                    scan_value = value.decode('utf-8')
+            
             # Execute the Frida script to scan memory
             addresses = await execute_script(
-                self.frida_scanner.session, SCAN_SCRIPT, "scanMemory", value_type, value
+                self.frida_scanner.session, SCAN_SCRIPT, "scanMemory", value_type, scan_value
             )
 
             # Convert addresses to scan results
@@ -158,7 +172,15 @@ class MemoryScanner:
             for addr in addresses:
                 if isinstance(addr, str):
                     addr = int(addr, 16)  # Convert hex string to int
-                results.append({"address": addr, "value": value})
+                # Ensure value is in bytes format for protobuf
+                if not isinstance(value, bytes):
+                    if isinstance(value, str):
+                        value_bytes = value.encode('utf-8')
+                    else:
+                        value_bytes = str(value).encode('utf-8')
+                else:
+                    value_bytes = value
+                results.append({"address": addr, "value": value_bytes})
 
             # Create checkpoint and save state
             metadata = {
