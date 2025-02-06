@@ -413,8 +413,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
             trace_id = str(span_context.trace_id) if span_context else ""
 
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            self.operation_duration.record(duration_ms, {"operation": "freeze"})
-
+            await asyncio.create_task(self.operation_duration.record(duration_ms, {"operation": "freeze"}))
             yield memory_scanner_pb2.FreezeStatus(
                 active=True,
                 error_message="",
@@ -463,8 +462,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 trace_id = str(span_context.trace_id) if span_context else ""
 
                 duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-                self.operation_duration.record(duration_ms, {"operation": "freeze"})
-
+                await asyncio.create_task(self.operation_duration.record(duration_ms, {"operation": "freeze"}))
                 yield memory_scanner_pb2.FreezeStatus(
                     active=True,
                     error_message="",
@@ -499,16 +497,18 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 freeze_key = f"{session_id}_{request.address}"
                 logger.info(f"Starting value freeze for address {request.address}")
 
+                # Cancel existing freeze task if it exists
                 if freeze_key in self.freezer_tasks:
                     logger.info(f"Cancelling existing freeze task for {freeze_key}")
                     try:
                         self.freezer_tasks[freeze_key].cancel()
+                        self.operation_counter.add(1, {"operation": "freeze_cancel"})
                     except Exception as e:
                         logger.warning(f"Error cancelling existing task: {e}")
                     finally:
                         del self.freezer_tasks[freeze_key]
 
-                # Record the freeze operation metric
+                # Record the freeze operation metric after validating session and cancelling any existing task
                 self.operation_counter.add(1, {"operation": "freeze"})
 
                 # Create an async generator to handle the freeze task
@@ -556,6 +556,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
             except Exception as e:
                 logger.error(f"Error setting up freeze task: {e}", exc_info=e)
+                self.error_counter.add(1, {"operation": "freeze", "error": str(e)})
                 yield memory_scanner_pb2.FreezeStatus(
                     active=False,
                     error_message=str(e)
@@ -570,6 +571,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
             try:
                 session_id = request.session_id
                 freeze_key = f"{session_id}_{request.address}"
+                span.set_attribute("freeze_key", freeze_key)
 
                 if freeze_key in self.freezer_tasks:
                     logger.info(f"Signaling cancellation for freeze task {freeze_key}")
@@ -577,14 +579,19 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     if isinstance(cancellation_event, asyncio.Event):
                         cancellation_event.set()
                     del self.freezer_tasks[freeze_key]
+                    self.operation_counter.add(1, {"operation": "unfreeze"})
                 else:
-                    logger.warning(f"No active freeze task found for {freeze_key}")
+                    logger.info(f"No active freeze task found for {freeze_key} - may have already been unfrozen")
+                    self.operation_counter.add(1, {"operation": "unfreeze_not_found"})
 
                 return memory_scanner_pb2.Empty()
             except Exception as e:
-                logger.error(f"Error unfreezing value: {e}", exc_info=e)
+                error_msg = f"Error unfreezing value: {e}"
+                logger.error(error_msg, exc_info=e)
+                self.error_counter.add(1, {"operation": "unfreeze", "error": str(e)})
+                span.set_status(Status(StatusCode.ERROR, error_msg))
                 context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
+                context.set_details(error_msg)
                 return memory_scanner_pb2.Empty()
 
     async def GetState(
