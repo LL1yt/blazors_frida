@@ -1,27 +1,25 @@
-0. Preliminary Notes
-	0.1.	Incremental Delivery and Testing
-	 •	For each feature or subsystem, use atomic, testable increments.
-	 •	Maintain full observability: logs, metrics, and traces at each step.
-    0.2.	Configuration Management
-	 •	Centralize all config in a single place (e.g., appsettings.json, environment variables, or a secrets manager).
-	 •	Each microservice or subsystem should read from the same config source to avoid drift.
+0.  Preliminary Notes
+    0.1. Incremental Delivery and Testing
+    • For each feature or subsystem, use atomic, testable increments.
+    • Maintain full observability: logs, metrics, and traces at each step.
+    0.2. Configuration Management
+    • Centralize all config in a single place (e.g., appsettings.json, environment variables, or a secrets manager).
+    • Each microservice or subsystem should read from the same config source to avoid drift.
     0.3. Quality Assurance Infrastructure
 
-     0.3.1    Set up automated testing framework
+    0.3.1 Set up automated testing framework
 
          •    Unit testing infrastructure for C# (.NET)
          •    Python test framework (pytest)
          •    Integration test harness
          •    UI automation tests (Playwright)
 
-
-     0.3.2    Establish monitoring stack
+    0.3.2 Establish monitoring stack
 
          •    Prometheus + Grafana deployment
          •    Custom dashboards for key metrics
          •    Alert rules configuration
-         •    Log aggregation system   
-
+         •    Log aggregation system
 
 ## 1. Architecture Overview
 
@@ -95,7 +93,6 @@
 ## 2. Migration Components
 
 The main thing is that the new functionality should work. old implementations can be simply deleted if they interfere with the launch of the new implementation
-
 
 ### 2.1 Python Microservice ✅
 
@@ -303,21 +300,14 @@ message AttachRequest {
    - Implement retry policies
    - Add circuit breaker pattern
 
-2. Implement Feature Flag Routing
-
-   - Add routing logic in MemoryScannerCoordinator
-   - Implement graceful fallback mechanisms
-   - Add monitoring for routing decisions
-   - Configure traffic splitting rules
-
-3. Deploy Monitoring for Existing Features
+2. Deploy Monitoring for Existing Features
 
    - Set up Prometheus metrics
    - Configure OpenTelemetry collectors
    - Create monitoring dashboards
    - Set up alerting rules
 
-4. Validate Existing Feature Migration
+3. Validate Existing Feature Migration
    - Test process attachment
    - Verify memory reading operations
    - Validate memory writing operations
@@ -355,14 +345,7 @@ message AttachRequest {
 
 ### Phase 3: UI Modernization (Week 4)
 
-1. Implement feature flag routing
-
-   - Add routing logic in MemoryScannerCoordinator
-   - Implement graceful fallback mechanisms
-   - Add monitoring for routing decisions
-   - Configure traffic splitting rules
-
-2. Implement Modern UI Components [0% Complete]
+1. Implement Modern UI Components [0% Complete]
 
    - Set up Radzen/Blazorise integration
    - Create base dashboard layout
@@ -371,40 +354,39 @@ message AttachRequest {
    - Create real-time value visualization
    - Add dark/light theme support
 
-3. Add Profile Management [0% Complete]
+2. Add Profile Management [0% Complete]
 
    - Implement profile CRUD operations
    - Create profile switching UI
    - Add profile import/export
    - Set up profile auto-save
 
-4. Implement Python Automation [0% Complete]
+3. Implement Python Automation [0% Complete]
 
    - Create signature_gen.py for pattern generation
    - Add Python script for signature analysis
    - Implement binary dump processing
    - Set up Python-C# interop for script execution
 
-5. Enhance Frida Integration [0% Complete]
+4. Enhance Frida Integration [0% Complete]
 
    - Set up Frida hooks for validation
    - Implement dynamic method interception
    - Add IL2CPP class discovery
    - Create BepInEx mod templates
 
-6. The main thing is that the new functionality should work. old implementations can be simply deleted if they interfere with the launch of the new implementation
+5. The main thing is that the new functionality should work. old implementations can be simply deleted if they interfere with the launch of the new implementation
 
    - Identify critical paths in Python.NET implementation
    - Create backup of current stable state
    - Prepare rollback scripts
    - Test new implementation in isolation
 
-7. Deploy monitoring
+6. Deploy monitoring
    - Set up Prometheus metrics
    - Configure OpenTelemetry collectors
    - Create monitoring dashboards
    - Set up alerting rules
-
 
 ### Phase 4: Cleanup (Week 7)
 
@@ -419,7 +401,6 @@ message AttachRequest {
 - Error rates
 - Memory usage
 - Process health
-- Feature flag status
 
 ### 4.2 Rollback Triggers
 

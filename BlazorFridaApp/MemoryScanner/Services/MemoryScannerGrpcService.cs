@@ -178,8 +178,37 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace placeholder with actual gRPC call
-            return new List<Models.ScanResult>();
+            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+
+            var request = new Proto.ScanRequest
+            {
+                SessionId = sessionId,
+                ValueType = valueType,
+                Value = Google.Protobuf.ByteString.CopyFrom(value),
+                ComparisonType = comparisonType,
+                ScanType = "value" // Default scan type for value scanning
+            };
+
+            // Add memory ranges to scan
+            foreach (var (start, end) in ranges)
+            {
+                request.Ranges.Add(new Proto.AddressRange
+                {
+                    Start = start,
+                    End = end
+                });
+            }
+
+            var response = await client.ScanMemoryAsync(request, CreateMetadata());
+
+            // Convert proto ScanResult to our Models.ScanResult
+            return response.Results.Select(r => new Models.ScanResult
+            {
+                ProcessId = int.Parse(sessionId),
+                Addresses = new List<nint> { new nint((long)r.Address) },
+                Pattern = r.Value.ToByteArray(),
+                Mask = string.Empty // Not applicable for value scanning
+            }).ToList();
         }
         catch (Exception ex)
         {
@@ -224,8 +253,18 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace placeholder with actual gRPC call
-            return (new byte[size], true, string.Empty);
+            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+            
+            var request = new Proto.ReadRequest
+            {
+                SessionId = sessionId,
+                Address = address,
+                Size = size,
+                ValueType = valueType
+            };
+
+            var response = await client.ReadMemoryAsync(request, CreateMetadata());
+            return (response.Value.ToByteArray(), response.Success, response.ErrorMessage);
         }
         catch (Exception ex)
         {
@@ -243,8 +282,18 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace placeholder with actual gRPC call
-            return (true, string.Empty);
+            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+
+            var request = new Proto.WriteRequest
+            {
+                SessionId = sessionId,
+                Address = address,
+                Value = Google.Protobuf.ByteString.CopyFrom(value),
+                ValueType = valueType
+            };
+
+            var response = await client.WriteMemoryAsync(request, CreateMetadata());
+            return (response.Success, response.ErrorMessage);
         }
         catch (Exception ex)
         {
@@ -300,8 +349,22 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace placeholder with actual gRPC call
-            return (new Dictionary<string, byte[]>(), Guid.NewGuid().ToString());
+            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+
+            var request = new Proto.StateRequest
+            {
+                SessionId = sessionId,
+                CheckpointId = checkpointId
+            };
+
+            var response = await client.GetStateAsync(request, CreateMetadata());
+
+            var state = response.State.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value.ToByteArray()
+            );
+
+            return (state, response.Version);
         }
         catch (Exception ex)
         {
@@ -318,8 +381,21 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            // TODO: Replace placeholder with actual gRPC call
-            return (true, string.Empty, Guid.NewGuid().ToString());
+            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+
+            var request = new Proto.SyncRequest
+            {
+                SessionId = sessionId,
+                Version = version
+            };
+
+            foreach (var (key, value) in stateUpdates)
+            {
+                request.StateUpdates[key] = Google.Protobuf.ByteString.CopyFrom(value);
+            }
+
+            var response = await client.SyncStateAsync(request, CreateMetadata());
+            return (response.Success, response.ErrorMessage, response.NewVersion);
         }
         catch (Exception ex)
         {
