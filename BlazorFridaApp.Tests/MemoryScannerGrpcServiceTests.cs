@@ -2,6 +2,7 @@ using Xunit;
 using Moq;
 using Microsoft.Extensions.Logging;
 using BlazorFridaApp.MemoryScanner.Services;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.MemoryScanner.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -13,104 +14,80 @@ namespace BlazorFridaApp.Tests;
 
 public class MemoryScannerGrpcServiceTests : IDisposable
 {
-    private readonly Mock<ILogger<MemoryScannerGrpcService>> _loggerMock;
-    private readonly Mock<IPythonProcessManager> _processManagerMock;
-    private readonly MemoryScannerGrpcService _service;
-    private readonly Mock<BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient> _clientMock;
+    private readonly Mock<ILogger<MemoryScannerFacade>> _loggerMock;
+    private readonly Mock<ProcessGrpcService> _processServiceMock;
+    private readonly Mock<MemoryGrpcService> _memoryServiceMock;
+    private readonly Mock<ScannerGrpcService> _scannerServiceMock;
+    private readonly Mock<StateGrpcService> _stateServiceMock;
+    private readonly Mock<FreezeGrpcService> _freezeServiceMock;
+    private readonly IMemoryScannerGrpcService _service;
 
     public MemoryScannerGrpcServiceTests()
     {
-        _loggerMock = new Mock<ILogger<MemoryScannerGrpcService>>();
-        _processManagerMock = new Mock<IPythonProcessManager>();
-        _processManagerMock.Setup(x => x.Port).Returns(50051);
-        _processManagerMock.Setup(x => x.EnsureServerRunning()).Returns(Task.CompletedTask);
+        _loggerMock = new Mock<ILogger<MemoryScannerFacade>>();
+        _processServiceMock = new Mock<ProcessGrpcService>();
+        _memoryServiceMock = new Mock<MemoryGrpcService>();
+        _scannerServiceMock = new Mock<ScannerGrpcService>();
+        _stateServiceMock = new Mock<StateGrpcService>();
+        _freezeServiceMock = new Mock<FreezeGrpcService>();
         
-        _clientMock = new Mock<BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient>();
         SetupMockResponses();
         
-        _service = new TestMemoryScannerGrpcService(_loggerMock.Object, _processManagerMock.Object, _clientMock.Object);
+        _service = new MemoryScannerFacade(
+            _processServiceMock.Object,
+            _memoryServiceMock.Object,
+            _scannerServiceMock.Object,
+            _stateServiceMock.Object,
+            _freezeServiceMock.Object,
+            _loggerMock.Object
+        );
     }
 
     private void SetupMockResponses()
     {
-        // Setup ReadMemory mock response
-        _clientMock.Setup(x => x.ReadMemoryAsync(
-            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.ReadRequest>(),
-            It.IsAny<CallOptions>()
-        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.ReadResponse>(
-            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.ReadResponse { 
-                Success = true,
-                Value = Google.Protobuf.ByteString.CopyFrom(new byte[] { 1, 2, 3, 4 }),
-                ErrorMessage = string.Empty
-            }),
-            Task.FromResult(new Metadata()),
-            () => Status.DefaultSuccess,
-            () => new Metadata(),
-            () => { }
-        ));
-
+        // Setup mock responses for individual services
+        _processServiceMock.Setup(x => x.ListProcessesAsync())
+            .ReturnsAsync(new List<ProcessInfo> { new ProcessInfo(1234, "test.exe") });
+            
+        _processServiceMock.Setup(x => x.AttachToProcessAsync(It.IsAny<int>()))
+            .ReturnsAsync(("test-session", true));
+            
+        _memoryServiceMock.Setup(x => x.ReadMemoryAsync(
+            It.IsAny<string>(),
+            It.IsAny<ulong>(),
+            It.IsAny<int>(),
+            It.IsAny<string>()
+        )).ReturnsAsync((new byte[] { 1, 2, 3, 4 }, true, string.Empty));
+        
         // Setup WriteMemory mock response
-        _clientMock.Setup(x => x.WriteMemoryAsync(
-            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.WriteRequest>(),
-            It.IsAny<CallOptions>()
-        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.WriteResponse>(
-            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.WriteResponse { 
-                Success = true,
-                ErrorMessage = string.Empty
-            }),
-            Task.FromResult(new Metadata()),
-            () => Status.DefaultSuccess,
-            () => new Metadata(),
-            () => { }
-        ));
-
+        _memoryServiceMock.Setup(x => x.WriteMemoryAsync(
+            It.IsAny<string>(),
+            It.IsAny<ulong>(),
+            It.IsAny<byte[]>(),
+            It.IsAny<string>()
+        )).ReturnsAsync((true, string.Empty));
+        
         // Setup ScanMemory mock response
-        _clientMock.Setup(x => x.ScanMemoryAsync(
-            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.ScanRequest>(),
-            It.IsAny<CallOptions>()
-        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.ScanResponse>(
-            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.ScanResponse { 
-                Results = { new BlazorFridaApp.MemoryScanner.Proto.ScanResult { 
-                    Address = 0x1000,
-                    Value = Google.Protobuf.ByteString.CopyFrom(new byte[] { 1, 2, 3, 4 })
-                }}
-            }),
-            Task.FromResult(new Metadata()),
-            () => Status.DefaultSuccess,
-            () => new Metadata(),
-            () => { }
-        ));
-
+        _scannerServiceMock.Setup(x => x.ScanMemoryAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<byte[]>(),
+            It.IsAny<string>(),
+            It.IsAny<List<(ulong start, ulong end)>>()
+        )).ReturnsAsync(new List<ScanResult> { new ScanResult { Addresses = new List<nint> { 0x1000 } } });
+        
         // Setup GetState mock response
-        _clientMock.Setup(x => x.GetStateAsync(
-            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.StateRequest>(),
-            It.IsAny<CallOptions>()
-        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.StateResponse>(
-            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.StateResponse {
-                State = { { "key1", Google.Protobuf.ByteString.CopyFrom(new byte[] { 1, 2, 3 }) } },
-                Version = "test-version"
-            }),
-            Task.FromResult(new Metadata()),
-            () => Status.DefaultSuccess,
-            () => new Metadata(),
-            () => { }
-        ));
-
+        _stateServiceMock.Setup(x => x.GetStateAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>()
+        )).ReturnsAsync((new Dictionary<string, byte[]> { { "key1", new byte[] { 1, 2, 3 } } }, "test-version"));
+        
         // Setup SyncState mock response
-        _clientMock.Setup(x => x.SyncStateAsync(
-            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.SyncRequest>(),
-            It.IsAny<CallOptions>()
-        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.SyncResponse>(
-            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.SyncResponse {
-                Success = true,
-                ErrorMessage = string.Empty,
-                NewVersion = "test-version-2"
-            }),
-            Task.FromResult(new Metadata()),
-            () => Status.DefaultSuccess,
-            () => new Metadata(),
-            () => { }
-        ));
+        _stateServiceMock.Setup(x => x.SyncStateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Dictionary<string, byte[]>>(),
+            It.IsAny<string>()
+        )).ReturnsAsync((true, string.Empty, "test-version-2"));
     }
 
     [Fact]
@@ -129,7 +106,6 @@ public class MemoryScannerGrpcServiceTests : IDisposable
         Assert.NotNull(result.value);
         Assert.True(result.success);
         Assert.Empty(result.error);
-        _processManagerMock.Verify(x => x.EnsureServerRunning(), Times.Once);
     }
 
     [Fact]
@@ -147,7 +123,6 @@ public class MemoryScannerGrpcServiceTests : IDisposable
         // Assert
         Assert.True(result.success);
         Assert.Empty(result.error);
-        _processManagerMock.Verify(x => x.EnsureServerRunning(), Times.Once);
     }
 
     [Fact]
@@ -172,7 +147,6 @@ public class MemoryScannerGrpcServiceTests : IDisposable
         Assert.Single(resultsList);
         Assert.Equal(1, resultsList[0].Addresses.Count);
         Assert.Equal(new nint(0x1000), resultsList[0].Addresses[0]);
-        _processManagerMock.Verify(x => x.EnsureServerRunning(), Times.Once);
     }
 
     [Fact]
@@ -190,7 +164,6 @@ public class MemoryScannerGrpcServiceTests : IDisposable
         Assert.NotNull(result.version);
         Assert.Single(result.state);
         Assert.Equal("test-version", result.version);
-        _processManagerMock.Verify(x => x.EnsureServerRunning(), Times.Once);
     }
 
     [Fact]
@@ -211,14 +184,13 @@ public class MemoryScannerGrpcServiceTests : IDisposable
         Assert.True(result.success);
         Assert.Empty(result.error);
         Assert.Equal("test-version-2", result.newVersion);
-        _processManagerMock.Verify(x => x.EnsureServerRunning(), Times.Once);
     }
 
     [Fact]
     public async Task ShouldHandleServerUnavailableError()
     {
         // Arrange
-        _processManagerMock.Setup(x => x.EnsureServerRunning())
+        _processServiceMock.Setup(x => x.ListProcessesAsync())
             .ThrowsAsync(new Grpc.Core.RpcException(new Grpc.Core.Status(Grpc.Core.StatusCode.Unavailable, "Server unavailable")));
 
         // Act & Assert
@@ -230,25 +202,5 @@ public class MemoryScannerGrpcServiceTests : IDisposable
     public void Dispose()
     {
         _service.Dispose();
-    }
-}
-
-// Helper class to inject the mock client
-public class TestMemoryScannerGrpcService : MemoryScannerGrpcService
-{
-    private readonly BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient _mockClient;
-
-    public TestMemoryScannerGrpcService(
-        ILogger<MemoryScannerGrpcService> logger,
-        IPythonProcessManager processManager,
-        BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient mockClient)
-        : base(logger, processManager)
-    {
-        _mockClient = mockClient;
-    }
-
-    protected override BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient CreateClient(GrpcChannel channel)
-    {
-        return _mockClient;
     }
 }

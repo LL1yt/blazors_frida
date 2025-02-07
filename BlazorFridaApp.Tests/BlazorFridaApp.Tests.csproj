@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorFridaApp\BlazorFridaApp.csproj" />
+    <ProjectReference Include="..\BlazorFridaApp\BlazorFridaApp.csproj" />
   </ItemGroup>
   
 
