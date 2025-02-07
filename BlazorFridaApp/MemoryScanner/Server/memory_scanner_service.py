@@ -26,16 +26,19 @@ tracer = trace.get_tracer(__name__)
 
 class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     def __init__(self):
+        from MemoryScanner.Server import metrics
+        metrics.init_metrics()  # Initialize metrics
+
         self.sessions: Dict[str, FridaMemoryScanner] = {}
         self.scanners: Dict[str, MemoryScanner] = {}
         self.readers: Dict[str, MemoryReader] = {}
         self.writers: Dict[str, MemoryWriter] = {}
         self.freezer_tasks: Dict[str, tuple] = {}
         self.state_versions: Dict[str, str] = {}
-        self.operation_counter = operation_counter
-        self.operation_duration = operation_duration
-        self.error_counter = error_counter
-        self.active_sessions_counter = active_sessions_counter
+        self.operation_counter = metrics.operation_counter
+        self.operation_duration = metrics.operation_duration
+        self.error_counter = metrics.error_counter
+        self.active_sessions_counter = metrics.active_sessions_counter
         logger.info("MemoryScannerService initialized")
 
     async def ListProcesses(self, request: memory_scanner_pb2.Empty, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.ProcessList:
@@ -124,6 +127,11 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 span.set_attribute("scan.type", request.scan_type)
                 span.set_attribute("value.type", request.value_type)
 
+                # Record pattern scan metric before the scan
+                if request.value_type == "pattern":
+                    logger.debug("Recording pattern scan metric")
+                    self.operation_counter.add(1, {"operation": "pattern_scan"})
+
                 results = await scanner.scan(
                     request.value,
                     request.value_type,
@@ -132,15 +140,22 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 duration = time.time() - start_time
                 operation_type = "pattern_scan" if request.value_type == "pattern" else "scan"
-                self.operation_counter.add(1, {"operation": operation_type})
+                if operation_type == "scan":  # Only record normal scan metric if not pattern scan
+                    self.operation_counter.add(1, {"operation": operation_type})
                 self.operation_duration.record(duration, {"operation": operation_type})
 
                 self.state_versions[session_id] = str(uuid.uuid4())
 
                 logger.info(f"{operation_type.title()} completed for session {session_id}, found {len(results)} results")
                 return memory_scanner_pb2.ScanResponse(
-                    addresses=[memory_scanner_pb2.MemoryRegion(address=addr, size=size)
-                              for addr, size in results]
+                    results=[
+                        memory_scanner_pb2.ScanResult(
+                            address=addr,
+                            value=value if isinstance(value, bytes) else str(value).encode('utf-8')
+                        )
+                        for addr, value in results
+                    ],
+                    checkpoint_id=str(uuid.uuid4())
                 )
             except Exception as e:
                 operation_type = "pattern_scan" if request.value_type == "pattern" else "scan"
@@ -336,8 +351,14 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 logger.info(f"Pattern scan completed for session {session_id}, found {len(results)} results")
                 return memory_scanner_pb2.ScanResponse(
-                    addresses=[memory_scanner_pb2.MemoryRegion(address=addr, size=size)
-                              for addr, size in results]
+                    results=[
+                        memory_scanner_pb2.ScanResult(
+                            address=addr,
+                            value=bytes([])  # Pattern scan doesn't return values, just addresses
+                        )
+                        for addr, _ in results
+                    ],
+                    checkpoint_id=str(uuid.uuid4())
                 )
             except Exception as e:
                 self.error_counter.add(1, {"operation": "pattern_scan", "error": str(e)})

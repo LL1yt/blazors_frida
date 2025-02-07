@@ -24,28 +24,32 @@ logger = logging.getLogger(__name__)
 
 class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        # Mock metrics collectors
-        self.active_sessions_counter = MagicMock()
-        self.operation_counter = MagicMock()
-        self.operation_duration = MagicMock()
-        self.error_counter = MagicMock()
+        # Create base mocks with proper async support
+        self.active_sessions_counter = AsyncMock()
+        self.operation_counter = AsyncMock()
+        self.operation_duration = AsyncMock()
+        self.error_counter = AsyncMock()
 
-        # Create patches for metrics
+        # Configure async methods
+        self.active_sessions_counter.add = AsyncMock()
+        self.operation_counter.add = AsyncMock()
+        self.operation_duration.record = AsyncMock()
+        self.error_counter.add = AsyncMock()
+
+        # Create async patches for metrics
         self.patches = [
-            patch(
-                "MemoryScanner.Server.metrics.active_sessions_counter",
-                self.active_sessions_counter,
-            ),
-            patch("MemoryScanner.Server.metrics.operation_counter", self.operation_counter),
-            patch("MemoryScanner.Server.metrics.operation_duration", self.operation_duration),
-            patch("MemoryScanner.Server.metrics.error_counter", self.error_counter),
+            patch('MemoryScanner.Server.metrics.active_sessions_counter', self.active_sessions_counter),
+            patch('MemoryScanner.Server.metrics.operation_counter', self.operation_counter),
+            patch('MemoryScanner.Server.metrics.operation_duration', self.operation_duration),
+            patch('MemoryScanner.Server.metrics.error_counter', self.error_counter),
+            patch('MemoryScanner.Server.metrics.init_metrics')  # Patch init_metrics to do nothing
         ]
 
         # Start all patches
         for p in self.patches:
             p.start()
 
-        # Initialize service
+        # Initialize service after patching metrics
         self.service = MemoryScannerService()
 
         # Mock context
@@ -227,41 +231,72 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         self.operation_duration.record.assert_called_once()
         self.assertIsNotNone(response.checkpoint_id)
 
-    @patch('MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner')
-    async def test_pattern_scanner(self, mock_frida_scanner):
+    @patch('MemoryScanner.Native.scanner.MemoryScanner')
+    async def test_pattern_scanner(self, mock_scanner_class):
         """Test pattern scanning functionality"""
+        # Verify metrics are properly mocked
+        self.assertIs(self.service.operation_counter, self.operation_counter, 
+            "Operation counter not properly initialized from mocked meter")
+        
+        # Reset mock counters before our test
+        self.operation_counter.reset_mock()
+        
         # Arrange
-        mock_instance = AsyncMock()
-        mock_frida_scanner.return_value = mock_instance
-        mock_instance.attach_to_process = AsyncMock()
-
-        # Create mock scanner that will return pattern scan results
-        mock_scanner = AsyncMock()
-        mock_scanner.scan = AsyncMock(return_value=[(0x1000, 8)])  # Mock address and size
+        mock_scanner_instance = AsyncMock()
+        mock_scanner_class.return_value = mock_scanner_instance
+        
+        # Set up mock scan method with AsyncMock
+        async def mock_scan(value, value_type, comparison_type):
+            logger.info(f"Mock scan called with value_type: {value_type}, comparison_type: {comparison_type}")
+            if value_type == "pattern":  # Only return results for pattern scans
+                return [(0x1000, b"")]
+            return []
+            
+        mock_scanner_instance.scan = AsyncMock(side_effect=mock_scan)
         
         # Configure service with mock scanner
-        self.service.scanners["test_session"] = mock_scanner
-        self.service.sessions["test_session"] = mock_instance
+        service = self.service
+        service.scanners["test_session"] = mock_scanner_instance
+        service.sessions["test_session"] = AsyncMock()
 
-        # Convert pattern string to bytes
+        # Create scan request
         pattern = "48 8B ? ? 45 85"
         pattern_bytes = pattern.encode('utf-8')
-
         request = memory_scanner_pb2.ScanRequest(
             session_id="test_session",
+            scan_type="pattern",  # This should match value_type
             value=pattern_bytes,
             value_type="pattern",
-            comparison_type="exact"  # Changed from compare_operation to match proto definition
+            comparison_type="exact"
         )
 
-        # Act
-        response = await self.service.ScanMemory(request, self.context)
+        try:
+            # Act
+            logger.info("Executing ScanMemory request...")
+            response = await service.ScanMemory(request, self.context)
+            logger.info("ScanMemory request completed")
 
-        # Assert
-        self.operation_counter.add.assert_called_with(1, {"operation": "pattern_scan"})
-        self.assertTrue(len(response.addresses) > 0)
-        self.assertEqual(response.addresses[0].address, 0x1000)
-        self.assertEqual(response.addresses[0].size, 8)
+            # Print diagnostic information
+            logger.info(f"Response results: {response.results}")
+            logger.info(f"Operation counter calls: {self.operation_counter.mock_calls}")
+            logger.info(f"Operation counter add method calls: {self.operation_counter.add.mock_calls}")
+
+            # Assert - verify the mock scan was called
+            self.assertTrue(service.operation_counter is self.operation_counter, 
+                "Service operation counter is not the mock counter")
+            
+            # Check that the pattern scan metric was recorded - use assert_called_once_with since we know it should be called exactly once
+            self.operation_counter.add.assert_called_once_with(1, {"operation": "pattern_scan"})
+            
+            # Verify response
+            self.assertTrue(len(response.results) > 0, "No results returned from scan")
+            self.assertEqual(response.results[0].address, 0x1000)
+            self.assertEqual(response.results[0].value, b"")
+        except Exception as e:
+            logger.error(f"Test failed with error: {e}")
+            logger.error(f"Operation counter mock state: {self.operation_counter._mock_return_value}")
+            logger.error(f"All mock calls: {self.operation_counter.mock_calls}")
+            raise
 
     async def test_value_freezer(self):
         """Test value freezing functionality"""
