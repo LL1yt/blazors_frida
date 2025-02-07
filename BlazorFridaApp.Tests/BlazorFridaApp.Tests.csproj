@@ -1,4 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -19,9 +20,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Grpc.AspNetCore.Server.ClientFactory" Version="2.67.0" />
     <PackageReference Include="Grpc.Net.Client" Version="2.67.0" />
-    <PackageReference Include="Google.Protobuf" Version="3.29.3" />
-    <PackageReference Include="Grpc.Tools" Version="2.60.0">
+    <PackageReference Include="Grpc.Tools" Version="2.62.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -29,12 +30,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorFridaApp\BlazorFridaApp.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Protobuf Include="..\BlazorFridaApp\MemoryScanner\Proto\*.proto" GrpcServices="Client" ProtoRoot="..\BlazorFridaApp\MemoryScanner\Proto">
-      <Link>Proto\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </Protobuf>
   </ItemGroup>
 
 </Project>

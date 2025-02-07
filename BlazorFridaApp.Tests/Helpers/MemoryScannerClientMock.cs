@@ -1,10 +1,10 @@
 using Grpc.Core;
-using BlazorFridaApp.MemoryScanner.Proto;
 using Google.Protobuf;
+using BlazorFridaApp.MemoryScanner.Proto;
 
 namespace BlazorFridaApp.Tests.Helpers;
 
-public class MemoryScannerClientMock : Proto.MemoryScanner.MemoryScannerClient
+public class MemoryScannerClientMock : MemoryScanner.MemoryScannerClient
 {
     public override AsyncUnaryCall<ReadResponse> ReadMemoryAsync(
         ReadRequest request, 
