@@ -1,9 +1,10 @@
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
-public class MemoryScannerFacade : IMemoryScannerGrpcService
+public class MemoryScannerFacade : BlazorFridaApp.MemoryScanner.Services.Interfaces.IMemoryScannerGrpcService
 {
     private readonly ProcessGrpcService _processService;
     private readonly MemoryGrpcService _memoryService;
@@ -28,8 +29,11 @@ public class MemoryScannerFacade : IMemoryScannerGrpcService
         _logger = logger;
     }
 
-    public Task<IEnumerable<Models.ProcessInfo>> ListProcessesAsync() =>
-        _processService.GetAccessibleProcessesAsync();
+    public async Task<IEnumerable<Models.ProcessInfo>> ListProcessesAsync()
+    {
+        var processes = await _processService.GetAccessibleProcessesAsync();
+        return processes.AsEnumerable();
+    }
 
     public Task<(bool success, string sessionId)> AttachToProcessAsync(int pid) =>
         _processService.AttachToProcessAsync(pid);
@@ -37,17 +41,28 @@ public class MemoryScannerFacade : IMemoryScannerGrpcService
     public Task DetachFromProcessAsync(string sessionId) =>
         _processService.DetachFromProcessAsync(sessionId);
 
-    public Task<IEnumerable<Models.ScanResult>> ScanMemoryAsync(
+    public async Task<IEnumerable<Models.ScanResult>> ScanMemoryAsync(
         string sessionId, 
         string valueType, 
         byte[] value, 
         string comparisonType, 
-        IEnumerable<(ulong start, ulong end)> ranges) =>
-        _scannerService.ScanAsync(
-            new ProcessInfo { Id = int.Parse(sessionId.Split('-')[0]) },
+        IEnumerable<(ulong start, ulong end)> ranges)
+    {
+        var process = new ProcessInfo { Id = int.Parse(sessionId.Split('-')[0]) };
+        var addresses = await _scannerService.ScanAsync(
+            process,
             System.Text.Encoding.UTF8.GetString(value),
-            0, // scanType будет определяться на основе valueType
+            0,
             new ScanProfile { ComparisonType = comparisonType });
+
+        return addresses.Select(addr => new Models.ScanResult 
+        { 
+            ProcessId = process.Id,
+            Addresses = new List<nint> { new nint(Convert.ToInt64(addr, 16)) },
+            Pattern = value,
+            Mask = string.Empty
+        }).ToList();
+    }
 
     public async Task<(byte[] value, bool success, string error)> ReadMemoryAsync(
         string sessionId,
@@ -62,7 +77,7 @@ public class MemoryScannerFacade : IMemoryScannerGrpcService
         }
         catch (Exception ex)
         {
-            return (Array.Empty<byte>(), false, ex.Message);
+            return (System.Array.Empty<byte>(), false, ex.Message);
         }
     }
 

@@ -84,7 +84,7 @@ try
     builder.Services.AddScoped<FreezeGrpcService>();
 
     // Register facade and interfaces
-    builder.Services.AddScoped<IMemoryScannerGrpcService, MemoryScannerFacade>();
+    builder.Services.AddScoped<BlazorFridaApp.MemoryScanner.Services.Interfaces.IMemoryScannerGrpcService, BlazorFridaApp.MemoryScanner.Services.MemoryScannerFacade>();
     builder.Services.AddScoped<IProcessService>(sp => sp.GetRequiredService<ProcessGrpcService>());
     builder.Services.AddScoped<IMemoryReaderService>(sp => sp.GetRequiredService<MemoryGrpcService>());
     builder.Services.AddScoped<IMemoryScannerService>(sp => sp.GetRequiredService<ScannerGrpcService>());

@@ -1,6 +1,7 @@
 using BlazorFridaApp.MemoryScanner.Services.Base;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using Grpc.Core;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
@@ -22,21 +23,52 @@ public class FreezeGrpcService : BaseGrpcService
         string valueType,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        try
+        var channel = await GetChannelAsync();
+        var client = CreateClient(channel);
+        var request = new Proto.FreezeRequest
         {
-            var channel = await GetChannelAsync();
-            var client = CreateClient(channel);
+            SessionId = sessionId,
+            Address = address,
+            Value = Google.Protobuf.ByteString.CopyFrom(value),
+            ValueType = valueType
+        };
 
-            var request = new Proto.FreezeRequest
+        using var call = client.FreezeValue(request, CreateMetadata(), cancellationToken: cancellationToken);
+        var stream = call.ResponseStream;
+        bool hasError = false;
+
+        while (!hasError && !cancellationToken.IsCancellationRequested)
+        {
+            Proto.FreezeStatus? status = null;
+            bool moveNextSuccess = false;
+
+            try
             {
-                SessionId = sessionId,
-                Address = address,
-                Value = Google.Protobuf.ByteString.CopyFrom(value),
-                ValueType = valueType
-            };
+                moveNextSuccess = await stream.MoveNext(cancellationToken);
+                if (moveNextSuccess)
+                {
+                    status = stream.Current;
+                }
+            }
+            catch (RpcException ex) when (ex.StatusCode != StatusCode.Cancelled)
+            {
+                _logger.LogError(ex, "Error during value freeze streaming for session {SessionId} at address {Address}", 
+                    sessionId, address);
+                hasError = true;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Error during value freeze streaming for session {SessionId} at address {Address}", 
+                    sessionId, address);
+                hasError = true;
+            }
 
-            using var call = client.FreezeValue(request, CreateMetadata(), cancellationToken: cancellationToken);
-            await foreach (var status in call.ResponseStream.ReadAllAsync(cancellationToken))
+            if (!moveNextSuccess)
+            {
+                break;
+            }
+
+            if (status != null)
             {
                 yield return (
                     status.Active,
@@ -44,12 +76,6 @@ public class FreezeGrpcService : BaseGrpcService
                     status.ErrorMessage
                 );
             }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(ex, "Error during value freeze streaming for session {SessionId} at address {Address}", 
-                sessionId, address);
-            yield return (false, Array.Empty<byte>(), ex.Message);
         }
     }
 

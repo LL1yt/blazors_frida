@@ -10,6 +10,7 @@ namespace BlazorFridaApp.MemoryScanner.Models
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;  // Added Path property
 
         public static void ConfigureLogger(ILogger<ProcessInfo> logger)
         {
@@ -42,7 +43,8 @@ namespace BlazorFridaApp.MemoryScanner.Models
                 {
                     Id = process.Id,
                     Name = process.ProcessName,
-                    DisplayName = $"{process.ProcessName} ({process.Id})"
+                    DisplayName = $"{process.ProcessName} ({process.Id})",
+                    Path = process.MainModule?.FileName ?? string.Empty
                 };
 
                 sw.Stop();
