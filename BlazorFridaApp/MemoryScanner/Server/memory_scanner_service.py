@@ -246,6 +246,11 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 await self.operation_counter.add(1, {"operation": "freeze"})
 
+                # Convert request value to int for comparison if it's an integer type
+                expected_value = None
+                if request.value_type in ["int32", "int64", "int16", "int8"]:
+                    expected_value = int.from_bytes(request.value, byteorder='little', signed=True)
+
                 while True:
                     try:
                         # Write the value
@@ -259,6 +264,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                             logger.error(f"Failed to write memory in freeze task for session {session_id}")
                             yield memory_scanner_pb2.FreezeStatus(
                                 active=False,
+                                current_value=request.value,
                                 error_message="Failed to write memory"
                             )
                             break
@@ -269,20 +275,45 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                             request.value_type
                         )
 
-                        # Ensure current_value is bytes
-                        if not isinstance(current_value, bytes):
-                            if isinstance(current_value, str):
-                                current_value = current_value.encode('utf-8')
-                            else:
-                                current_value = str(current_value).encode('utf-8')
+                        # Verify the value based on type
+                        if request.value_type in ["int32", "int64", "int16", "int8"]:
+                            # Convert current value to int
+                            current_int = int.from_bytes(current_value, byteorder='little', signed=True)
+                            
+                            # Convert back to bytes for response
+                            current_value = current_int.to_bytes(len(request.value), byteorder='little', signed=True)
+                            
+                            # Compare integer values
+                            if current_int != expected_value:
+                                logger.error(f"Value mismatch: got {current_int}, expected {expected_value}")
+                                yield memory_scanner_pb2.FreezeStatus(
+                                    active=False,
+                                    current_value=current_value,
+                                    error_message=f"Value mismatch: got {current_int}, expected {expected_value}"
+                                )
+                                break
+                        else:
+                            # For other types, ensure we have bytes
+                            if not isinstance(current_value, bytes):
+                                current_value = current_value if isinstance(current_value, bytes) else str(current_value).encode('utf-8')
 
-                        # Yield status update
+                            # Direct comparison for non-integer types
+                            if current_value != request.value:
+                                yield memory_scanner_pb2.FreezeStatus(
+                                    active=False,
+                                    current_value=current_value,
+                                    error_message="Value mismatch"
+                                )
+                                break
+
+                        # Value matched, yield success status
                         yield memory_scanner_pb2.FreezeStatus(
                             active=True,
                             current_value=current_value
                         )
 
                         await asyncio.sleep(0.1)  # Small delay to prevent excessive CPU usage
+
                     except asyncio.CancelledError:
                         logger.info(f"Freeze task cancelled for session {session_id} at address {request.address}")
                         break
@@ -290,6 +321,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                         logger.error(f"Error in freeze task for session {session_id}", exc_info=e)
                         yield memory_scanner_pb2.FreezeStatus(
                             active=False,
+                            current_value=request.value,
                             error_message=str(e)
                         )
                         break
@@ -299,6 +331,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 logger.error(f"Failed to start freeze task for session {session_id}", exc_info=e)
                 yield memory_scanner_pb2.FreezeStatus(
                     active=False,
+                    current_value=request.value,
                     error_message=str(e)
                 )
 
