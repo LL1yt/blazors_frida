@@ -100,8 +100,19 @@ try
 
     // Add database context and initialization service
     builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        if (options == null)
+            throw new ArgumentNullException(nameof(options));
+
         options.UseSqlite("Data Source=gamememory.db",
-            sqliteOptions => sqliteOptions.MigrationsAssembly("BlazorFridaApp")));
+            sqliteOptions => 
+            {
+                if (sqliteOptions == null)
+                    throw new ArgumentNullException(nameof(sqliteOptions));
+                    
+                sqliteOptions.MigrationsAssembly("BlazorFridaApp");
+            });
+    });
     builder.Services.AddScoped<IDatabaseInitializationService, DatabaseInitializationService>();
 
     // Add memory cleanup service
@@ -160,15 +171,20 @@ try
     {
         ResponseWriter = async (context, report) =>
         {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+            if (report == null)
+                throw new ArgumentNullException(nameof(report));
+
             context.Response.ContentType = "application/json";
             var result = new
             {
                 status = report.Status.ToString(),
                 checks = report.Entries.Select(e => new
                 {
-                    name = e.Key,
+                    name = e.Key ?? "Unknown",
                     status = e.Value.Status.ToString(),
-                    description = e.Value.Description,
+                    description = e.Value.Description ?? string.Empty,
                     duration = e.Value.Duration.ToString()
                 })
             };
@@ -179,6 +195,9 @@ try
     // Global exception handler
     AppDomain.CurrentDomain.UnhandledException += (sender, error) =>
     {
+        if (error?.ExceptionObject == null)
+            return;
+
         Log.Fatal(error.ExceptionObject as Exception, "Unhandled application error");
     };
 

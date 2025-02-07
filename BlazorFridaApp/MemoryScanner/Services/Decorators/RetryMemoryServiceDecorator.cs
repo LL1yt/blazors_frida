@@ -1,4 +1,5 @@
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using BlazorFridaApp.MemoryScanner.Exceptions;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
@@ -40,49 +41,70 @@ public class RetryMemoryServiceDecorator : IMemoryReaderService
                 });
     }
 
+    private async Task<T> ExecuteWithRetry<T>(Func<Task<T>> operation, string operationName)
+    {
+        try
+        {
+            return await _retryPolicy.ExecuteAsync(operation);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to execute {Operation} after all retry attempts", operationName);
+            throw new MemoryScanException($"Failed to execute {operationName}: {ex.Message}", ex);
+        }
+    }
+
+    private async Task ExecuteWithRetry(Func<Task> operation, string operationName)
+    {
+        try
+        {
+            await _retryPolicy.ExecuteAsync(operation);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to execute {Operation} after all retry attempts", operationName);
+            throw new MemoryScanException($"Failed to execute {operationName}: {ex.Message}", ex);
+        }
+    }
+
     public void OpenProcess(int processId)
     {
         try
         {
             _inner.OpenProcess(processId);
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException ex)
         {
-            _logger.LogError(ex, "Failed to open process {ProcessId}", processId);
-            throw;
+            throw new ProcessAccessException($"Access denied when trying to open process {processId}", ex);
         }
     }
 
-    public async Task<byte[]> ReadMemoryBytes(nint address, int length)
+    public async Task<byte[]> ReadMemoryBytes(IntPtr address, int size)
     {
-        return await _retryPolicy.ExecuteAsync(async () =>
+        try
         {
-            try
-            {
-                return await _inner.ReadMemoryBytes(address, length);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error reading memory at address {Address}", address);
-                throw;
-            }
-        });
+            return await ExecuteWithRetry(
+                () => _inner.ReadMemoryBytes(address, size),
+                "ReadMemoryBytes");
+        }
+        catch (Exception ex) when (ex is not MemoryScanException)
+        {
+            throw new MemoryScanException($"Failed to read memory at address {address}: {ex.Message}", ex);
+        }
     }
 
-    public async Task WriteMemoryBytes(nint address, byte[] value)
+    public async Task WriteMemoryBytes(IntPtr address, byte[] bytes)
     {
-        await _retryPolicy.ExecuteAsync(async () =>
+        try
         {
-            try
-            {
-                await _inner.WriteMemoryBytes(address, value);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error writing memory at address {Address}", address);
-                throw;
-            }
-        });
+            await ExecuteWithRetry(
+                () => _inner.WriteMemoryBytes(address, bytes),
+                "WriteMemoryBytes");
+        }
+        catch (Exception ex) when (ex is not MemoryWriteException)
+        {
+            throw new MemoryWriteException($"Failed to write memory at address {address}: {ex.Message}", ex);
+        }
     }
 
     public ValueTask DisposeAsync()

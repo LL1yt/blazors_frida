@@ -15,9 +15,9 @@ namespace BlazorFridaApp.Services
             IProcessService processService,
             ILogger<MemoryCleanupService> logger)
         {
-            _memoryReader = memoryReader;
-            _processService = processService;
-            _logger = logger;
+            _memoryReader = memoryReader ?? throw new ArgumentNullException(nameof(memoryReader));
+            _processService = processService ?? throw new ArgumentNullException(nameof(processService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task CleanupAsync()

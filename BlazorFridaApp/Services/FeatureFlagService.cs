@@ -18,7 +18,7 @@ public class FeatureFlagService : IFeatureFlagService
 
     public FeatureFlagService(IConfiguration configuration)
     {
-        _configuration = configuration;
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _random = new Random();
     }
 
@@ -29,16 +29,25 @@ public class FeatureFlagService : IFeatureFlagService
 
     public bool IsOperationEnabled(string operationType)
     {
+        if (string.IsNullOrEmpty(operationType))
+            throw new ArgumentException("Operation type cannot be null or empty", nameof(operationType));
+
         return _configuration.GetValue<bool>($"FeatureFlags:Operations:{operationType}:UseNewImplementation");
     }
 
     public int GetOperationTrafficPercentage(string operationType)
     {
+        if (string.IsNullOrEmpty(operationType))
+            throw new ArgumentException("Operation type cannot be null or empty", nameof(operationType));
+
         return _configuration.GetValue<int>($"FeatureFlags:Operations:{operationType}:TrafficPercentage");
     }
 
     public bool ShouldUseNewImplementation(string operationType)
     {
+        if (string.IsNullOrEmpty(operationType))
+            throw new ArgumentException("Operation type cannot be null or empty", nameof(operationType));
+
         if (!IsGrpcServiceEnabled()) return false;
         if (!IsOperationEnabled(operationType)) return false;
 
@@ -52,6 +61,9 @@ public class FeatureFlagService : IFeatureFlagService
 
     public bool IsMonitoringEnabled(string monitoringType)
     {
+        if (string.IsNullOrEmpty(monitoringType))
+            throw new ArgumentException("Monitoring type cannot be null or empty", nameof(monitoringType));
+
         return _configuration.GetValue<bool>($"FeatureFlags:Monitoring:{monitoringType}Enabled");
     }
 }

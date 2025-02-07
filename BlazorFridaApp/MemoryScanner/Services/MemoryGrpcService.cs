@@ -24,6 +24,11 @@ public class MemoryGrpcService : BaseGrpcService, IMemoryReaderService
 
     public void OpenProcess(int processId)
     {
+        if (processId <= 0)
+        {
+            throw new ArgumentException("Process ID must be a positive number", nameof(processId));
+        }
+
         _memoryLogger.LogInformation("Opening process with ID: {ProcessId}", processId);
         
         try
@@ -40,6 +45,21 @@ public class MemoryGrpcService : BaseGrpcService, IMemoryReaderService
 
     public async Task<byte[]> ReadMemoryBytes(nint address, int length)
     {
+        if (address == nint.Zero)
+        {
+            throw new ArgumentException("Memory address cannot be zero", nameof(address));
+        }
+        
+        if (length <= 0)
+        {
+            throw new ArgumentException("Length must be a positive number", nameof(length));
+        }
+
+        if (_processHandle == nint.Zero)
+        {
+            throw new InvalidOperationException("Process handle is not initialized. Call OpenProcess first.");
+        }
+
         _memoryLogger.LogInformation("Reading {Size} bytes from process at address {Address}", length, address);
         
         try

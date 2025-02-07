@@ -9,11 +9,16 @@ namespace BlazorFridaApp.Services
 
         public NotificationService(Radzen.NotificationService radzenNotificationService)
         {
-            _radzenNotificationService = radzenNotificationService;
+            _radzenNotificationService = radzenNotificationService ?? throw new ArgumentNullException(nameof(radzenNotificationService));
         }
 
         public void ShowInfo(string title, string message)
         {
+            if (string.IsNullOrEmpty(title))
+                throw new ArgumentException("Title cannot be null or empty", nameof(title));
+            if (string.IsNullOrEmpty(message))
+                throw new ArgumentException("Message cannot be null or empty", nameof(message));
+
             _radzenNotificationService.Notify(new NotificationMessage
             {
                 Severity = NotificationSeverity.Info,
@@ -25,6 +30,11 @@ namespace BlazorFridaApp.Services
 
         public void ShowWarning(string title, string message)
         {
+            if (string.IsNullOrEmpty(title))
+                throw new ArgumentException("Title cannot be null or empty", nameof(title));
+            if (string.IsNullOrEmpty(message))
+                throw new ArgumentException("Message cannot be null or empty", nameof(message));
+
             _radzenNotificationService.Notify(new NotificationMessage
             {
                 Severity = NotificationSeverity.Warning,
@@ -36,6 +46,11 @@ namespace BlazorFridaApp.Services
 
         public void ShowError(string title, string message, Exception? exception = null)
         {
+            if (string.IsNullOrEmpty(title))
+                throw new ArgumentException("Title cannot be null or empty", nameof(title));
+            if (string.IsNullOrEmpty(message))
+                throw new ArgumentException("Message cannot be null or empty", nameof(message));
+
             var detail = exception != null ? $"{message}\n{exception.Message}" : message;
             _radzenNotificationService.Notify(new NotificationMessage
             {
@@ -48,6 +63,11 @@ namespace BlazorFridaApp.Services
 
         public void ShowSuccess(string title, string message)
         {
+            if (string.IsNullOrEmpty(title))
+                throw new ArgumentException("Title cannot be null or empty", nameof(title));
+            if (string.IsNullOrEmpty(message))
+                throw new ArgumentException("Message cannot be null or empty", nameof(message));
+
             _radzenNotificationService.Notify(new NotificationMessage
             {
                 Severity = NotificationSeverity.Success,

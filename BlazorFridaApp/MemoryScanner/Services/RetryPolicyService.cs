@@ -18,6 +18,11 @@ public class RetryPolicyService
 
     public AsyncRetryPolicy<T> CreateAsyncRetryPolicy<T>()
     {
+        if (typeof(T) == null)
+        {
+            throw new ArgumentNullException(nameof(T), "Generic type parameter cannot be null");
+        }
+
         return Policy<T>
             .Handle<SocketException>()
             .Or<TimeoutException>()
