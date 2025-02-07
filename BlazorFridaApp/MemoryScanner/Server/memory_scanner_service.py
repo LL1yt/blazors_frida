@@ -9,18 +9,16 @@ from opentelemetry.trace.status import Status, StatusCode
 
 import sys
 sys.path.append('../Proto')
-sys.path.append('../Base')
+sys.path.append('../Native')
 sys.path.append('../Operations')
 
-import memory_scanner_pb2
-import memory_scanner_pb2_grpc
-import health_pb2
-from metrics import active_sessions_counter, operation_counter, operation_duration, error_counter
-from frida_module import FridaMemoryScanner
-from process_list import get_process_list
-from scanner import MemoryScanner
-from reader import MemoryReader
-from writer import MemoryWriter
+from MemoryScanner.Native import memory_scanner_pb2, memory_scanner_pb2_grpc, health_pb2
+from MemoryScanner.Native.frida_module import FridaMemoryScanner
+from MemoryScanner.Native.process_list import get_process_list
+from MemoryScanner.Native.scanner import MemoryScanner
+from MemoryScanner.Native.reader import MemoryReader
+from MemoryScanner.Native.writer import MemoryWriter
+from MemoryScanner.Server.metrics import active_sessions_counter, operation_counter, operation_duration, error_counter
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)

@@ -12,7 +12,6 @@ MemoryScanner/Native/frida_module.py
 MemoryScanner/Native/generate_protos.py
 MemoryScanner/Native/health_pb2.py
 MemoryScanner/Native/health_pb2_grpc.py
-MemoryScanner/Native/health_service.py
 MemoryScanner/Native/memory_scanner_pb2.py
 MemoryScanner/Native/memory_scanner_pb2_grpc.py
 MemoryScanner/Native/process_list.py
@@ -27,6 +26,7 @@ MemoryScanner/Proto/__init__.py
 MemoryScanner/Proto/health.proto
 MemoryScanner/Proto/memory_scanner.proto
 MemoryScanner/Server/__init__.py
+MemoryScanner/Server/health_service.py
 MemoryScanner/Server/main.py
 MemoryScanner/Server/memory_scanner_service.py
 MemoryScanner/Server/metrics.py

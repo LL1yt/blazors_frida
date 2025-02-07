@@ -21,18 +21,16 @@ class BuildPyCommand(build_py):
         super().run()
 
 setup(
-    name='MemoryScanner',
-    version='1.0',
+    name="MemoryScanner",
+    version="1.0.0",
     packages=find_packages(),
-    package_data={
-        'MemoryScanner.Proto': ['*.pyi', '*.proto'],
-    },
     install_requires=[
-        'grpcio',
-        'grpcio-tools',
-        'opentelemetry-sdk'
+        "grpcio",
+        "opentelemetry-api",
+        "opentelemetry-sdk",
+        "opentelemetry-instrumentation-grpc",
+        "python-json-logger",
+        "frida"
     ],
-    cmdclass={
-        'build_py': BuildPyCommand,
-    },
+    python_requires=">=3.7",
 )

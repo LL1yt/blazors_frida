@@ -1,3 +1,6 @@
 grpcio
-grpcio-tools
+opentelemetry-api
 opentelemetry-sdk
+opentelemetry-instrumentation-grpc
+python-json-logger
+frida

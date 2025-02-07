@@ -3,18 +3,21 @@ import asyncio
 import logging
 import signal
 import sys
+import os
 from concurrent import futures
 from grpc import aio
 
-sys.path.append('../Proto')
+# Change to the script's directory and add parent paths
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append('../Native')
 
 import health_pb2
 import health_pb2_grpc
 import memory_scanner_pb2_grpc
 from MemoryScanner.Server.memory_scanner_service import MemoryScannerService
-from health_service import HealthServicer
-from telemetry import setup_telemetry
+from MemoryScanner.Server.health_service import HealthServicer
+from MemoryScanner.Server.telemetry import setup_telemetry
 
 # Global server reference
 server = None
