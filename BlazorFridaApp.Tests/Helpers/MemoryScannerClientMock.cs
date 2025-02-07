@@ -4,7 +4,7 @@ using BlazorFridaApp.MemoryScanner.Proto;
 
 namespace BlazorFridaApp.Tests.Helpers;
 
-public class MemoryScannerClientMock : MemoryScanner.MemoryScannerClient
+public class MemoryScannerClientMock : BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient
 {
     public override AsyncUnaryCall<ReadResponse> ReadMemoryAsync(
         ReadRequest request, 

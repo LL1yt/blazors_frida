@@ -1,9 +1,10 @@
 using Grpc.Core;
+using Google.Protobuf;
 using BlazorFridaApp.MemoryScanner.Proto;
 
 namespace BlazorFridaApp.Tests.Helpers;
 
-public class MemoryScannerClientErrorMock : MemoryScanner.MemoryScannerClient
+public class MemoryScannerClientErrorMock : BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient
 {
     private static RpcException CreateError(string message) => 
         new(new Status(StatusCode.Internal, message));
