@@ -7,19 +7,15 @@ import grpc
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
 
-import sys
-sys.path.append('../Server')
-sys.path.append('../Proto')
-
-import memory_scanner_pb2
-from memory_scanner_service import MemoryScannerService
 import argparse
 import sqlite3
 import os
 import time
-from scanner import MemoryScanner
-from writer import MemoryWriter
-from state_manager import StateManager
+from MemoryScanner.Server.memory_scanner_service import MemoryScannerService
+from MemoryScanner.Proto import memory_scanner_pb2
+from MemoryScanner.Native.scanner import MemoryScanner
+from MemoryScanner.Native.writer import MemoryWriter
+from MemoryScanner.Native.state_manager import StateManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -67,7 +63,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         request = memory_scanner_pb2.ProcessRequest(pid=1234)
 
         # Act
-        with patch("memory_scanner_service.FridaMemoryScanner") as mock_frida:
+        with patch("MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner") as mock_frida:
             instance = mock_frida.return_value
 
             async def mock_attach(pid):
@@ -90,7 +86,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         request = memory_scanner_pb2.ProcessRequest(pid=1234)
 
         # Act
-        with patch("memory_scanner_service.FridaMemoryScanner") as mock_frida:
+        with patch("MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner") as mock_frida:
             instance = mock_frida.return_value
 
             async def mock_attach(pid):
@@ -118,7 +114,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        with patch("memory_scanner_service.MemoryWriter") as mock_writer:
+        with patch("MemoryScanner.Server.memory_scanner_service.MemoryWriter") as mock_writer:
             instance = mock_writer.return_value
 
             async def mock_write(address, value, value_type):
@@ -145,7 +141,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        with patch("memory_scanner_service.MemoryWriter") as mock_writer:
+        with patch("MemoryScanner.Server.memory_scanner_service.MemoryWriter") as mock_writer:
             instance = mock_writer.return_value
 
             async def mock_write(address, value, value_type):
@@ -174,7 +170,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        with patch("memory_scanner_service.MemoryReader") as mock_reader:
+        with patch("MemoryScanner.Server.memory_scanner_service.MemoryReader") as mock_reader:
             instance = mock_reader.return_value
 
             async def mock_read(address, size, value_type):
@@ -208,7 +204,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        with patch("memory_scanner_service.MemoryScanner") as mock_scanner:
+        with patch("MemoryScanner.Server.memory_scanner_service.MemoryScanner") as mock_scanner:
             instance = mock_scanner.return_value
 
             async def mock_scan(*args, **kwargs):
@@ -230,34 +226,28 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         self.operation_duration.record.assert_called_once()
         self.assertIsNotNone(response.checkpoint_id)
 
-    async def test_pattern_scanner(self):
+    @patch('MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner')
+    async def test_pattern_scanner(self, mock_scanner):
         """Test pattern scanning functionality"""
         # Arrange
-        attach_response = await self.service.AttachToProcess(
-            memory_scanner_pb2.ProcessRequest(pid=1234), self.context
-        )
+        attach_request = memory_scanner_pb2.ProcessRequest(pid=1234)
+        attach_response = await self.service.AttachToProcess(attach_request, self.context)
         session_id = attach_response.session_id
-        pattern = "48 8B ? ? 45 85"  # Test pattern
 
         request = memory_scanner_pb2.ScanRequest(
             session_id=session_id,
-            value_type="pattern",
-            value=pattern.encode(),
-            comparison_type="pattern",
-            ranges=[],
+            scan_type='pattern',
+            value_type='bytes',
+            value=b"48 8B ? ? 45 85",
+            comparison_type='pattern',
+            ranges=[]
         )
 
         # Act
-        with patch("memory_scanner_service.MemoryScanner") as mock_scanner:
-            instance = mock_scanner.return_value
-
-            async def mock_scan(*args, **kwargs):
-                current_span = trace.get_current_span()
-                current_span.set_attribute("pattern.value", pattern)
-                return [{"address": 0x1000, "value": pattern}]
-
-            instance.scan = mock_scan
-            response = await self.service.ScanMemory(request, self.context)
+        mock_scanner_instance = AsyncMock()
+        mock_scanner.return_value = mock_scanner_instance
+        mock_scanner_instance.scan_pattern = AsyncMock(return_value=[{"address": 0x1000, "value": b"48 8B ? ? 45 85"}])
+        response = await self.service.ScanMemory(request, self.context)
 
         # Assert
         self.operation_counter.add.assert_called_once_with(

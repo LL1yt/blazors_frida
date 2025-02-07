@@ -61,10 +61,11 @@ message DetachResponse {
 // Scanning messages
 message ScanRequest {
   string session_id = 1;
-  string value_type = 2;
-  bytes value = 3;
-  string comparison_type = 4;
-  repeated AddressRange ranges = 5;
+  string scan_type = 2;
+  string value_type = 3;
+  bytes value = 4;
+  string comparison_type = 5;
+  repeated AddressRange ranges = 6;
 }
 
 message AddressRange {
