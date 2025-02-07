@@ -6,7 +6,6 @@ import grpc
 from grpc import aio
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
-import time
 
 import sys
 sys.path.append('../Proto')
@@ -339,21 +338,10 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 scanner = self.scanners[session_id]
                 span.set_attribute("pattern", request.pattern)
 
-                try:
-                    start_time = time.monotonic()
-                    results = await scanner.scan_pattern(
-                        request.pattern,
-                        request.mask,
-                        request.size,
-                        request.flags
-                    )
-                    duration = time.monotonic() - start_time
-                    self.operation_duration.record(duration, {"operation": "pattern_scan"})
-                    self.operation_counter.add(1, {"operation": "pattern_scan"})
-                except Exception as e:
-                    self.error_counter.add(1, {"operation": "pattern_scan"})
-                    raise
+                with self.operation_duration.time({"operation": "pattern_scan"}):
+                    results = await scanner.pattern_scan(request.pattern)
 
+                self.operation_counter.add(1, {"operation": "pattern_scan"})
                 self.state_versions[session_id] = str(uuid.uuid4())
 
                 logger.info(f"Pattern scan completed for session {session_id}, found {len(results)} results")
@@ -362,6 +350,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                               for addr, size in results]
                 )
             except Exception as e:
+                self.error_counter.add(1, {"operation": "pattern_scan", "error": str(e)})
                 logger.error(f"Failed to perform pattern scan for session {session_id}", exc_info=e)
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))

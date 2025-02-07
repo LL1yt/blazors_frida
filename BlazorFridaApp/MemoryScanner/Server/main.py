@@ -12,7 +12,7 @@ sys.path.append('../Native')
 import health_pb2
 import health_pb2_grpc
 import memory_scanner_pb2_grpc
-from memory_scanner_service import MemoryScannerService
+from MemoryScanner.Server.memory_scanner_service import MemoryScannerService
 from health_service import HealthServicer
 from telemetry import setup_telemetry
 
