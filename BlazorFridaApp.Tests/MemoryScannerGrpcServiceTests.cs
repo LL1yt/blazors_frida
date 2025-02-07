@@ -15,24 +15,21 @@ namespace BlazorFridaApp.Tests;
 public class MemoryScannerGrpcServiceTests
 {
     private readonly Mock<ILogger<MemoryScannerFacade>> _loggerMock;
-    private readonly Mock<ProcessGrpcService> _processServiceMock;
-    private readonly Mock<MemoryGrpcService> _memoryServiceMock;
-    private readonly Mock<ScannerGrpcService> _scannerServiceMock;
-    private readonly Mock<StateGrpcService> _stateServiceMock;
-    private readonly Mock<FreezeGrpcService> _freezeServiceMock;
+    private readonly Mock<IProcessGrpcService> _processServiceMock;
+    private readonly Mock<IMemoryGrpcService> _memoryServiceMock;
+    private readonly Mock<IScannerGrpcService> _scannerServiceMock;
+    private readonly Mock<IStateGrpcService> _stateServiceMock;
+    private readonly Mock<IFreezeGrpcService> _freezeServiceMock;
     private readonly IMemoryScannerGrpcService _service;
 
     public MemoryScannerGrpcServiceTests()
     {
-        var mockLogger = new Mock<ILogger<ProcessGrpcService>>();
-        var mockPythonManager = new Mock<IPythonProcessManager>();
-        
         _loggerMock = new Mock<ILogger<MemoryScannerFacade>>();
-        _processServiceMock = new Mock<ProcessGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
-        _memoryServiceMock = new Mock<MemoryGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
-        _scannerServiceMock = new Mock<ScannerGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
-        _stateServiceMock = new Mock<StateGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
-        _freezeServiceMock = new Mock<FreezeGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
+        _processServiceMock = new Mock<IProcessGrpcService>();
+        _memoryServiceMock = new Mock<IMemoryGrpcService>();
+        _scannerServiceMock = new Mock<IScannerGrpcService>();
+        _stateServiceMock = new Mock<IStateGrpcService>();
+        _freezeServiceMock = new Mock<IFreezeGrpcService>();
         
         SetupMockResponses();
         
