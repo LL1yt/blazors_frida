@@ -1,18 +1,18 @@
-using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
+using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
-using BlazorFridaApp.MemoryScanner.Models;
+using BlazorFridaApp.Tests.Helpers;
+using Grpc.Core;
+using Grpc.Net.Client;
+using Microsoft.Extensions.Logging;
+using Moq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using BlazorFridaApp.Tests.Helpers;
-using Grpc.Net.Client;
-using Grpc.Core;
+using Xunit;
 
 namespace BlazorFridaApp.Tests;
 
-public class MemoryScannerGrpcServiceTests : IDisposable
+public class MemoryScannerGrpcServiceTests
 {
     private readonly Mock<ILogger<MemoryScannerFacade>> _loggerMock;
     private readonly Mock<ProcessGrpcService> _processServiceMock;
@@ -24,12 +24,15 @@ public class MemoryScannerGrpcServiceTests : IDisposable
 
     public MemoryScannerGrpcServiceTests()
     {
+        var mockLogger = new Mock<ILogger<ProcessGrpcService>>();
+        var mockPythonManager = new Mock<IPythonProcessManager>();
+        
         _loggerMock = new Mock<ILogger<MemoryScannerFacade>>();
-        _processServiceMock = new Mock<ProcessGrpcService>();
-        _memoryServiceMock = new Mock<MemoryGrpcService>();
-        _scannerServiceMock = new Mock<ScannerGrpcService>();
-        _stateServiceMock = new Mock<StateGrpcService>();
-        _freezeServiceMock = new Mock<FreezeGrpcService>();
+        _processServiceMock = new Mock<ProcessGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
+        _memoryServiceMock = new Mock<MemoryGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
+        _scannerServiceMock = new Mock<ScannerGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
+        _stateServiceMock = new Mock<StateGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
+        _freezeServiceMock = new Mock<FreezeGrpcService>(MockBehavior.Loose, mockLogger.Object, mockPythonManager.Object);
         
         SetupMockResponses();
         
@@ -46,43 +49,41 @@ public class MemoryScannerGrpcServiceTests : IDisposable
     private void SetupMockResponses()
     {
         // Setup mock responses for individual services
-        _processServiceMock.Setup(x => x.ListProcessesAsync())
-            .ReturnsAsync(new List<ProcessInfo> { new ProcessInfo(1234, "test.exe") });
+        var testProcess = new ProcessInfo { Id = 1234, Name = "test.exe" };
+        _processServiceMock.Setup(x => x.GetAccessibleProcessesAsync())
+            .ReturnsAsync(new List<ProcessInfo> { testProcess });
+            
+        _processServiceMock.Setup(x => x.GetTargetProcessAsync())
+            .ReturnsAsync(testProcess);
             
         _processServiceMock.Setup(x => x.AttachToProcessAsync(It.IsAny<int>()))
-            .ReturnsAsync(("test-session", true));
-            
-        _memoryServiceMock.Setup(x => x.ReadMemoryAsync(
+            .ReturnsAsync((true, "test-session"));
+
+        _memoryServiceMock.Setup(x => x.ReadMemoryBytes(
             It.IsAny<string>(),
             It.IsAny<ulong>(),
-            It.IsAny<int>(),
-            It.IsAny<string>()
+            It.IsAny<int>()
         )).ReturnsAsync((new byte[] { 1, 2, 3, 4 }, true, string.Empty));
         
-        // Setup WriteMemory mock response
-        _memoryServiceMock.Setup(x => x.WriteMemoryAsync(
+        _memoryServiceMock.Setup(x => x.WriteMemoryBytes(
             It.IsAny<string>(),
             It.IsAny<ulong>(),
-            It.IsAny<byte[]>(),
-            It.IsAny<string>()
+            It.IsAny<byte[]>()
         )).ReturnsAsync((true, string.Empty));
         
-        // Setup ScanMemory mock response
-        _scannerServiceMock.Setup(x => x.ScanMemoryAsync(
+        _scannerServiceMock.Setup(x => x.ScanAsync(
             It.IsAny<string>(),
             It.IsAny<string>(),
             It.IsAny<byte[]>(),
             It.IsAny<string>(),
-            It.IsAny<List<(ulong start, ulong end)>>()
+            It.IsAny<IEnumerable<(ulong start, ulong end)>>()
         )).ReturnsAsync(new List<ScanResult> { new ScanResult { Addresses = new List<nint> { 0x1000 } } });
         
-        // Setup GetState mock response
         _stateServiceMock.Setup(x => x.GetStateAsync(
             It.IsAny<string>(),
             It.IsAny<string>()
         )).ReturnsAsync((new Dictionary<string, byte[]> { { "key1", new byte[] { 1, 2, 3 } } }, "test-version"));
         
-        // Setup SyncState mock response
         _stateServiceMock.Setup(x => x.SyncStateAsync(
             It.IsAny<string>(),
             It.IsAny<Dictionary<string, byte[]>>(),
@@ -103,8 +104,8 @@ public class MemoryScannerGrpcServiceTests : IDisposable
         var result = await _service.ReadMemoryAsync(sessionId, address, size, valueType);
 
         // Assert
-        Assert.NotNull(result.value);
         Assert.True(result.success);
+        Assert.Equal(4, result.value.Length);
         Assert.Empty(result.error);
     }
 
@@ -145,7 +146,7 @@ public class MemoryScannerGrpcServiceTests : IDisposable
         Assert.NotNull(results);
         var resultsList = results.ToList();
         Assert.Single(resultsList);
-        Assert.Equal(1, resultsList[0].Addresses.Count);
+        Assert.Single(resultsList[0].Addresses);
         Assert.Equal(new nint(0x1000), resultsList[0].Addresses[0]);
     }
 
@@ -190,17 +191,12 @@ public class MemoryScannerGrpcServiceTests : IDisposable
     public async Task ShouldHandleServerUnavailableError()
     {
         // Arrange
-        _processServiceMock.Setup(x => x.ListProcessesAsync())
-            .ThrowsAsync(new Grpc.Core.RpcException(new Grpc.Core.Status(Grpc.Core.StatusCode.Unavailable, "Server unavailable")));
+        _processServiceMock.Setup(x => x.GetAccessibleProcessesAsync())
+            .ThrowsAsync(new RpcException(new Status(StatusCode.Unavailable, "Server unavailable")));
 
         // Act & Assert
         var result = await _service.ReadMemoryAsync("test", 0x1000, 4, "int32");
         Assert.False(result.success);
         Assert.Contains("Server unavailable", result.error);
-    }
-
-    public void Dispose()
-    {
-        _service.Dispose();
     }
 }
