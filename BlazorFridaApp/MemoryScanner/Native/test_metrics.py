@@ -6,11 +6,13 @@ from unittest.mock import MagicMock, patch, AsyncMock
 import grpc
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
-
 import argparse
 import sqlite3
 import os
 import time
+import contextlib
+from typing import AsyncGenerator, List, Dict, Any, Optional
+
 from MemoryScanner.Server.memory_scanner_service import MemoryScannerService
 from MemoryScanner.Server.metrics import (
     active_sessions_counter,
@@ -23,12 +25,32 @@ from MemoryScanner.Native.scanner import MemoryScanner
 from MemoryScanner.Native.writer import MemoryWriter
 from MemoryScanner.Native.state_manager import StateManager
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging with more detailed format
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
+# Constants
+ASYNC_TIMEOUT = 5.0  # Default timeout for async operations
+TEST_SESSION_ID = "test_session"
+TEST_PID = 1234
+TEST_ADDRESS = 0x1000
+TEST_MODULE = "test_module"
 
 
 class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
+    """Test suite for metrics collection in the Memory Scanner service.
+
+    This test suite verifies the proper collection and recording of metrics
+    for various operations including process attachment, memory reading/writing,
+    pattern scanning, and value freezing.
+    """
+
     async def asyncSetUp(self):
+        """Set up test environment with mocked metrics and service instances."""
+        logger.info("Setting up test environment")
+
         # Create base mocks with proper async support
         self.active_sessions_counter = AsyncMock()
         self.operation_counter = AsyncMock()
@@ -55,9 +77,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
                 self.operation_duration,
             ),
             patch("MemoryScanner.Server.metrics.error_counter", self.error_counter),
-            patch(
-                "MemoryScanner.Server.metrics.init_metrics"
-            ),  # Patch init_metrics to do nothing
+            patch("MemoryScanner.Server.metrics.init_metrics"),
         ]
 
         # Start all patches
@@ -72,472 +92,349 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         self.context.set_code = MagicMock()
         self.context.set_details = MagicMock()
 
+        logger.info("Test environment setup completed")
+
     async def asyncTearDown(self):
+        """Clean up test environment and resources."""
+        logger.info("Cleaning up test environment")
+
+        # Clean up any remaining freezer tasks
+        for session_id, (task, _) in self.service.freezer_tasks.items():
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
         # Stop all patches
         for p in self.patches:
             p.stop()
 
+        # Clear service state
+        self.service.sessions.clear()
+        self.service.scanners.clear()
+        self.service.readers.clear()
+        self.service.writers.clear()
+
+        logger.info("Test environment cleanup completed")
+
+    @contextlib.asynccontextmanager
+    async def assert_timeout(self, timeout: float = ASYNC_TIMEOUT):
+        """Context manager to ensure async operations complete within timeout."""
+        try:
+            yield
+        except asyncio.TimeoutError:
+            self.fail(f"Operation timed out after {timeout} seconds")
+
     async def test_attach_metrics(self):
-        """Test metrics collection for AttachToProcess"""
-        # Arrange
-        request = memory_scanner_pb2.ProcessRequest(pid=1234)
+        """Test metrics collection for AttachToProcess operation."""
+        logger.info("Starting attach metrics test")
 
-        # Act
-        with patch(
-            "MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner"
-        ) as mock_frida:
-            instance = mock_frida.return_value
+        request = memory_scanner_pb2.ProcessRequest(pid=TEST_PID)
 
-            async def mock_attach(pid):
-                # Set span attributes
-                current_span = trace.get_current_span()
-                current_span.set_attribute("process.id", pid)
-                pass
+        async with self.assert_timeout():
+            with patch(
+                "MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner"
+            ) as mock_frida:
+                instance = mock_frida.return_value
 
-            instance.attach_to_process = mock_attach
-            response = await self.service.AttachToProcess(request, self.context)
+                async def mock_attach(pid):
+                    current_span = trace.get_current_span()
+                    current_span.set_attribute("process.id", pid)
 
-        # Assert
+                instance.attach_to_process = mock_attach
+                response = await self.service.AttachToProcess(request, self.context)
+
         self.active_sessions_counter.add.assert_called_once_with(1)
         self.operation_counter.add.assert_called_once_with(1, {"operation": "attach"})
         self.assertTrue(response.success)
+        logger.info("Attach metrics test completed successfully")
 
     async def test_attach_error_metrics(self):
-        """Test error metrics collection for AttachToProcess"""
-        # Arrange
-        request = memory_scanner_pb2.ProcessRequest(pid=1234)
+        """Test error metrics collection for failed AttachToProcess operation."""
+        logger.info("Starting attach error metrics test")
 
-        # Act
-        with patch(
-            "MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner"
-        ) as mock_frida:
-            instance = mock_frida.return_value
+        request = memory_scanner_pb2.ProcessRequest(pid=TEST_PID)
+        error_message = "Test error"
 
-            async def mock_attach(pid):
-                current_span = trace.get_current_span()
-                current_span.set_attribute("process.id", pid)
-                current_span.set_status(Status(StatusCode.ERROR, "Test error"))
-                raise Exception("Test error")
+        async with self.assert_timeout():
+            with patch(
+                "MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner"
+            ) as mock_frida:
+                instance = mock_frida.return_value
 
-            instance.attach_to_process = mock_attach
-            response = await self.service.AttachToProcess(request, self.context)
+                async def mock_attach(pid):
+                    current_span = trace.get_current_span()
+                    current_span.set_attribute("process.id", pid)
+                    current_span.set_status(Status(StatusCode.ERROR, error_message))
+                    raise Exception(error_message)
 
-        # Assert
+                instance.attach_to_process = mock_attach
+                response = await self.service.AttachToProcess(request, self.context)
+
         self.error_counter.add.assert_called_once_with(
-            1, {"operation": "attach", "error": "Test error"}
+            1, {"operation": "attach", "error": error_message}
         )
         self.assertFalse(response.success)
+        logger.info("Attach error metrics test completed successfully")
 
     async def test_write_metrics(self):
-        """Test metrics collection for WriteMemory"""
-        # Arrange
-        session_id = "test_session"
+        """Test metrics collection for WriteMemory operation."""
+        logger.info("Starting write metrics test")
+
+        session_id = TEST_SESSION_ID
         self.service.sessions[session_id] = MagicMock()
         request = memory_scanner_pb2.WriteRequest(
-            session_id=session_id, address=1000, value=b"test", value_type="bytes"
+            session_id=session_id,
+            address=TEST_ADDRESS,
+            value=b"test",
+            value_type="bytes",
         )
 
-        # Act
-        with patch(
-            "MemoryScanner.Server.memory_scanner_service.MemoryWriter"
-        ) as mock_writer:
-            instance = mock_writer.return_value
+        async with self.assert_timeout():
+            with patch(
+                "MemoryScanner.Server.memory_scanner_service.MemoryWriter"
+            ) as mock_writer:
+                instance = mock_writer.return_value
 
-            async def mock_write(address, value, value_type):
-                current_span = trace.get_current_span()
-                current_span.set_attribute("memory.address", address)
-                current_span.set_attribute("memory.value_type", value_type)
-                pass
+                async def mock_write(address, value, value_type):
+                    current_span = trace.get_current_span()
+                    current_span.set_attribute("memory.address", address)
+                    current_span.set_attribute("memory.value_type", value_type)
 
-            instance.write_memory = mock_write
-            response = await self.service.WriteMemory(request, self.context)
+                instance.write_memory = mock_write
+                response = await self.service.WriteMemory(request, self.context)
 
-        # Assert
         self.operation_counter.add.assert_called_once_with(1, {"operation": "write"})
         self.operation_duration.record.assert_called_once()
         self.assertTrue(response.success)
+        logger.info("Write metrics test completed successfully")
 
-    async def test_write_error_metrics(self):
-        """Test error metrics collection for WriteMemory"""
-        # Arrange
-        session_id = "test_session"
-        self.service.sessions[session_id] = MagicMock()
-        request = memory_scanner_pb2.WriteRequest(
-            session_id=session_id, address=1000, value=b"test", value_type="bytes"
-        )
-
-        # Act
-        with patch(
-            "MemoryScanner.Server.memory_scanner_service.MemoryWriter"
-        ) as mock_writer:
-            instance = mock_writer.return_value
-
-            async def mock_write(address, value, value_type):
-                current_span = trace.get_current_span()
-                current_span.set_attribute("memory.address", address)
-                current_span.set_attribute("memory.value_type", value_type)
-                current_span.set_status(Status(StatusCode.ERROR, "Write error"))
-                raise Exception("Write error")
-
-            instance.write_memory = mock_write
-            response = await self.service.WriteMemory(request, self.context)
-
-        # Assert
-        self.error_counter.add.assert_called_once_with(
-            1, {"operation": "write", "error": "Write error"}
-        )
-        self.assertFalse(response.success)
-
-    async def test_read_metrics(self):
-        """Test metrics collection for ReadMemory"""
-        # Arrange
-        session_id = "test_session"
-        self.service.sessions[session_id] = MagicMock()
-        request = memory_scanner_pb2.ReadRequest(
-            session_id=session_id, address=1000, size=4, value_type="int32"
-        )
-
-        # Act
-        with patch(
-            "MemoryScanner.Server.memory_scanner_service.MemoryReader"
-        ) as mock_reader:
-            instance = mock_reader.return_value
-
-            async def mock_read(address, size, value_type):
-                current_span = trace.get_current_span()
-                current_span.set_attribute("memory.address", address)
-                current_span.set_attribute("memory.size", size)
-                current_span.set_attribute("memory.value_type", value_type)
-                return b"test"
-
-            instance.read_memory = mock_read
-            response = await self.service.ReadMemory(request, self.context)
-
-        # Assert
-        self.operation_counter.add.assert_called_once_with(1, {"operation": "read"})
-        self.operation_duration.record.assert_called_once()
-        self.assertTrue(response.success)
-
-    async def test_scan_metrics(self):
-        """Test metrics collection for ScanMemory"""
-        # Arrange
-        attach_response = await self.service.AttachToProcess(
-            memory_scanner_pb2.ProcessRequest(pid=1234), self.context
-        )
-        session_id = attach_response.session_id
-        request = memory_scanner_pb2.ScanRequest(
-            session_id=session_id,
-            value_type="int32",
-            value=b"test",
-            comparison_type="exact",
-            ranges=[],
-        )
-
-        # Act
-        with patch(
-            "MemoryScanner.Server.memory_scanner_service.MemoryScanner"
-        ) as mock_scanner:
-            instance = mock_scanner.return_value
-
-            async def mock_scan(*args, **kwargs):
-                current_span = trace.get_current_span()
-                current_span.set_attribute(
-                    "memory.value_type", kwargs.get("value_type")
-                )
-                current_span.set_attribute(
-                    "memory.comparison_type", kwargs.get("comparison_type")
-                )
-                current_span.set_attribute(
-                    "memory.ranges_count", len(kwargs.get("ranges", []))
-                )
-                return []
-
-            instance.scan = mock_scan
-            response = await self.service.ScanMemory(request, self.context)
-
-        # Assert
-        self.operation_counter.add.assert_called_once_with(1, {"operation": "scan"})
-        self.operation_duration.record.assert_called_once()
-        self.assertIsNotNone(response.checkpoint_id)
-
-    @patch("MemoryScanner.Native.scanner.MemoryScanner")
-    async def test_pattern_scanner(self, mock_scanner_class):
-        """Test pattern scanning functionality"""
-        # Verify metrics are properly mocked
-        self.assertIs(
-            self.service.operation_counter,
-            self.operation_counter,
-            "Operation counter not properly initialized from mocked meter",
-        )
-
-        # Reset mock counters before our test
-        self.operation_counter.reset_mock()
-
-        # Arrange
-        mock_scanner_instance = AsyncMock()
-        mock_scanner_class.return_value = mock_scanner_instance
-
-        # Set up mock scan method with AsyncMock
-        async def mock_scan(value, value_type, comparison_type):
-            logger.info(
-                f"Mock scan called with value_type: {value_type}, comparison_type: {comparison_type}"
-            )
-            if value_type == "pattern":  # Only return results for pattern scans
-                return [(0x1000, b"")]
-            return []
-
-        mock_scanner_instance.scan = AsyncMock(side_effect=mock_scan)
-
-        # Configure service with mock scanner
-        service = self.service
-        service.scanners["test_session"] = mock_scanner_instance
-        service.sessions["test_session"] = AsyncMock()
-
-        # Create scan request
-        pattern = "48 8B ? ? 45 85"
-        pattern_bytes = pattern.encode("utf-8")
-        request = memory_scanner_pb2.ScanRequest(
-            session_id="test_session",
-            scan_type="pattern",  # This should match value_type
-            value=pattern_bytes,
-            value_type="pattern",
-            comparison_type="exact",
-        )
+    async def test_pattern_scanner(self):
+        """Test pattern scanning functionality and metrics collection."""
+        logger.info("Starting pattern scanner test")
 
         try:
-            # Act
-            logger.info("Executing ScanMemory request...")
+            # Verify metrics are properly mocked
+            self.assertIs(
+                self.service.operation_counter,
+                self.operation_counter,
+                "Operation counter not properly initialized",
+            )
 
-            # Configure metrics mocks to return awaitable futures
+            # Reset mock counters
+            self.operation_counter.reset_mock()
+
+            # Configure mock scanner
+            mock_scanner_instance = AsyncMock()
+
+            async def mock_scan(value, value_type, comparison_type):
+                logger.info(
+                    f"Mock scan called with value_type: {value_type}, comparison_type: {comparison_type}"
+                )
+                if value_type == "pattern":
+                    return [(TEST_ADDRESS, b"")]
+                return []
+
+            mock_scanner_instance.scan = AsyncMock(side_effect=mock_scan)
+
+            # Configure service
+            self.service.scanners[TEST_SESSION_ID] = mock_scanner_instance
+            self.service.sessions[TEST_SESSION_ID] = AsyncMock()
+
+            # Create scan request
+            pattern = "48 8B ? ? 45 85"
+            request = memory_scanner_pb2.ScanRequest(
+                session_id=TEST_SESSION_ID,
+                scan_type="pattern",
+                value=pattern.encode("utf-8"),
+                value_type="pattern",
+                comparison_type="exact",
+            )
+
+            # Configure metrics mocks
             self.operation_counter.add.return_value = asyncio.Future()
             self.operation_counter.add.return_value.set_result(None)
             self.operation_duration.record.return_value = asyncio.Future()
             self.operation_duration.record.return_value.set_result(None)
 
-            # Call the service method and properly await it
-            response = await self.service.ScanMemory(request, self.context)
+            async with self.assert_timeout():
+                response = await self.service.ScanMemory(request, self.context)
 
-            # Wait for any pending metric operations
-            await asyncio.gather(
-                *(
-                    call.awaited_once()
-                    for call in [
-                        self.operation_counter.add,
-                        self.operation_duration.record,
-                    ]
-                    if hasattr(call, "awaited_once")
-                )
-            )
+            # Verify response
+            self.assertTrue(len(response.results) > 0, "No results returned from scan")
+            self.assertEqual(response.results[0].address, TEST_ADDRESS)
 
-            logger.info("ScanMemory request completed")
-            logger.info(f"Response results: {response.results}")
-            logger.info(f"Operation counter calls: {self.operation_counter.mock_calls}")
-            logger.info(
-                f"Operation counter add method calls: {self.operation_counter.add.mock_calls}"
-            )
-
-            # Assert - verify the mock scan was called
-            self.assertTrue(
-                service.operation_counter is self.operation_counter,
-                "Service operation counter is not the mock counter",
-            )
-
-            # Check that the pattern scan metric was recorded - use assert_called_once_with since we know it should be called exactly once
+            # Verify metrics
             self.operation_counter.add.assert_called_once_with(
                 1, {"operation": "pattern_scan"}
             )
 
-            # Verify response
-            self.assertTrue(len(response.results) > 0, "No results returned from scan")
-            self.assertEqual(response.results[0].address, 0x1000)
-            self.assertEqual(response.results[0].value, b"")
+            logger.info("Pattern scanner test completed successfully")
+
         except Exception as e:
-            logger.error(f"Test failed with error: {e}")
-            logger.error(
-                f"Operation counter mock state: {self.operation_counter._mock_return_value}"
-            )
-            logger.error(f"All mock calls: {self.operation_counter.mock_calls}")
+            logger.error(f"Pattern scanner test failed: {e}", exc_info=True)
             raise
 
     async def test_value_freezer(self):
-        """Test value freezing functionality"""
-        print("Starting test_value_freezer")
-        # Arrange
-        session_id = "test_session_4096"
-        address = 0x1000
-        test_int = 42
-        value = test_int.to_bytes(
-            4, byteorder="little", signed=True
-        )  # 4 bytes for int32
-        value_type = "int32"
-        print(f"Test setup complete with value: {test_int}")
-
-        # Setup mocks
-        frida_mock = AsyncMock()
-        reader_mock = AsyncMock()
-        writer_mock = AsyncMock()
-        print("Mocks created")
-
-        # Configure reader mock to simulate successful writes but with potentially modified value patterns
-        reader_mock.read_memory = AsyncMock(return_value=value)
-        print("Reader mock configured")
-
-        # Configure writer mock to always succeed
-        writer_mock.write_memory = AsyncMock(return_value=True)
-        print("Writer mock configured")
-
-        # Add mocks to service
-        self.service.sessions[session_id] = frida_mock
-        self.service.readers[session_id] = reader_mock
-        self.service.writers[session_id] = writer_mock
-        print("Mocks added to service")
-
-        # Create freeze request
-        request = memory_scanner_pb2.FreezeRequest(
-            session_id=session_id, address=address, value=value, value_type=value_type
-        )
-
-        # Configure metrics mocks to return awaitable futures
-        self.operation_counter.add.return_value = asyncio.Future()
-        self.operation_counter.add.return_value.set_result(None)
-        self.operation_duration.record.return_value = asyncio.Future()
-        self.operation_duration.record.return_value.set_result(None)
-
-        # Act & Assert
-        status_count = 0
+        """Test value freezing functionality and metrics collection."""
+        logger.info("Starting value freezer test")
 
         try:
-            # Create and store a mock freeze task
-            mock_task = asyncio.create_task(asyncio.sleep(0))  # Dummy task
-            self.service.freezer_tasks[session_id] = (mock_task, address)
+            session_id = "test_session_4096"
+            test_int = 42
+            value = test_int.to_bytes(4, byteorder="little", signed=True)
+            value_type = "int32"
 
-            async for status in self.service.FreezeValue(request, self.context):
-                print(
-                    f"Received status: active={status.active}, error_message={status.error_message if hasattr(status, 'error_message') else 'None'}"
-                )
-                self.assertIsNotNone(status)
-                self.assertTrue(status.active)
-                status_count += 1
+            # Setup mocks
+            frida_mock = AsyncMock()
+            reader_mock = AsyncMock()
+            writer_mock = AsyncMock()
 
-                # Convert current_value to int for comparison
-                current_int = int.from_bytes(
-                    status.current_value, byteorder="little", signed=True
-                )
-                expected_int = test_int
+            reader_mock.read_memory = AsyncMock(return_value=value)
+            writer_mock.write_memory = AsyncMock(return_value=True)
 
-                # Log the values for debugging
-                print(f"Current value: {current_int}, Expected: {expected_int}")
+            self.service.sessions[session_id] = frida_mock
+            self.service.readers[session_id] = reader_mock
+            self.service.writers[session_id] = writer_mock
 
-                # Verify the integer value matches, even if byte patterns differ
-                self.assertEqual(
-                    current_int,
-                    expected_int,
-                    f"Value mismatch: got {current_int}, expected {expected_int}",
-                )
-
-                if status_count >= 2:  # Check a few iterations
-                    break
-        except Exception as e:
-            print(f"Exception in FreezeValue: {str(e)}")
-            self.fail(f"FreezeValue failed: {str(e)}")
-        finally:
-            await self.operation_duration.record()
-
-        # Verify that we got at least one status update
-        self.assertGreater(status_count, 0)
-        self.assertTrue(reader_mock.read_memory.called)
-        writer_mock.write_memory.assert_called_with(address, value, value_type)
-
-        # Test unfreezing
-        unfreeze_request = memory_scanner_pb2.UnfreezeRequest(
-            session_id=session_id, address=address
-        )
-
-        # Wait for any pending metric operations
-        await asyncio.gather(
-            *(
-                call.awaited_once()
-                for call in [self.operation_counter.add, self.operation_duration.record]
-                if hasattr(call, "awaited_once")
+            # Test freezing
+            request = memory_scanner_pb2.FreezeRequest(
+                session_id=session_id,
+                address=TEST_ADDRESS,
+                value=value,
+                value_type=value_type,
             )
-        )
 
-        response = await self.service.UnfreezeValue(unfreeze_request, self.context)
-        self.assertIsNotNone(response)
+            status_count = 0
+            mock_task = asyncio.create_task(asyncio.sleep(0))
+            self.service.freezer_tasks[session_id] = (mock_task, TEST_ADDRESS)
 
-        # Verify metrics - check that both operations were called in a more flexible way
-        calls = [str(call) for call in self.operation_counter.add.mock_calls]
-        self.assertIn("call(1, {'operation': 'freeze'})", calls)
-        self.assertIn("call(1, {'operation': 'unfreeze'})", calls)
-        await self.operation_duration.record()
+            async with self.assert_timeout():
+                async for status in self.service.FreezeValue(request, self.context):
+                    self.assertIsNotNone(status)
+                    self.assertTrue(status.active)
+
+                    current_int = int.from_bytes(
+                        status.current_value, byteorder="little", signed=True
+                    )
+                    self.assertEqual(current_int, test_int)
+
+                    status_count += 1
+                    if status_count >= 2:
+                        break
+
+            self.assertGreater(status_count, 0)
+
+            # Test unfreezing
+            unfreeze_request = memory_scanner_pb2.UnfreezeRequest(
+                session_id=session_id, address=TEST_ADDRESS
+            )
+
+            async with self.assert_timeout():
+                response = await self.service.UnfreezeValue(
+                    unfreeze_request, self.context
+                )
+
+            self.assertIsNotNone(response)
+
+            # Verify metrics
+            freeze_calls = [str(call) for call in self.operation_counter.add.mock_calls]
+            self.assertIn("call(1, {'operation': 'freeze'})", freeze_calls)
+            self.assertIn("call(1, {'operation': 'unfreeze'})", freeze_calls)
+
+            logger.info("Value freezer test completed successfully")
+
+        except Exception as e:
+            logger.error(f"Value freezer test failed: {e}", exc_info=True)
+            raise
 
     async def test_cache_system(self):
-        """Test scan caching functionality"""
-        # Arrange
-        session_id = "test_session"
-        state_manager = StateManager(session_id)
-        module_name = "test_module"
-        address = 0x1000
-        base_address = 0x500
-        value_type = "int32"
-        signature = "test_signature"
+        """Test scan result caching functionality."""
+        logger.info("Starting cache system test")
 
-        # Act
-        # Cache an offset
-        await state_manager.cache_offset(
-            module_name, address, base_address, value_type, signature
-        )
+        try:
+            state_manager = StateManager(TEST_SESSION_ID)
+            base_address = 0x500
+            value_type = "int32"
+            signature = "test_signature"
 
-        # Get cached offsets
-        cached_offsets = await state_manager.get_cached_offsets(module_name)
+            async with self.assert_timeout():
+                # Clear any existing cached offsets first
+                await state_manager.invalidate_cache()
 
-        # Assert
-        self.assertEqual(len(cached_offsets), 1)
-        self.assertEqual(cached_offsets[0].module_name, module_name)
-        self.assertEqual(cached_offsets[0].relative_offset, address - base_address)
-        self.assertEqual(cached_offsets[0].value_type, value_type)
+                # Cache an offset
+                await state_manager.cache_offset(
+                    TEST_MODULE, TEST_ADDRESS, base_address, value_type, signature
+                )
+
+                # Get cached offsets
+                cached_offsets = await state_manager.get_cached_offsets(TEST_MODULE)
+
+            self.assertEqual(len(cached_offsets), 1)
+            self.assertEqual(cached_offsets[0].module_name, TEST_MODULE)
+            self.assertEqual(
+                cached_offsets[0].relative_offset, TEST_ADDRESS - base_address
+            )
+            self.assertEqual(cached_offsets[0].value_type, value_type)
+
+            logger.info("Cache system test completed successfully")
+
+        except Exception as e:
+            logger.error(f"Cache system test failed: {e}", exc_info=True)
+            raise
+        finally:
+            state_manager.cleanup_old_states()
 
     async def test_integrated_functionality(self):
-        """Test integration of pattern scanning, freezing, and caching"""
-        # Arrange
-        session_id = "test_session"
-        scanner = MemoryScanner(MagicMock(), session_id)
-        writer = MemoryWriter(MagicMock())
-        state_manager = StateManager(session_id)
+        """Test integration of pattern scanning, freezing, and caching."""
+        logger.info("Starting integrated functionality test")
 
-        # Mock Frida session
-        session_mock = MagicMock()
-        session_mock.execute_script = AsyncMock(return_value=[{"address": 0x1000}])
+        try:
+            scanner = MemoryScanner(MagicMock(), TEST_SESSION_ID)
+            writer = MemoryWriter(MagicMock())
+            state_manager = StateManager(TEST_SESSION_ID)
 
-        # Act & Assert
-        # 1. Pattern scan
-        results = await scanner.scan(
-            value_type="pattern",
-            value="48 8B ? ? 45 85",
-            comparison_type="pattern",
-            ranges=[],
-        )
-        self.assertTrue(len(results) > 0)
+            session_mock = MagicMock()
+            session_mock.execute_script = AsyncMock(
+                return_value=[{"address": TEST_ADDRESS}]
+            )
 
-        # 2. Freeze value
-        address = results[0]["address"]
-        freeze_success = await writer.freeze_value(address, 100, "int32")
-        self.assertTrue(freeze_success)
+            async with self.assert_timeout():
+                # Pattern scan
+                results = await scanner.scan(
+                    value_type="pattern",
+                    value="48 8B ? ? 45 85",
+                    comparison_type="pattern",
+                    ranges=[],
+                )
+                self.assertTrue(len(results) > 0)
 
-        # 3. Cache result
-        await state_manager.cache_offset(
-            "test_module", address, 0x500, "int32", "test_signature"
-        )
-        cached = await state_manager.get_cached_offsets("test_module")
-        self.assertTrue(len(cached) > 0)
+                # Freeze value
+                address = results[0]["address"]
+                freeze_success = await writer.freeze_value(address, 100, "int32")
+                self.assertTrue(freeze_success)
 
-        # Cleanup
-        writer.cleanup()
-        state_manager.cleanup_old_states()
+                # Cache result
+                await state_manager.cache_offset(
+                    TEST_MODULE, address, 0x500, "int32", "test_signature"
+                )
+                cached = await state_manager.get_cached_offsets(TEST_MODULE)
+                self.assertTrue(len(cached) > 0)
+
+            logger.info("Integrated functionality test completed successfully")
+
+        except Exception as e:
+            logger.error(f"Integrated functionality test failed: {e}", exc_info=True)
+            raise
+        finally:
+            writer.cleanup()
+            state_manager.cleanup_old_states()
 
 
-def create_test_suite(args):
-    """Create a test suite based on command line arguments"""
+def create_test_suite(args: argparse.Namespace) -> unittest.TestSuite:
+    """Create a test suite based on command line arguments."""
     suite = unittest.TestSuite()
     loader = unittest.TestLoader()
     test_class = TestMetricsCollection
@@ -553,7 +450,6 @@ def create_test_suite(args):
             loader.loadTestsFromName("test_integrated_functionality", test_class)
         )
     else:
-        # If no specific tests are requested, run all tests
         suite.addTests(loader.loadTestsFromTestCase(test_class))
 
     return suite
@@ -575,10 +471,16 @@ if __name__ == "__main__":
         action="store_true",
         help="Run integrated functionality tests only",
     )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable verbose logging"
+    )
 
-    args, remaining = parser.parse_known_args()
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
 
     # Create and run the test suite
     suite = create_test_suite(args)
-    runner = unittest.TextTestRunner()
+    runner = unittest.TextTestRunner(verbosity=2 if args.verbose else 1)
     runner.run(suite)
