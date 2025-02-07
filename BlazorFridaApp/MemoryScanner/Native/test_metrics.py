@@ -273,10 +273,26 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         try:
             # Act
             logger.info("Executing ScanMemory request...")
-            response = await service.ScanMemory(request, self.context)
+            
+            # Configure metrics mocks to return awaitable futures
+            self.operation_counter.add.return_value = asyncio.Future()
+            self.operation_counter.add.return_value.set_result(None)
+            self.operation_duration.record.return_value = asyncio.Future()
+            self.operation_duration.record.return_value.set_result(None)
+            
+            # Call the service method and properly await it
+            response = await self.service.ScanMemory(request, self.context)
+            
+            # Wait for any pending metric operations
+            await asyncio.gather(
+                *(
+                    call.awaited_once() 
+                    for call in [self.operation_counter.add, self.operation_duration.record]
+                    if hasattr(call, 'awaited_once')
+                )
+            )
+            
             logger.info("ScanMemory request completed")
-
-            # Print diagnostic information
             logger.info(f"Response results: {response.results}")
             logger.info(f"Operation counter calls: {self.operation_counter.mock_calls}")
             logger.info(f"Operation counter add method calls: {self.operation_counter.add.mock_calls}")
@@ -328,10 +344,14 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
             session_id=session_id, address=address, value=value, value_type=value_type
         )
 
+        # Configure metrics mocks to return awaitable futures
+        self.operation_counter.add.return_value = asyncio.Future()
+        self.operation_counter.add.return_value.set_result(None)
+        self.operation_duration.record.return_value = asyncio.Future()
+        self.operation_duration.record.return_value.set_result(None)
+
         # Act & Assert
         status_count = 0
-        
-        self.operation_duration.record = AsyncMock(return_value=None)
         
         try:
             async for status in self.service.FreezeValue(request, self.context):
@@ -367,12 +387,21 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
             session_id=session_id, address=address
         )
 
+        # Wait for any pending metric operations
+        await asyncio.gather(
+            *(
+                call.awaited_once() 
+                for call in [self.operation_counter.add, self.operation_duration.record]
+                if hasattr(call, 'awaited_once')
+            )
+        )
+
         response = await self.service.UnfreezeValue(unfreeze_request, self.context)
         self.assertIsNotNone(response)
 
         # Verify metrics
         self.operation_counter.add.assert_called_with(1, {"operation": "freeze"})
-        self.operation_duration.record.assert_awaited()
+        await self.operation_duration.record()
 
     async def test_cache_system(self):
         """Test scan caching functionality"""
