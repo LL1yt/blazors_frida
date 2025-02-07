@@ -198,7 +198,15 @@ class MemoryWriter:
         try:
             # Debug logging for value details
             logger.debug(f"Writing {value_type} value to {hex(address)}")
-            logger.debug(f"Value type: {type(value)}, Length: {len(value)}, Raw bytes: {value.hex() if isinstance(value, bytes) else value}")
+
+            # Handle debug logging for different value types
+            if isinstance(value, (bytes, str)):
+                logger.debug(
+                    f"Value type: {type(value)}, Length: {len(value)}, "
+                    f"Raw bytes: {value.hex() if isinstance(value, bytes) else value}"
+                )
+            else:
+                logger.debug(f"Value type: {type(value)}, Value: {value}")
 
             result = await execute_script(
                 self.session, WRITE_SCRIPT, "writeMemory", address, value, value_type
@@ -231,25 +239,34 @@ class MemoryWriter:
             logger.error(f"Batch write error: {e}")
             return [{"success": False, "error": str(e)} for _ in operations]
 
-    def freeze_value(
+    async def freeze_value(
         self,
         address: int,
         value: Any,
         value_type: str = "bytes",
         update_interval: float = 0.1,
     ) -> bool:
-        """Freeze a memory value by continuously writing it.
+        """Freeze a value at a memory address.
 
         Args:
             address: Memory address to freeze
-            value: Value to maintain
+            value: Value to maintain at the address
             value_type: Type of value
             update_interval: How often to update the value (seconds)
 
         Returns:
-            Boolean indicating if freeze was initiated
+            Boolean indicating if freezing was initiated successfully
         """
         try:
+            # First attempt to write the value
+            success = await self.write(address, value, value_type)
+            if not success:
+                logger.error(
+                    f"Initial write failed for freeze at address {hex(address)}"
+                )
+                return False
+
+            # Store the frozen value
             self.frozen_values[address] = FrozenValue(
                 address=address,
                 value=value,
@@ -258,16 +275,16 @@ class MemoryWriter:
                 update_interval=update_interval,
             )
 
-            # Start freeze thread if not running
+            # Start the freeze thread if not already running
             if not self._freeze_thread or not self._freeze_thread.is_alive():
                 self._stop_event.clear()
-                self._freeze_thread = threading.Thread(
-                    target=self._freeze_loop, daemon=True
-                )
+                self._freeze_thread = threading.Thread(target=self._freeze_loop)
+                self._freeze_thread.daemon = True
                 self._freeze_thread.start()
-                logger.info(f"Started freeze thread for {hex(address)}")
 
+            logger.info(f"Value frozen at address {hex(address)}")
             return True
+
         except Exception as e:
             logger.error(f"Failed to freeze value: {e}")
             return False

@@ -392,14 +392,28 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         logger.info("Starting integrated functionality test")
 
         try:
-            scanner = MemoryScanner(MagicMock(), TEST_SESSION_ID)
-            writer = MemoryWriter(MagicMock())
-            state_manager = StateManager(TEST_SESSION_ID)
+            # Create proper async mocks for Frida session
+            session_mock = AsyncMock()
+            script_mock = AsyncMock()
 
-            session_mock = MagicMock()
-            session_mock.execute_script = AsyncMock(
-                return_value=[{"address": TEST_ADDRESS}]
+            # Configure script mock to return raw addresses as the real Frida script would
+            script_mock.exports.scanMemory = AsyncMock(
+                return_value=[hex(TEST_ADDRESS)]  # Return hex string like real Frida
             )
+            script_mock.exports.writeMemory = AsyncMock(
+                return_value=True
+            )  # Mock successful write
+            script_mock.load = AsyncMock()
+
+            # Configure session mock
+            session_mock.create_script = AsyncMock(return_value=script_mock)
+
+            # Create scanner with properly mocked session
+            frida_mock = AsyncMock()
+            frida_mock.session = session_mock
+            scanner = MemoryScanner(frida_mock, TEST_SESSION_ID)
+            writer = MemoryWriter(frida_mock)
+            state_manager = StateManager(TEST_SESSION_ID)
 
             async with self.assert_timeout():
                 # Pattern scan
@@ -409,10 +423,29 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
                     comparison_type="pattern",
                     ranges=[],
                 )
-                self.assertTrue(len(results) > 0)
+                self.assertTrue(len(results) > 0, "No scan results returned")
+
+                # Log the results for debugging
+                logger.debug(f"Scan results: {results}")
+
+                # Get first result and extract address
+                result = results[0]
+                logger.debug(f"First result: {result}")
+
+                # Verify result structure
+                self.assertIsInstance(
+                    result, dict, "Scan result should be a dictionary"
+                )
+                self.assertIn(
+                    "address", result, "Scan result should contain 'address' key"
+                )
+
+                # Extract the address value - it should already be an integer from the scanner
+                address = result["address"]
+                logger.debug(f"Extracted address: {address} (type: {type(address)})")
+                self.assertIsInstance(address, int, "Address should be an integer")
 
                 # Freeze value
-                address = results[0]["address"]
                 freeze_success = await writer.freeze_value(address, 100, "int32")
                 self.assertTrue(freeze_success)
 

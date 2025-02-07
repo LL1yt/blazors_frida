@@ -10,6 +10,8 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 import uuid
 import aiosqlite
+import base64
+from json import JSONEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,22 @@ class StateSnapshot:
     metadata: Dict[str, Any]
     module_info: Optional[ModuleInfo] = None
     cached_offsets: List[CachedOffset] = None
+
+
+class BytesEncoder(JSONEncoder):
+    """Custom JSON encoder that handles bytes objects by base64 encoding them."""
+
+    def default(self, obj):
+        if isinstance(obj, bytes):
+            return {"__type__": "bytes", "data": base64.b64encode(obj).decode("utf-8")}
+        return super().default(obj)
+
+
+def bytes_decoder(dct):
+    """Custom JSON decoder that handles base64 encoded bytes objects."""
+    if "__type__" in dct and dct["__type__"] == "bytes":
+        return base64.b64decode(dct["data"].encode("utf-8"))
+    return dct
 
 
 class StateManager:
@@ -221,7 +239,9 @@ class StateManager:
             try:
                 state_path = self._get_state_path(new_version)
                 async with aiofiles.open(state_path, "w") as f:
-                    await f.write(json.dumps(asdict(snapshot), indent=2))
+                    await f.write(
+                        json.dumps(asdict(snapshot), indent=2, cls=BytesEncoder)
+                    )
                 logger.info(f"State saved: version={new_version}")
                 self.current_version = new_version
                 return new_version
@@ -254,7 +274,7 @@ class StateManager:
 
                 async with aiofiles.open(state_path, "r") as f:
                     content = await f.read()
-                    state_dict = json.loads(content)
+                    state_dict = json.loads(content, object_hook=bytes_decoder)
                     return StateSnapshot(**state_dict)
             except Exception as e:
                 logger.error(f"Failed to load state: {e}")
