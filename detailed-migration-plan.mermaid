@@ -1,0 +1,132 @@
+graph TB
+    subgraph "Architecture Migration"
+        subgraph "Current Architecture"
+            BA1[Blazor App] --> PN[Python.NET] --> PF1[Python Frida Modules]
+        end
+
+        subgraph "Target Architecture"
+            BA2[Blazor App] <--> GRPC[gRPC Service] <--> PS[Python Service] --> PF2[Python Frida Modules]
+            GRPC --> RETRY[Retry Policies]
+            GRPC --> CIRC[Circuit Breaker]
+            GRPC --> POOL[Connection Pool]
+        end
+    end
+
+    subgraph "Phase 1: Core Migration"
+        direction TB
+        GRPC --> P1_1[Connection Management]
+        GRPC --> P1_2[Feature Flag Routing]
+        GRPC --> P1_3[Error Handling]
+        
+        P1_1 --> CM1[Pool Configuration]
+        P1_1 --> CM2[Health Checks]
+        P1_1 --> CM3[Auto-Recovery]
+        
+        P1_2 --> FF1[Route Definition]
+        P1_2 --> FF2[Fallback Logic]
+        P1_2 --> FF3[Traffic Splitting]
+        
+        P1_3 --> EH1[Retry Logic]
+        P1_3 --> EH2[Circuit Breaking]
+        P1_3 --> EH3[Error Reporting]
+    end
+
+    subgraph "Phase 2: Pattern Scanner"
+        direction TB
+        PS1[Pattern Scanner] --> SG[Signature Generation]
+        PS1 --> BS[Block Scanning]
+        PS1 --> PM[Pattern Matching]
+        
+        SG --> SG1[Pattern Creation]
+        SG --> SG2[Optimization]
+        SG --> SG3[Validation]
+        
+        BS --> BS1[Memory Blocks]
+        BS --> BS2[Region Filtering]
+        BS --> BS3[Scan Strategy]
+        
+        VF[Value Freeze] --> VF1[Freeze Methods]
+        VF --> VF2[Background Updates]
+        VF --> VF3[Batch Operations]
+        
+        CR[Cache System] --> CR1[SQLite Storage]
+        CR --> CR2[Offset Management]
+        CR --> CR3[Validation Logic]
+    end
+
+    subgraph "Phase 3: UI Modernization"
+        direction TB
+        UI[UI Components] --> CL[Component Library]
+        UI --> AM[Address Management]
+        UI --> HX[Hex Navigation]
+        
+        CL --> CL1[Radzen Setup]
+        CL --> CL2[Theme System]
+        CL --> CL3[Base Layout]
+        
+        AM --> AM1[Process Selector]
+        AM --> AM2[Value Display]
+        AM --> AM3[Control Panel]
+        
+        HX --> HX1[Hex Viewer]
+        HX --> HX2[Memory Navigation]
+        HX --> HX3[Search System]
+    end
+
+    subgraph "Phase 4: Advanced Features"
+        direction TB
+        IL[IL2CPP Integration] --> FB[Frida Bridge]
+        IL --> BD[BepInEx Support]
+        IL --> CD[Class Discovery]
+        
+        FB --> FB1[Method Hooking]
+        FB --> FB2[Runtime Modification]
+        FB --> FB3[Memory Validation]
+        
+        PM[Profile Management] --> PM1[CRUD Operations]
+        PM --> PM2[Import/Export]
+        PM --> PM3[Auto-Save]
+    end
+
+    subgraph "Monitoring & Testing"
+        direction TB
+        MON[Monitoring] --> MT[Metrics]
+        MON --> LOG[Logging]
+        MON --> TRACE[Tracing]
+        
+        MT --> MT1[Response Times]
+        MT --> MT2[Error Rates]
+        MT --> MT3[Resource Usage]
+        
+        LOG --> LOG1[Correlation IDs]
+        LOG --> LOG2[Structured Format]
+        LOG --> LOG3[Aggregation]
+        
+        TEST[Testing] --> T1[Unit Tests]
+        TEST --> T2[Integration Tests]
+        TEST --> T3[Performance Tests]
+    end
+
+    subgraph "Rollback & Recovery"
+        RB[Rollback System] --> RB1[Backup Creation]
+        RB --> RB2[State Management]
+        RB --> RB3[Recovery Scripts]
+        
+        TRIG[Rollback Triggers] --> TR1[Error Threshold]
+        TRIG --> TR2[Performance Issues]
+        TRIG --> TR3[Memory Problems]
+    end
+
+    classDef completed fill:#90EE90,stroke:#006400
+    classDef inProgress fill:#FFE4B5,stroke:#DAA520
+    classDef planned fill:#FFFFFF,stroke:#000000
+    classDef critical fill:#FFB6C1,stroke:#8B0000
+
+    %% Completed Components
+    class PS1,VF,CR,SG,BS,PM,VF1,VF2,VF3,CR1,CR2,CR3 completed
+    %% In Progress Components
+    class GRPC,PS,P1_1,P1_2,P1_3,UI inProgress
+    %% Planned Components
+    class IL,MON,TEST planned
+    %% Critical Path Components
+    class RB,TRIG critical

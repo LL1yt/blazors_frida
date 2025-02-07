@@ -1,9 +1,27 @@
-# Python.NET to Standalone Python Process Migration Plan
+0. Preliminary Notes
+	0.1.	Incremental Delivery and Testing
+	 •	For each feature or subsystem, use atomic, testable increments.
+	 •	Maintain full observability: logs, metrics, and traces at each step.
+    0.2.	Configuration Management
+	 •	Centralize all config in a single place (e.g., appsettings.json, environment variables, or a secrets manager).
+	 •	Each microservice or subsystem should read from the same config source to avoid drift.
+    0.3. Quality Assurance Infrastructure
 
-0.1 mark what has been done with details and improve the plan if necessary.
-0.2 Prioritize atomic transitions of individual features while maintaining full system observability through each migration phase.
-0.3 implementing functionality step by step
-0.4 test each step to make sure they work properly
+     0.3.1    Set up automated testing framework
+
+         •    Unit testing infrastructure for C# (.NET)
+         •    Python test framework (pytest)
+         •    Integration test harness
+         •    UI automation tests (Playwright)
+
+
+     0.3.2    Establish monitoring stack
+
+         •    Prometheus + Grafana deployment
+         •    Custom dashboards for key metrics
+         •    Alert rules configuration
+         •    Log aggregation system   
+
 
 ## 1. Architecture Overview
 
@@ -19,17 +37,67 @@
 [Blazor App] <-> [gRPC] <-> [Python Service] -> [Python Frida Modules]
 ```
 
+    1.1 Python Microservice Enhancement
+
+         •    Core Service Implementation
+
+         ••    Process management subsystem
+
+         •••    Process discovery
+         •••    Attachment/detachment logic
+         •••    Process monitoring
+         •••    Crash recovery
+
+
+         ••    Memory operations framework
+
+         •••    Read operations optimization
+         •••    Write operations with validation
+         •••    Memory region management
+         •••    Permission handling
+
+
+         ••    Error handling system
+
+         •••    Custom exception hierarchy
+         •••    Error recovery strategies
+         •••    Logging enhancement
+         •••    Retry policies
+
+
+
+
+         •    Performance Optimization
+
+         ••    Memory caching system
+
+         •••    Read cache implementation
+         •••    Write buffer management
+         •••    Cache invalidation strategy
+         •••    Memory pressure monitoring
+
+
+         ••    Batch operations support
+
+         •••    Bulk read operations
+         •••    Batch write capabilities
+         •••    Operation coalescing
+         •••    Result aggregation
+
+
+         ••    Resource management
+
+         •••    Connection pooling
+         •••    Thread pool optimization
+         •••    Memory usage monitoring
+         •••    Resource cleanup
+
 ## 2. Migration Components
 
 The main thing is that the new functionality should work. old implementations can be simply deleted if they interfere with the launch of the new implementation
 
-### 2.1 Feature Flag System ✅
 
-- Implement feature flags for each memory operation type
-- Configuration in appsettings.json for granular control
-- Runtime toggle capability via admin interface
-
-### 2.2 Python Microservice ✅
+### 2.1 Python Microservice ✅
 
 - Standalone Python process exposing gRPC endpoints
 - Protocol Buffers schema for all operations
@@ -37,14 +105,14 @@ The main thing is that the new functionality should work. old implementations ca
 - Automatic process recovery
 - Structured logging with correlation IDs
 
-### 2.3 Core State Management ✅
+### 2.2 Core State Management ✅
 
 - Versioned state payloads
 - Checkpointing system for process state
 - State synchronization protocol
 - Rollback capability
 
-### 2.4 IPC Layer ✅
+### 2.3 IPC Layer ✅
 
 ```protobuf
 service MemoryScanner {
@@ -61,7 +129,7 @@ message AttachRequest {
 // ... other message definitions
 ```
 
-### 2.5 Pattern Scanner Implementation ✅
+### 2.4 Pattern Scanner Implementation ✅
 
 - Goal: Enable finding dynamic values (e.g., "health") based on signatures
 - Details:
@@ -72,7 +140,7 @@ message AttachRequest {
   - Store potential addresses in intermediate data structure ✅
 - Reasoning: Signature scanning is a classic technique used in tools like Cheat Engine. Python integration enables rapid pattern search code development.
 
-### 2.6 Value Freeze and Modification System ✅
+### 2.5 Value Freeze and Modification System ✅
 
 - Goal: Implement "Freeze/Unfreeze" functionality similar to Cheat Engine
 - Details:
@@ -84,7 +152,7 @@ message AttachRequest {
   - Value change notifications ✅
 - Reasoning: Freeze functionality is essential for maintaining constant memory values, often needed for "immortality" and other game tricks
 
-### 2.7 Scan Results Caching ✅
+### 2.6 Scan Results Caching ✅
 
 - Goal: Avoid repeated full scans on each launch using "offset caching"
 - Details:
@@ -337,36 +405,8 @@ message AttachRequest {
    - Create monitoring dashboards
    - Set up alerting rules
 
-### Phase 4: Gradual Migration (Weeks 4-6)
 
-1. Migrate process attachment (20% traffic)
-
-   - Monitor attachment success rates
-   - Track performance metrics
-   - Validate process state consistency
-   - Gradually increase traffic percentage
-
-2. Migrate memory reading (30% traffic)
-
-   - Ensure read accuracy
-   - Compare performance with baseline
-   - Monitor error rates
-   - Scale traffic based on metrics
-
-3. Migrate memory writing (30% traffic)
-
-   - Validate write operations
-   - Track state consistency
-   - Monitor system stability
-   - Adjust traffic based on performance
-
-4. Migrate process detachment (20% traffic)
-   - Ensure clean detachment
-   - Monitor resource cleanup
-   - Track process stability
-   - Complete traffic migration
-
-### Phase 5: Cleanup (Week 7)
+### Phase 4: Cleanup (Week 7)
 
 1. Remove Python.NET code
 2. Performance optimization
