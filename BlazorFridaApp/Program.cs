@@ -4,6 +4,7 @@ using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.MemoryScanner.Services.Decorators;
 using BlazorFridaApp.MemoryScanner.Middleware;
 using BlazorFridaApp.MemoryScanner;
+using BlazorFridaApp.MemoryScanner.Configuration;
 using BlazorFridaApp.Persistence;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.Services.Interfaces;
@@ -23,6 +24,7 @@ using Serilog.Events;
 using BlazorFridaApp.MemoryScanner.Base;
 using Microsoft.Extensions.Http;
 using Scrutor;
+using Microsoft.Extensions.Options;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -133,6 +135,32 @@ try
         logging.AddDebug();
         logging.SetMinimumLevel(LogLevel.Information);
     });
+
+    // Add configuration
+    builder.Services.Configure<MemoryScannerSettings>(
+        builder.Configuration.GetSection("MemoryScanner"));
+
+    // Add configuration validation
+    builder.Services.AddSingleton<IValidateOptions<MemoryScannerSettings>, ConfigurationValidator>();
+
+    // Validate configuration at startup
+    var memoryScannerSettings = builder.Configuration
+        .GetSection("MemoryScanner")
+        .Get<MemoryScannerSettings>();
+
+    if (memoryScannerSettings == null)
+    {
+        throw new InvalidOperationException("MemoryScanner configuration section is missing");
+    }
+
+    var validator = new ConfigurationValidator();
+    var validationResult = validator.Validate(null, memoryScannerSettings);
+
+    if (validationResult.Failed)
+    {
+        throw new InvalidOperationException(
+            $"MemoryScanner configuration validation failed: {string.Join(", ", validationResult.Failures)}");
+    }
 
     var app = builder.Build();
 

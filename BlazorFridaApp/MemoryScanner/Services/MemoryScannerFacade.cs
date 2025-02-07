@@ -1,10 +1,13 @@
+using BlazorFridaApp.MemoryScanner.Configuration;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
-public class MemoryScannerFacade : BlazorFridaApp.MemoryScanner.Services.Interfaces.IMemoryScannerGrpcService
+public class MemoryScannerFacade : IMemoryScannerGrpcService
 {
     private readonly IProcessGrpcService _processService;
     private readonly IMemoryGrpcService _memoryService;
@@ -12,6 +15,7 @@ public class MemoryScannerFacade : BlazorFridaApp.MemoryScanner.Services.Interfa
     private readonly IStateGrpcService _stateService;
     private readonly IFreezeGrpcService _freezeService;
     private readonly ILogger<MemoryScannerFacade> _logger;
+    private readonly MemoryScannerSettings _settings;
 
     public MemoryScannerFacade(
         IProcessGrpcService processService,
@@ -19,6 +23,7 @@ public class MemoryScannerFacade : BlazorFridaApp.MemoryScanner.Services.Interfa
         IScannerGrpcService scannerService,
         IStateGrpcService stateService,
         IFreezeGrpcService freezeService,
+        IOptions<MemoryScannerSettings> settings,
         ILogger<MemoryScannerFacade> logger)
     {
         _processService = processService;
@@ -26,6 +31,7 @@ public class MemoryScannerFacade : BlazorFridaApp.MemoryScanner.Services.Interfa
         _scannerService = scannerService;
         _stateService = stateService;
         _freezeService = freezeService;
+        _settings = settings.Value;
         _logger = logger;
     }
 
@@ -41,27 +47,42 @@ public class MemoryScannerFacade : BlazorFridaApp.MemoryScanner.Services.Interfa
     public Task DetachFromProcessAsync(string sessionId) =>
         _processService.DetachFromProcessAsync(sessionId);
 
-    public async Task<IEnumerable<Models.ScanResult>> ScanMemoryAsync(
-        string sessionId, 
-        string valueType, 
-        byte[] value, 
-        string comparisonType, 
+    public async Task<IEnumerable<ScanResult>> ScanMemoryAsync(
+        string sessionId,
+        string valueType,
+        byte[] value,
+        string comparisonType,
         IEnumerable<(ulong start, ulong end)> ranges)
     {
-        var process = new ProcessInfo { Id = int.Parse(sessionId.Split('-')[0]) };
-        var addresses = await _scannerService.ScanAsync(
-            process,
-            System.Text.Encoding.UTF8.GetString(value),
-            0,
-            new ScanProfile { ComparisonType = comparisonType });
+        try
+        {
+            var process = await _processService.GetTargetProcessAsync();
+            if (process == null)
+            {
+                return Enumerable.Empty<ScanResult>();
+            }
 
-        return addresses.Select(addr => new Models.ScanResult 
-        { 
-            ProcessId = process.Id,
-            Addresses = new List<nint> { new nint(Convert.ToInt64(addr, 16)) },
-            Pattern = value,
-            Mask = string.Empty
-        }).ToList();
+            if (!ranges.Any())
+            {
+                ranges = new[] { (_settings.DefaultMemoryRanges.DefaultStart, _settings.DefaultMemoryRanges.DefaultEnd) };
+            }
+
+            var scanProfile = new ScanProfile
+            {
+                ComparisonType = comparisonType ?? _settings.DefaultComparisonType
+            };
+
+            var addresses = await _scannerService.ScanAsync(process, sessionId, value.Length, scanProfile);
+            return addresses.Select(addr => new ScanResult 
+            { 
+                Addresses = new List<nint> { new nint(Convert.ToInt64(addr, 16)) }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during memory scan");
+            return Enumerable.Empty<ScanResult>();
+        }
     }
 
     public async Task<(byte[] value, bool success, string error)> ReadMemoryAsync(
@@ -72,11 +93,17 @@ public class MemoryScannerFacade : BlazorFridaApp.MemoryScanner.Services.Interfa
     {
         try
         {
-            var result = await _memoryService.ReadMemoryBytes(new nint((long)address), size);
+            if (size <= 0 || size > _settings.MaxReadSize)
+            {
+                return (System.Array.Empty<byte>(), false, $"Invalid size. Must be between 1 and {_settings.MaxReadSize}");
+            }
+
+            var result = await _memoryService.ReadMemoryBytes((nint)address, size);
             return (result, true, string.Empty);
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Error reading memory at address {Address}", address);
             return (System.Array.Empty<byte>(), false, ex.Message);
         }
     }

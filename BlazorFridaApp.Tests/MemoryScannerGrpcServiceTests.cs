@@ -1,10 +1,12 @@
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using BlazorFridaApp.MemoryScanner.Configuration;
 using BlazorFridaApp.Tests.Helpers;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -21,6 +23,7 @@ public class MemoryScannerGrpcServiceTests
     private readonly Mock<IStateGrpcService> _stateServiceMock;
     private readonly Mock<IFreezeGrpcService> _freezeServiceMock;
     private readonly IMemoryScannerGrpcService _service;
+    private readonly MemoryScannerSettings _settings;
 
     public MemoryScannerGrpcServiceTests()
     {
@@ -31,7 +34,25 @@ public class MemoryScannerGrpcServiceTests
         _stateServiceMock = new Mock<IStateGrpcService>();
         _freezeServiceMock = new Mock<IFreezeGrpcService>();
         
+        _settings = new MemoryScannerSettings
+        {
+            DefaultReadSize = 4,
+            MaxReadSize = 1024,
+            MaxWriteSize = 1024,
+            DefaultValueType = "int32",
+            DefaultComparisonType = "exact",
+            DefaultScanTimeout = 30000,
+            DefaultMemoryRanges = new MemoryRangeSettings
+            {
+                DefaultStart = 0x1000,
+                DefaultEnd = 0x2000
+            }
+        };
+        
         SetupMockResponses();
+        
+        var optionsMock = new Mock<IOptions<MemoryScannerSettings>>();
+        optionsMock.Setup(x => x.Value).Returns(_settings);
         
         _service = new MemoryScannerFacade(
             _processServiceMock.Object,
@@ -39,6 +60,7 @@ public class MemoryScannerGrpcServiceTests
             _scannerServiceMock.Object,
             _stateServiceMock.Object,
             _freezeServiceMock.Object,
+            optionsMock.Object,
             _loggerMock.Object
         );
     }
@@ -69,7 +91,7 @@ public class MemoryScannerGrpcServiceTests
             It.IsAny<ProcessInfo>(),
             It.IsAny<string>(),
             It.IsAny<int>(),
-            It.Is<ScanProfile>(p => p.ComparisonType == "exact")
+            It.Is<ScanProfile>(p => p.ComparisonType == _settings.DefaultComparisonType)
         )).ReturnsAsync(new List<string> { "0x1000" });
         
         _stateServiceMock.Setup(x => x.GetStateAsync(
@@ -90,16 +112,33 @@ public class MemoryScannerGrpcServiceTests
         // Arrange
         const string sessionId = "test-session";
         const ulong address = 0x1000;
-        const int size = 4;
         const string valueType = "int32";
 
         // Act
-        var result = await _service.ReadMemoryAsync(sessionId, address, size, valueType);
+        var result = await _service.ReadMemoryAsync(sessionId, address, _settings.DefaultReadSize, valueType);
 
         // Assert
         Assert.True(result.success);
-        Assert.Equal(4, result.value.Length);
+        Assert.Equal(_settings.DefaultReadSize, result.value.Length);
         Assert.Empty(result.error);
+    }
+
+    [Fact]
+    public async Task ReadMemoryAsync_ShouldFailWithInvalidSize()
+    {
+        // Arrange
+        const string sessionId = "test-session";
+        const ulong address = 0x1000;
+        const string valueType = "int32";
+        var invalidSize = _settings.MaxReadSize + 1;
+
+        // Act
+        var result = await _service.ReadMemoryAsync(sessionId, address, invalidSize, valueType);
+
+        // Assert
+        Assert.False(result.success);
+        Assert.Empty(result.value);
+        Assert.Contains("Invalid size", result.error);
     }
 
     [Fact]
@@ -123,17 +162,21 @@ public class MemoryScannerGrpcServiceTests
     public async Task ScanMemoryAsync_ShouldHandleValidScan()
     {
         // Arrange
-        const string sessionId = "1234-session";  // Using the process ID from the mock setup
+        const string sessionId = "test-session";
         const string valueType = "int32";
         var value = new byte[] { 1, 2, 3, 4 };
-        const string comparisonType = "exact";
         var ranges = new List<(ulong start, ulong end)> 
         { 
-            (0x1000, 0x2000) 
+            (_settings.DefaultMemoryRanges.DefaultStart, _settings.DefaultMemoryRanges.DefaultEnd)
         };
 
         // Act
-        var results = await _service.ScanMemoryAsync(sessionId, valueType, value, comparisonType, ranges);
+        var results = await _service.ScanMemoryAsync(
+            sessionId, 
+            valueType, 
+            value, 
+            _settings.DefaultComparisonType, 
+            ranges);
 
         // Assert
         Assert.NotNull(results);
