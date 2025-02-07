@@ -23,6 +23,9 @@ MemoryScanner/Native/test_health.py
 MemoryScanner/Native/test_metrics.py
 MemoryScanner/Native/test_state.py
 MemoryScanner/Native/writer.py
+MemoryScanner/Proto/__init__.py
+MemoryScanner/Proto/health.proto
+MemoryScanner/Proto/memory_scanner.proto
 MemoryScanner/Server/__init__.py
 MemoryScanner/Server/main.py
 MemoryScanner/Server/memory_scanner_service.py
