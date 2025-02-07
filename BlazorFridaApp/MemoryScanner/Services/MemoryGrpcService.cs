@@ -9,7 +9,7 @@ namespace BlazorFridaApp.MemoryScanner.Services;
 public class MemoryGrpcService : BaseGrpcService, IMemoryReaderService
 {
     private string _currentSessionId = string.Empty;
-    private readonly nint _processHandle;
+    private nint _processHandle;
     public nint ProcessHandle => _processHandle;
 
     private readonly ILogger<MemoryGrpcService> _memoryLogger;

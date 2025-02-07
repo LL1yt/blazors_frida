@@ -25,14 +25,13 @@ public class RetryPolicyService
             .WaitAndRetryAsync(
                 MaxRetries,
                 retryAttempt => TimeSpan.FromMilliseconds(InitialDelayMs * Math.Pow(2, retryAttempt - 1)),
-                (exception, timeSpan, retryCount, _) =>
+                (result, duration, retryCount, context) =>
                 {
-                    _logger.LogWarning(
-                        exception,
-                        "Attempt {RetryCount} of {MaxRetries} failed. Retrying in {DelayMs}ms...",
-                        retryCount,
-                        MaxRetries,
-                        timeSpan.TotalMilliseconds);
+                    if (result.Exception != null)
+                    {
+                        var logMessage = $"Attempt {retryCount} of {MaxRetries} failed. Retrying in {duration.TotalMilliseconds}ms...";
+                        _logger.LogWarning(result.Exception, logMessage);
+                    }
                 });
     }
 
@@ -45,14 +44,10 @@ public class RetryPolicyService
             .WaitAndRetryAsync(
                 MaxRetries,
                 retryAttempt => TimeSpan.FromMilliseconds(InitialDelayMs * Math.Pow(2, retryAttempt - 1)),
-                (exception, timeSpan, retryCount, _) =>
+                (exception, duration, retryCount, context) =>
                 {
-                    _logger.LogWarning(
-                        exception,
-                        "Attempt {RetryCount} of {MaxRetries} failed. Retrying in {DelayMs}ms...",
-                        retryCount,
-                        MaxRetries,
-                        timeSpan.TotalMilliseconds);
+                    var logMessage = $"Attempt {retryCount} of {MaxRetries} failed. Retrying in {duration.TotalMilliseconds}ms...";
+                    _logger.LogWarning(exception, logMessage);
                 });
     }
 }
