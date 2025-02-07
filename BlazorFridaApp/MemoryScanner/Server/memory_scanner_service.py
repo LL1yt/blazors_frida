@@ -9,9 +9,10 @@ from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
 
 import sys
-sys.path.append('../Proto')
-sys.path.append('../Native')
-sys.path.append('../Operations')
+
+sys.path.append("../Proto")
+sys.path.append("../Native")
+sys.path.append("../Operations")
 
 from MemoryScanner.Native import memory_scanner_pb2, memory_scanner_pb2_grpc, health_pb2
 from MemoryScanner.Native.frida_module import FridaMemoryScanner
@@ -19,14 +20,21 @@ from MemoryScanner.Native.process_list import get_process_list
 from MemoryScanner.Native.scanner import MemoryScanner
 from MemoryScanner.Native.reader import MemoryReader
 from MemoryScanner.Native.writer import MemoryWriter
-from MemoryScanner.Server.metrics import active_sessions_counter, operation_counter, operation_duration, error_counter
+from MemoryScanner.Server.metrics import (
+    active_sessions_counter,
+    operation_counter,
+    operation_duration,
+    error_counter,
+)
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
+
 class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     def __init__(self):
         from MemoryScanner.Server import metrics
+
         metrics.init_metrics()  # Initialize metrics
 
         self.sessions: Dict[str, FridaMemoryScanner] = {}
@@ -41,7 +49,9 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         self.active_sessions_counter = metrics.active_sessions_counter
         logger.info("MemoryScannerService initialized")
 
-    async def ListProcesses(self, request: memory_scanner_pb2.Empty, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.ProcessList:
+    async def ListProcesses(
+        self, request: memory_scanner_pb2.Empty, context: grpc.aio.ServicerContext
+    ) -> memory_scanner_pb2.ProcessList:
         with tracer.start_as_current_span("list_processes") as span:
             try:
                 logger.info("Starting process list enumeration...")
@@ -49,7 +59,9 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 logger.info(f"Found {len(processes)} processes")
                 return memory_scanner_pb2.ProcessList(
                     processes=[
-                        memory_scanner_pb2.ProcessInfo(pid=p.pid, name=p.name, path=p.path)
+                        memory_scanner_pb2.ProcessInfo(
+                            pid=p.pid, name=p.name, path=p.path
+                        )
                         for p in processes
                     ]
                 )
@@ -59,7 +71,11 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 context.set_details(str(e))
                 return memory_scanner_pb2.ProcessList()
 
-    async def AttachToProcess(self, request: memory_scanner_pb2.ProcessRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.AttachResponse:
+    async def AttachToProcess(
+        self,
+        request: memory_scanner_pb2.ProcessRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> memory_scanner_pb2.AttachResponse:
         with tracer.start_as_current_span("attach_to_process") as span:
             try:
                 session_id = str(uuid.uuid4())
@@ -76,14 +92,24 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 self.active_sessions_counter.add(1)
                 self.operation_counter.add(1, {"operation": "attach"})
 
-                logger.info(f"Successfully attached to process {request.pid} with session {session_id}")
-                return memory_scanner_pb2.AttachResponse(success=True, session_id=session_id)
+                logger.info(
+                    f"Successfully attached to process {request.pid} with session {session_id}"
+                )
+                return memory_scanner_pb2.AttachResponse(
+                    success=True, session_id=session_id
+                )
             except Exception as e:
                 self.error_counter.add(1, {"operation": "attach", "error": str(e)})
                 logger.error(f"Failed to attach to process {request.pid}", exc_info=e)
-                return memory_scanner_pb2.AttachResponse(success=False, error_message=str(e))
+                return memory_scanner_pb2.AttachResponse(
+                    success=False, error_message=str(e)
+                )
 
-    async def DetachFromProcess(self, request: memory_scanner_pb2.DetachRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.DetachResponse:
+    async def DetachFromProcess(
+        self,
+        request: memory_scanner_pb2.DetachRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> memory_scanner_pb2.DetachResponse:
         with tracer.start_as_current_span("detach_from_process") as span:
             try:
                 session_id = request.session_id
@@ -112,60 +138,83 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
             except Exception as e:
                 self.error_counter.add(1, {"operation": "detach", "error": str(e)})
                 logger.error(f"Failed to detach from session {session_id}", exc_info=e)
-                return memory_scanner_pb2.DetachResponse(success=False, error_message=str(e))
+                return memory_scanner_pb2.DetachResponse(
+                    success=False, error_message=str(e)
+                )
 
-    async def ScanMemory(self, request: memory_scanner_pb2.ScanRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.ScanResponse:
+    async def ScanMemory(
+        self, request: memory_scanner_pb2.ScanRequest, context: grpc.aio.ServicerContext
+    ) -> memory_scanner_pb2.ScanResponse:
         with tracer.start_as_current_span("scan_memory") as span:
             try:
                 start_time = time.time()
-                
+
                 session_id = request.session_id
                 if session_id not in self.sessions:
                     raise ValueError(f"Invalid session ID: {session_id}")
                 scanner = self.scanners[session_id]
                 span.set_attribute("scan.type", request.scan_type)
                 span.set_attribute("value.type", request.value_type)
-                
+
                 # Record pattern scan metric before the scan
                 if request.value_type == "pattern":
                     logger.debug("Recording pattern scan metric")
                     await self.operation_counter.add(1, {"operation": "pattern_scan"})
-                
+
                 results = await scanner.scan(
-                    request.value,
-                    request.value_type,
-                    request.comparison_type
+                    request.value, request.value_type, request.comparison_type
                 )
-                
+
                 duration = time.time() - start_time
-                operation_type = "pattern_scan" if request.value_type == "pattern" else "scan"
-                
-                if operation_type == "scan":  # Only record normal scan metric if not pattern scan
+                operation_type = (
+                    "pattern_scan" if request.value_type == "pattern" else "scan"
+                )
+
+                if (
+                    operation_type == "scan"
+                ):  # Only record normal scan metric if not pattern scan
                     await self.operation_counter.add(1, {"operation": operation_type})
-                await self.operation_duration.record(duration, {"operation": operation_type})
-                
+                await self.operation_duration.record(
+                    duration, {"operation": operation_type}
+                )
+
                 self.state_versions[session_id] = str(uuid.uuid4())
-                logger.info(f"{operation_type.title()} completed for session {session_id}, found {len(results)} results")
-                
+                logger.info(
+                    f"{operation_type.title()} completed for session {session_id}, found {len(results)} results"
+                )
+
                 return memory_scanner_pb2.ScanResponse(
                     results=[
                         memory_scanner_pb2.ScanResult(
                             address=addr,
-                            value=value if isinstance(value, bytes) else str(value).encode('utf-8')
+                            value=(
+                                value
+                                if isinstance(value, bytes)
+                                else str(value).encode("utf-8")
+                            ),
                         )
                         for addr, value in results
                     ],
-                    checkpoint_id=str(uuid.uuid4())
+                    checkpoint_id=str(uuid.uuid4()),
                 )
             except Exception as e:
-                operation_type = "pattern_scan" if request.value_type == "pattern" else "scan"
-                await self.error_counter.add(1, {"operation": operation_type, "error": str(e)})
-                logger.error(f"Failed to perform {operation_type} for session {session_id}", exc_info=e)
+                operation_type = (
+                    "pattern_scan" if request.value_type == "pattern" else "scan"
+                )
+                await self.error_counter.add(
+                    1, {"operation": operation_type, "error": str(e)}
+                )
+                logger.error(
+                    f"Failed to perform {operation_type} for session {session_id}",
+                    exc_info=e,
+                )
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return memory_scanner_pb2.ScanResponse()
 
-    async def ReadMemory(self, request: memory_scanner_pb2.ReadRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.ReadResponse:
+    async def ReadMemory(
+        self, request: memory_scanner_pb2.ReadRequest, context: grpc.aio.ServicerContext
+    ) -> memory_scanner_pb2.ReadResponse:
         with tracer.start_as_current_span("read_memory") as span:
             try:
                 session_id = request.session_id
@@ -178,19 +227,28 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 with self.operation_duration.time({"operation": "read"}):
                     value = await reader.read_memory(
-                        request.address,
-                        request.value_type
+                        request.address, request.value_type
                     )
 
                 self.operation_counter.add(1, {"operation": "read"})
-                logger.info(f"Memory read completed for session {session_id} at address {request.address}")
+                logger.info(
+                    f"Memory read completed for session {session_id} at address {request.address}"
+                )
                 return memory_scanner_pb2.ReadResponse(value=value, success=True)
             except Exception as e:
                 self.error_counter.add(1, {"operation": "read", "error": str(e)})
-                logger.error(f"Failed to read memory for session {session_id}", exc_info=e)
-                return memory_scanner_pb2.ReadResponse(success=False, error_message=str(e))
+                logger.error(
+                    f"Failed to read memory for session {session_id}", exc_info=e
+                )
+                return memory_scanner_pb2.ReadResponse(
+                    success=False, error_message=str(e)
+                )
 
-    async def WriteMemory(self, request: memory_scanner_pb2.WriteRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.WriteResponse:
+    async def WriteMemory(
+        self,
+        request: memory_scanner_pb2.WriteRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> memory_scanner_pb2.WriteResponse:
         with tracer.start_as_current_span("write_memory") as span:
             try:
                 session_id = request.session_id
@@ -203,34 +261,51 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 with self.operation_duration.time({"operation": "write"}):
                     success = await writer.write_memory(
-                        request.address,
-                        request.value,
-                        request.value_type
+                        request.address, request.value, request.value_type
                     )
 
                 self.operation_counter.add(1, {"operation": "write"})
                 self.state_versions[session_id] = str(uuid.uuid4())
 
-                logger.info(f"Memory write completed for session {session_id} at address {request.address}")
+                logger.info(
+                    f"Memory write completed for session {session_id} at address {request.address}"
+                )
                 return memory_scanner_pb2.WriteResponse(success=success)
             except Exception as e:
                 self.error_counter.add(1, {"operation": "write", "error": str(e)})
-                logger.error(f"Failed to write memory for session {session_id}", exc_info=e)
-                return memory_scanner_pb2.WriteResponse(success=False, error_message=str(e))
+                logger.error(
+                    f"Failed to write memory for session {session_id}", exc_info=e
+                )
+                return memory_scanner_pb2.WriteResponse(
+                    success=False, error_message=str(e)
+                )
 
-    async def _freeze_value_task(self, session_id: str, address: int, value: bytes, value_type: str, context: grpc.aio.ServicerContext):
+    async def _freeze_value_task(
+        self,
+        session_id: str,
+        address: int,
+        value: bytes,
+        value_type: str,
+        context: grpc.aio.ServicerContext,
+    ):
         writer = self.writers[session_id]
         try:
             while True:
                 await writer.write_memory(address, value, value_type)
                 await asyncio.sleep(0.1)  # Small delay to prevent excessive CPU usage
         except asyncio.CancelledError:
-            logger.info(f"Freeze task cancelled for session {session_id} at address {address}")
+            logger.info(
+                f"Freeze task cancelled for session {session_id} at address {address}"
+            )
         except Exception as e:
             logger.error(f"Error in freeze task for session {session_id}", exc_info=e)
             raise
 
-    async def FreezeValue(self, request: memory_scanner_pb2.FreezeRequest, context: grpc.aio.ServicerContext):
+    async def FreezeValue(
+        self,
+        request: memory_scanner_pb2.FreezeRequest,
+        context: grpc.aio.ServicerContext,
+    ):
         """Stream status updates while freezing a value at the specified address."""
         with tracer.start_as_current_span("freeze_value") as span:
             try:
@@ -249,93 +324,115 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 # Convert request value to int for comparison if it's an integer type
                 expected_value = None
                 if request.value_type in ["int32", "int64", "int16", "int8"]:
-                    expected_value = int.from_bytes(request.value, byteorder='little', signed=True)
+                    expected_value = int.from_bytes(
+                        request.value, byteorder="little", signed=True
+                    )
 
                 while True:
                     try:
                         # Write the value
                         success = await writer.write_memory(
-                            request.address,
-                            request.value,
-                            request.value_type
+                            request.address, request.value, request.value_type
                         )
 
                         if not success:
-                            logger.error(f"Failed to write memory in freeze task for session {session_id}")
+                            logger.error(
+                                f"Failed to write memory in freeze task for session {session_id}"
+                            )
                             yield memory_scanner_pb2.FreezeStatus(
                                 active=False,
                                 current_value=request.value,
-                                error_message="Failed to write memory"
+                                error_message="Failed to write memory",
                             )
                             break
 
                         # Read back the current value to verify
                         current_value = await reader.read_memory(
-                            request.address,
-                            request.value_type
+                            request.address, request.value_type
                         )
 
                         # Verify the value based on type
                         if request.value_type in ["int32", "int64", "int16", "int8"]:
                             # Convert current value to int
-                            current_int = int.from_bytes(current_value, byteorder='little', signed=True)
-                            
+                            current_int = int.from_bytes(
+                                current_value, byteorder="little", signed=True
+                            )
+
                             # Convert back to bytes for response
-                            current_value = current_int.to_bytes(len(request.value), byteorder='little', signed=True)
-                            
+                            current_value = current_int.to_bytes(
+                                len(request.value), byteorder="little", signed=True
+                            )
+
                             # Compare integer values
                             if current_int != expected_value:
-                                logger.error(f"Value mismatch: got {current_int}, expected {expected_value}")
+                                logger.error(
+                                    f"Value mismatch: got {current_int}, expected {expected_value}"
+                                )
                                 yield memory_scanner_pb2.FreezeStatus(
                                     active=False,
                                     current_value=current_value,
-                                    error_message=f"Value mismatch: got {current_int}, expected {expected_value}"
+                                    error_message=f"Value mismatch: got {current_int}, expected {expected_value}",
                                 )
                                 break
                         else:
                             # For other types, ensure we have bytes
                             if not isinstance(current_value, bytes):
-                                current_value = current_value if isinstance(current_value, bytes) else str(current_value).encode('utf-8')
+                                current_value = (
+                                    current_value
+                                    if isinstance(current_value, bytes)
+                                    else str(current_value).encode("utf-8")
+                                )
 
                             # Direct comparison for non-integer types
                             if current_value != request.value:
                                 yield memory_scanner_pb2.FreezeStatus(
                                     active=False,
                                     current_value=current_value,
-                                    error_message="Value mismatch"
+                                    error_message="Value mismatch",
                                 )
                                 break
 
                         # Value matched, yield success status
                         yield memory_scanner_pb2.FreezeStatus(
-                            active=True,
-                            current_value=current_value
+                            active=True, current_value=current_value
                         )
 
-                        await asyncio.sleep(0.1)  # Small delay to prevent excessive CPU usage
+                        await asyncio.sleep(
+                            0.1
+                        )  # Small delay to prevent excessive CPU usage
 
                     except asyncio.CancelledError:
-                        logger.info(f"Freeze task cancelled for session {session_id} at address {request.address}")
+                        logger.info(
+                            f"Freeze task cancelled for session {session_id} at address {request.address}"
+                        )
                         break
                     except Exception as e:
-                        logger.error(f"Error in freeze task for session {session_id}", exc_info=e)
+                        logger.error(
+                            f"Error in freeze task for session {session_id}", exc_info=e
+                        )
                         yield memory_scanner_pb2.FreezeStatus(
                             active=False,
                             current_value=request.value,
-                            error_message=str(e)
+                            error_message=str(e),
                         )
                         break
 
             except Exception as e:
-                await self.error_counter.add(1, {"operation": "freeze", "error": str(e)})
-                logger.error(f"Failed to start freeze task for session {session_id}", exc_info=e)
+                await self.error_counter.add(
+                    1, {"operation": "freeze", "error": str(e)}
+                )
+                logger.error(
+                    f"Failed to start freeze task for session {session_id}", exc_info=e
+                )
                 yield memory_scanner_pb2.FreezeStatus(
-                    active=False,
-                    current_value=request.value,
-                    error_message=str(e)
+                    active=False, current_value=request.value, error_message=str(e)
                 )
 
-    async def UnfreezeValue(self, request: memory_scanner_pb2.UnfreezeRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.Empty:
+    async def UnfreezeValue(
+        self,
+        request: memory_scanner_pb2.UnfreezeRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> memory_scanner_pb2.Empty:
         with tracer.start_as_current_span("unfreeze_value") as span:
             try:
                 session_id = request.session_id
@@ -346,16 +443,24 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     task, address = self.freezer_tasks[session_id]
                     task.cancel()
                     del self.freezer_tasks[session_id]
-                    
-                self.operation_counter.add(1, {"operation": "unfreeze"})
+
+                await self.operation_counter.add(1, {"operation": "unfreeze"})
                 logger.info(f"Cancelled freeze task for session {session_id}")
                 return memory_scanner_pb2.Empty()
             except Exception as e:
-                self.error_counter.add(1, {"operation": "unfreeze", "error": str(e)})
-                logger.error(f"Failed to cancel freeze task for session {session_id}", exc_info=e)
+                await self.error_counter.add(
+                    1, {"operation": "unfreeze", "error": str(e)}
+                )
+                logger.error(
+                    f"Failed to cancel freeze task for session {session_id}", exc_info=e
+                )
                 return memory_scanner_pb2.Empty()
 
-    async def GetState(self, request: memory_scanner_pb2.StateRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.StateResponse:
+    async def GetState(
+        self,
+        request: memory_scanner_pb2.StateRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> memory_scanner_pb2.StateResponse:
         with tracer.start_as_current_span("get_state") as span:
             try:
                 session_id = request.session_id
@@ -364,21 +469,28 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 scanner = self.scanners[session_id]
                 version = self.state_versions[session_id]
-                
+
                 state = {
                     "scan_results": scanner.get_results(),
-                    "frozen_addresses": [addr for _, (_, addr) in self.freezer_tasks.items() if _ == session_id]
+                    "frozen_addresses": [
+                        addr
+                        for _, (_, addr) in self.freezer_tasks.items()
+                        if _ == session_id
+                    ],
                 }
 
                 return memory_scanner_pb2.StateResponse(
-                    state=str(state),
-                    version=version
+                    state=str(state), version=version
                 )
             except Exception as e:
-                logger.error(f"Failed to get state for session {session_id}", exc_info=e)
+                logger.error(
+                    f"Failed to get state for session {session_id}", exc_info=e
+                )
                 return memory_scanner_pb2.StateResponse(error_message=str(e))
 
-    async def SyncState(self, request: memory_scanner_pb2.SyncRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.SyncResponse:
+    async def SyncState(
+        self, request: memory_scanner_pb2.SyncRequest, context: grpc.aio.ServicerContext
+    ) -> memory_scanner_pb2.SyncResponse:
         with tracer.start_as_current_span("sync_state") as span:
             try:
                 session_id = request.session_id
@@ -389,17 +501,21 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 needs_sync = current_version != request.version
 
                 return memory_scanner_pb2.SyncResponse(
-                    needs_sync=needs_sync,
-                    current_version=current_version
+                    needs_sync=needs_sync, current_version=current_version
                 )
             except Exception as e:
-                logger.error(f"Failed to check sync state for session {session_id}", exc_info=e)
+                logger.error(
+                    f"Failed to check sync state for session {session_id}", exc_info=e
+                )
                 return memory_scanner_pb2.SyncResponse(
-                    needs_sync=True,
-                    error_message=str(e)
+                    needs_sync=True, error_message=str(e)
                 )
 
-    async def ScanPattern(self, request: memory_scanner_pb2.PatternScanRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.ScanResponse:
+    async def ScanPattern(
+        self,
+        request: memory_scanner_pb2.PatternScanRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> memory_scanner_pb2.ScanResponse:
         with tracer.start_as_current_span("scan_pattern") as span:
             try:
                 session_id = request.session_id
@@ -415,20 +531,29 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 self.operation_counter.add(1, {"operation": "pattern_scan"})
                 self.state_versions[session_id] = str(uuid.uuid4())
 
-                logger.info(f"Pattern scan completed for session {session_id}, found {len(results)} results")
+                logger.info(
+                    f"Pattern scan completed for session {session_id}, found {len(results)} results"
+                )
                 return memory_scanner_pb2.ScanResponse(
                     results=[
                         memory_scanner_pb2.ScanResult(
                             address=addr,
-                            value=bytes([])  # Pattern scan doesn't return values, just addresses
+                            value=bytes(
+                                []
+                            ),  # Pattern scan doesn't return values, just addresses
                         )
                         for addr, _ in results
                     ],
-                    checkpoint_id=str(uuid.uuid4())
+                    checkpoint_id=str(uuid.uuid4()),
                 )
             except Exception as e:
-                self.error_counter.add(1, {"operation": "pattern_scan", "error": str(e)})
-                logger.error(f"Failed to perform pattern scan for session {session_id}", exc_info=e)
+                self.error_counter.add(
+                    1, {"operation": "pattern_scan", "error": str(e)}
+                )
+                logger.error(
+                    f"Failed to perform pattern scan for session {session_id}",
+                    exc_info=e,
+                )
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return memory_scanner_pb2.ScanResponse()
