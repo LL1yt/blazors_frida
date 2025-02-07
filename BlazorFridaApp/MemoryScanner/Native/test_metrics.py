@@ -195,22 +195,10 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
     async def test_scan_metrics(self):
         """Test metrics collection for ScanMemory"""
         # Arrange
-        session_id = "test_session"
-        scanner_mock = MagicMock()
-
-        async def mock_scan(*args, **kwargs):
-            current_span = trace.get_current_span()
-            current_span.set_attribute("memory.value_type", kwargs.get("value_type"))
-            current_span.set_attribute(
-                "memory.comparison_type", kwargs.get("comparison_type")
-            )
-            current_span.set_attribute(
-                "memory.ranges_count", len(kwargs.get("ranges", []))
-            )
-            return []
-
-        scanner_mock.scan = mock_scan
-        self.service.scanners[session_id] = scanner_mock
+        attach_response = await self.service.AttachToProcess(
+            memory_scanner_pb2.ProcessRequest(pid=1234), self.context
+        )
+        session_id = attach_response.session_id
         request = memory_scanner_pb2.ScanRequest(
             session_id=session_id,
             value_type="int32",
@@ -220,7 +208,22 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        response = await self.service.ScanMemory(request, self.context)
+        with patch("memory_scanner_service.MemoryScanner") as mock_scanner:
+            instance = mock_scanner.return_value
+
+            async def mock_scan(*args, **kwargs):
+                current_span = trace.get_current_span()
+                current_span.set_attribute("memory.value_type", kwargs.get("value_type"))
+                current_span.set_attribute(
+                    "memory.comparison_type", kwargs.get("comparison_type")
+                )
+                current_span.set_attribute(
+                    "memory.ranges_count", len(kwargs.get("ranges", []))
+                )
+                return []
+
+            instance.scan = mock_scan
+            response = await self.service.ScanMemory(request, self.context)
 
         # Assert
         self.operation_counter.add.assert_called_once_with(1, {"operation": "scan"})
@@ -230,17 +233,12 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
     async def test_pattern_scanner(self):
         """Test pattern scanning functionality"""
         # Arrange
-        session_id = "test_session"
-        scanner_mock = MagicMock()
+        attach_response = await self.service.AttachToProcess(
+            memory_scanner_pb2.ProcessRequest(pid=1234), self.context
+        )
+        session_id = attach_response.session_id
         pattern = "48 8B ? ? 45 85"  # Test pattern
 
-        async def mock_scan(*args, **kwargs):
-            current_span = trace.get_current_span()
-            current_span.set_attribute("pattern.value", pattern)
-            return [{"address": 0x1000, "value": pattern}]
-
-        scanner_mock.scan = mock_scan
-        self.service.scanners[session_id] = scanner_mock
         request = memory_scanner_pb2.ScanRequest(
             session_id=session_id,
             value_type="pattern",
@@ -250,7 +248,16 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         )
 
         # Act
-        response = await self.service.ScanMemory(request, self.context)
+        with patch("memory_scanner_service.MemoryScanner") as mock_scanner:
+            instance = mock_scanner.return_value
+
+            async def mock_scan(*args, **kwargs):
+                current_span = trace.get_current_span()
+                current_span.set_attribute("pattern.value", pattern)
+                return [{"address": 0x1000, "value": pattern}]
+
+            instance.scan = mock_scan
+            response = await self.service.ScanMemory(request, self.context)
 
         # Assert
         self.operation_counter.add.assert_called_once_with(

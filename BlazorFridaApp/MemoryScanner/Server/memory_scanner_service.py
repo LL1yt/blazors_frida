@@ -124,20 +124,28 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 span.set_attribute("value.type", request.value_type)
 
                 with self.operation_duration.time({"operation": "scan"}):
-                    if request.scan_type == memory_scanner_pb2.ScanType.FIRST:
-                        results = await scanner.first_scan(
+                    if request.value_type == "pattern":
+                        results = await scanner.scan(
                             request.value,
                             request.value_type,
                             request.compare_operation
                         )
+                        self.operation_counter.add(1, {"operation": "pattern_scan"})
                     else:
-                        results = await scanner.next_scan(
-                            request.value,
-                            request.value_type,
-                            request.compare_operation
-                        )
+                        if request.scan_type == memory_scanner_pb2.ScanType.FIRST:
+                            results = await scanner.first_scan(
+                                request.value,
+                                request.value_type,
+                                request.compare_operation
+                            )
+                        else:
+                            results = await scanner.next_scan(
+                                request.value,
+                                request.value_type,
+                                request.compare_operation
+                            )
+                        self.operation_counter.add(1, {"operation": "scan"})
 
-                self.operation_counter.add(1, {"operation": "scan"})
                 self.state_versions[session_id] = str(uuid.uuid4())
 
                 logger.info(f"Scan completed for session {session_id}, found {len(results)} results")

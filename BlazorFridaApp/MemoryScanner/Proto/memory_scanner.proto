@@ -13,6 +13,7 @@ service MemoryScanner {
 
   // Memory scanning operations
   rpc ScanMemory (ScanRequest) returns (ScanResponse);
+  rpc ScanPattern (PatternScanRequest) returns (ScanResponse);  // Added pattern scan operation
   rpc ReadMemory (ReadRequest) returns (ReadResponse);
   rpc WriteMemory (WriteRequest) returns (WriteResponse);
 
@@ -79,6 +80,12 @@ message ScanResponse {
 message ScanResult {
   uint64 address = 1;
   bytes value = 2;
+}
+
+// Pattern scanning message
+message PatternScanRequest {
+  string session_id = 1;
+  string pattern = 2;
 }
 
 // Memory access messages

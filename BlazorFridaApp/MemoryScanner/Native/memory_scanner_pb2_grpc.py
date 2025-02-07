@@ -55,6 +55,11 @@ class MemoryScannerStub(object):
                 request_serializer=memory__scanner__pb2.ScanRequest.SerializeToString,
                 response_deserializer=memory__scanner__pb2.ScanResponse.FromString,
                 _registered_method=True)
+        self.ScanPattern = channel.unary_unary(
+                '/memory_scanner.MemoryScanner/ScanPattern',
+                request_serializer=memory__scanner__pb2.PatternScanRequest.SerializeToString,
+                response_deserializer=memory__scanner__pb2.ScanResponse.FromString,
+                _registered_method=True)
         self.ReadMemory = channel.unary_unary(
                 '/memory_scanner.MemoryScanner/ReadMemory',
                 request_serializer=memory__scanner__pb2.ReadRequest.SerializeToString,
@@ -112,6 +117,13 @@ class MemoryScannerServicer(object):
 
     def ScanMemory(self, request, context):
         """Memory scanning operations
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ScanPattern(self, request, context):
+        """Added pattern scan operation
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -176,6 +188,11 @@ def add_MemoryScannerServicer_to_server(servicer, server):
             'ScanMemory': grpc.unary_unary_rpc_method_handler(
                     servicer.ScanMemory,
                     request_deserializer=memory__scanner__pb2.ScanRequest.FromString,
+                    response_serializer=memory__scanner__pb2.ScanResponse.SerializeToString,
+            ),
+            'ScanPattern': grpc.unary_unary_rpc_method_handler(
+                    servicer.ScanPattern,
+                    request_deserializer=memory__scanner__pb2.PatternScanRequest.FromString,
                     response_serializer=memory__scanner__pb2.ScanResponse.SerializeToString,
             ),
             'ReadMemory': grpc.unary_unary_rpc_method_handler(
@@ -317,6 +334,33 @@ class MemoryScanner(object):
             target,
             '/memory_scanner.MemoryScanner/ScanMemory',
             memory__scanner__pb2.ScanRequest.SerializeToString,
+            memory__scanner__pb2.ScanResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ScanPattern(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/memory_scanner.MemoryScanner/ScanPattern',
+            memory__scanner__pb2.PatternScanRequest.SerializeToString,
             memory__scanner__pb2.ScanResponse.FromString,
             options,
             channel_credentials,

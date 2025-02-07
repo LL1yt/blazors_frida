@@ -1,4 +1,11 @@
 @echo off
+echo Installing Python requirements...
+pip install -r requirements.txt
+
+echo.
+echo Generating gRPC code...
+python generate_protos.py
+
 echo Starting Python gRPC server in a new window...
 start "Memory Scanner gRPC Server" cmd /k python ../Server/main.py
 
