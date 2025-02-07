@@ -54,6 +54,11 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         });
     }
 
+    protected virtual Proto.MemoryScanner.MemoryScannerClient CreateClient(GrpcChannel channel)
+    {
+        return new Proto.MemoryScanner.MemoryScannerClient(channel);
+    }
+
     private Metadata CreateMetadata()
     {
         var metadata = new Metadata();
@@ -144,7 +149,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+            var client = CreateClient(channel);
             
             var request = new Proto.DetachRequest
             {
@@ -178,7 +183,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+            var client = CreateClient(channel);
 
             var request = new Proto.ScanRequest
             {
@@ -253,7 +258,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+            var client = CreateClient(channel);
             
             var request = new Proto.ReadRequest
             {
@@ -282,7 +287,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+            var client = CreateClient(channel);
 
             var request = new Proto.WriteRequest
             {
@@ -349,7 +354,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+            var client = CreateClient(channel);
 
             var request = new Proto.StateRequest
             {
@@ -381,7 +386,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         try
         {
             var channel = await GetChannelAsync();
-            var client = new Proto.MemoryScanner.MemoryScannerClient(channel);
+            var client = CreateClient(channel);
 
             var request = new Proto.SyncRequest
             {

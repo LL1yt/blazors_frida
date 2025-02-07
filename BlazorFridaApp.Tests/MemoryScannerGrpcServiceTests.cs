@@ -16,6 +16,7 @@ public class MemoryScannerGrpcServiceTests : IDisposable
     private readonly Mock<ILogger<MemoryScannerGrpcService>> _loggerMock;
     private readonly Mock<IPythonProcessManager> _processManagerMock;
     private readonly MemoryScannerGrpcService _service;
+    private readonly Mock<BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient> _clientMock;
 
     public MemoryScannerGrpcServiceTests()
     {
@@ -24,7 +25,92 @@ public class MemoryScannerGrpcServiceTests : IDisposable
         _processManagerMock.Setup(x => x.Port).Returns(50051);
         _processManagerMock.Setup(x => x.EnsureServerRunning()).Returns(Task.CompletedTask);
         
-        _service = new MemoryScannerGrpcService(_loggerMock.Object, _processManagerMock.Object);
+        _clientMock = new Mock<BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient>();
+        SetupMockResponses();
+        
+        _service = new TestMemoryScannerGrpcService(_loggerMock.Object, _processManagerMock.Object, _clientMock.Object);
+    }
+
+    private void SetupMockResponses()
+    {
+        // Setup ReadMemory mock response
+        _clientMock.Setup(x => x.ReadMemoryAsync(
+            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.ReadRequest>(),
+            It.IsAny<CallOptions>()
+        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.ReadResponse>(
+            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.ReadResponse { 
+                Success = true,
+                Value = Google.Protobuf.ByteString.CopyFrom(new byte[] { 1, 2, 3, 4 }),
+                ErrorMessage = string.Empty
+            }),
+            Task.FromResult(new Metadata()),
+            () => Status.DefaultSuccess,
+            () => new Metadata(),
+            () => { }
+        ));
+
+        // Setup WriteMemory mock response
+        _clientMock.Setup(x => x.WriteMemoryAsync(
+            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.WriteRequest>(),
+            It.IsAny<CallOptions>()
+        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.WriteResponse>(
+            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.WriteResponse { 
+                Success = true,
+                ErrorMessage = string.Empty
+            }),
+            Task.FromResult(new Metadata()),
+            () => Status.DefaultSuccess,
+            () => new Metadata(),
+            () => { }
+        ));
+
+        // Setup ScanMemory mock response
+        _clientMock.Setup(x => x.ScanMemoryAsync(
+            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.ScanRequest>(),
+            It.IsAny<CallOptions>()
+        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.ScanResponse>(
+            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.ScanResponse { 
+                Results = { new BlazorFridaApp.MemoryScanner.Proto.ScanResult { 
+                    Address = 0x1000,
+                    Value = Google.Protobuf.ByteString.CopyFrom(new byte[] { 1, 2, 3, 4 })
+                }}
+            }),
+            Task.FromResult(new Metadata()),
+            () => Status.DefaultSuccess,
+            () => new Metadata(),
+            () => { }
+        ));
+
+        // Setup GetState mock response
+        _clientMock.Setup(x => x.GetStateAsync(
+            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.StateRequest>(),
+            It.IsAny<CallOptions>()
+        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.StateResponse>(
+            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.StateResponse {
+                State = { { "key1", Google.Protobuf.ByteString.CopyFrom(new byte[] { 1, 2, 3 }) } },
+                Version = "test-version"
+            }),
+            Task.FromResult(new Metadata()),
+            () => Status.DefaultSuccess,
+            () => new Metadata(),
+            () => { }
+        ));
+
+        // Setup SyncState mock response
+        _clientMock.Setup(x => x.SyncStateAsync(
+            It.IsAny<BlazorFridaApp.MemoryScanner.Proto.SyncRequest>(),
+            It.IsAny<CallOptions>()
+        )).Returns(new AsyncUnaryCall<BlazorFridaApp.MemoryScanner.Proto.SyncResponse>(
+            Task.FromResult(new BlazorFridaApp.MemoryScanner.Proto.SyncResponse {
+                Success = true,
+                ErrorMessage = string.Empty,
+                NewVersion = "test-version-2"
+            }),
+            Task.FromResult(new Metadata()),
+            () => Status.DefaultSuccess,
+            () => new Metadata(),
+            () => { }
+        ));
     }
 
     [Fact]
@@ -144,5 +230,25 @@ public class MemoryScannerGrpcServiceTests : IDisposable
     public void Dispose()
     {
         _service.Dispose();
+    }
+}
+
+// Helper class to inject the mock client
+public class TestMemoryScannerGrpcService : MemoryScannerGrpcService
+{
+    private readonly BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient _mockClient;
+
+    public TestMemoryScannerGrpcService(
+        ILogger<MemoryScannerGrpcService> logger,
+        IPythonProcessManager processManager,
+        BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient mockClient)
+        : base(logger, processManager)
+    {
+        _mockClient = mockClient;
+    }
+
+    protected override BlazorFridaApp.MemoryScanner.Proto.MemoryScanner.MemoryScannerClient CreateClient(GrpcChannel channel)
+    {
+        return _mockClient;
     }
 }
