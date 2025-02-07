@@ -1,8 +1,9 @@
 using BlazorFridaApp.Components;
-using BlazorFridaApp.MemoryScanner;
 using BlazorFridaApp.MemoryScanner.Services;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
-using BlazorFridaApp.MemoryScanner.Services.Adapters;
+using BlazorFridaApp.MemoryScanner.Services.Decorators;
+using BlazorFridaApp.MemoryScanner.Middleware;
+using BlazorFridaApp.MemoryScanner;
 using BlazorFridaApp.Persistence;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.Services.Interfaces;
@@ -21,6 +22,7 @@ using Serilog;
 using Serilog.Events;
 using BlazorFridaApp.MemoryScanner.Base;
 using Microsoft.Extensions.Http;
+using Scrutor;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -86,7 +88,8 @@ try
     // Register facade and interfaces
     builder.Services.AddScoped<BlazorFridaApp.MemoryScanner.Services.Interfaces.IMemoryScannerGrpcService, BlazorFridaApp.MemoryScanner.Services.MemoryScannerFacade>();
     builder.Services.AddScoped<IProcessService>(sp => sp.GetRequiredService<ProcessGrpcService>());
-    builder.Services.AddScoped<IMemoryReaderService>(sp => sp.GetRequiredService<MemoryGrpcService>());
+    builder.Services.AddScoped<IMemoryReaderService, MemoryGrpcService>();
+    builder.Services.Decorate<IMemoryReaderService, RetryMemoryServiceDecorator>();
     builder.Services.AddScoped<IMemoryScannerService>(sp => sp.GetRequiredService<ScannerGrpcService>());
 
     // Add the main ProcessMemoryScanner that orchestrates all services
@@ -111,23 +114,31 @@ try
     builder.Services.AddHealthChecks()
         .AddCheck<GrpcHealthCheck>("grpc_health_check", tags: new[] { "grpc" });
 
-var app = builder.Build();
+    builder.Services.AddScoped<RetryPolicyService>();
+    builder.Services.AddLogging(logging =>
+    {
+        logging.ClearProviders();
+        logging.AddConsole();
+        logging.AddDebug();
+        logging.SetMinimumLevel(LogLevel.Information);
+    });
 
-// Configure ProcessInfo logger
-using (var scope = app.Services.CreateScope())
-{
-    var processInfoLogger = scope.ServiceProvider.GetRequiredService<ILogger<ProcessInfo>>();
-    ProcessInfo.ConfigureLogger(processInfoLogger);
-}
+    var app = builder.Build();
 
-// Initialize database
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    var dbInitService = scope.ServiceProvider.GetRequiredService<IDatabaseInitializationService>();
-    await dbInitService.InitializeDatabaseAsync().ConfigureAwait(false);
-}
+    // Configure ProcessInfo logger
+    using (var scope = app.Services.CreateScope())
+    {
+        var processInfoLogger = scope.ServiceProvider.GetRequiredService<ILogger<ProcessInfo>>();
+        ProcessInfo.ConfigureLogger(processInfoLogger);
+    }
 
-// Configure the HTTP request pipeline.
+    // Initialize database
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        var dbInitService = scope.ServiceProvider.GetRequiredService<IDatabaseInitializationService>();
+        await dbInitService.InitializeDatabaseAsync().ConfigureAwait(false);
+    }
+
     // Configure the HTTP request pipeline.
     if (!app.Environment.IsDevelopment())
     {
@@ -138,6 +149,8 @@ await using (var scope = app.Services.CreateAsyncScope())
     app.UseHttpsRedirection();
     app.UseStaticFiles();
     app.UseAntiforgery();
+
+    app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
