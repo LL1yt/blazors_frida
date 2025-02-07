@@ -22,11 +22,16 @@ public class ScannerGrpcService : BaseGrpcService, IMemoryScannerService
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
 
+            // Convert the search pattern to bytes
+            byte[] patternBytes = searchPattern.Split(' ')
+                .Select(s => byte.Parse(s, System.Globalization.NumberStyles.HexNumber))
+                .ToArray();
+
             var request = new Proto.ScanRequest
             {
                 SessionId = process.Id.ToString(),
                 ValueType = "pattern",
-                Value = ByteString.CopyFromUtf8(searchPattern),
+                Value = ByteString.CopyFrom(patternBytes),
                 ScanType = scanType.ToString(),
                 ComparisonType = profile.ComparisonType ?? "exact"
             };
@@ -48,11 +53,13 @@ public class ScannerGrpcService : BaseGrpcService, IMemoryScannerService
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
 
+            // Convert pattern bytes to hex string for the gRPC call
+            string patternHex = BitConverter.ToString(pattern).Replace("-", " ");
+
             var request = new Proto.PatternScanRequest
             {
                 SessionId = processId.ToString(),
-                Pattern = ByteString.CopyFrom(pattern),
-                Mask = mask
+                Pattern = patternHex
             };
 
             var response = await client.ScanPatternAsync(request, CreateMetadata());
