@@ -259,7 +259,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         {
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
-            
+
             var request = new Proto.ReadRequest
             {
                 SessionId = sessionId,
@@ -271,10 +271,15 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
             var response = await client.ReadMemoryAsync(request, CreateMetadata());
             return (response.Value.ToByteArray(), response.Success, response.ErrorMessage);
         }
+        catch (RpcException ex)
+        {
+            _logger.LogError(ex, "Failed to read memory at {Address} for session {SessionId}", address, sessionId);
+            return (System.Array.Empty<byte>(), false, ex.Status.Detail);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to read memory at {Address} for session {SessionId}", address, sessionId);
-            return (new byte[0], false, ex.Message);
+            return (System.Array.Empty<byte>(), false, ex.Message);
         }
     }
 
@@ -299,6 +304,11 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
 
             var response = await client.WriteMemoryAsync(request, CreateMetadata());
             return (response.Success, response.ErrorMessage);
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogError(ex, "Failed to write memory at {Address} for session {SessionId}", address, sessionId);
+            return (false, ex.Status.Detail);
         }
         catch (Exception ex)
         {
@@ -359,22 +369,28 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
             var request = new Proto.StateRequest
             {
                 SessionId = sessionId,
-                CheckpointId = checkpointId
+                CheckpointId = checkpointId ?? string.Empty
             };
 
             var response = await client.GetStateAsync(request, CreateMetadata());
-
-            var state = response.State.ToDictionary(
-                kvp => kvp.Key,
-                kvp => kvp.Value.ToByteArray()
-            );
+            
+            var state = new Dictionary<string, byte[]>();
+            foreach (var kvp in response.State)
+            {
+                state[kvp.Key] = kvp.Value.ToByteArray();
+            }
 
             return (state, response.Version);
         }
+        catch (RpcException ex)
+        {
+            _logger.LogError(ex, "Failed to get state for session {SessionId} and checkpoint {CheckpointId}", sessionId, checkpointId);
+            return (new Dictionary<string, byte[]>(), string.Empty);
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get state for session {SessionId}", sessionId);
-            throw;
+            _logger.LogError(ex, "Failed to get state for session {SessionId} and checkpoint {CheckpointId}", sessionId, checkpointId);
+            return (new Dictionary<string, byte[]>(), string.Empty);
         }
     }
 
@@ -391,16 +407,21 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
             var request = new Proto.SyncRequest
             {
                 SessionId = sessionId,
-                Version = version
+                Version = version ?? string.Empty
             };
 
-            foreach (var (key, value) in stateUpdates)
+            foreach (var kvp in stateUpdates)
             {
-                request.StateUpdates[key] = Google.Protobuf.ByteString.CopyFrom(value);
+                request.StateUpdates[kvp.Key] = Google.Protobuf.ByteString.CopyFrom(kvp.Value);
             }
 
             var response = await client.SyncStateAsync(request, CreateMetadata());
             return (response.Success, response.ErrorMessage, response.NewVersion);
+        }
+        catch (RpcException ex)
+        {
+            _logger.LogError(ex, "Failed to sync state for session {SessionId}", sessionId);
+            return (false, ex.Status.Detail, string.Empty);
         }
         catch (Exception ex)
         {
