@@ -277,7 +277,7 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
 
             if (response == null)
             {
-                return (Array.Empty<byte>(), false, "No response received from server");
+                return (System.Array.Empty<byte>(), false, "No response received from server");
             }
 
             return (response.Value.ToByteArray(), response.Success, response.ErrorMessage);
@@ -285,12 +285,12 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
         catch (RpcException ex)
         {
             _logger.LogError(ex, "Failed to read memory at {Address} for session {SessionId}", address, sessionId);
-            return (Array.Empty<byte>(), false, ex.Status.Detail);
+            return (System.Array.Empty<byte>(), false, ex.Status.Detail);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to read memory at {Address} for session {SessionId}", address, sessionId);
-            return (Array.Empty<byte>(), false, ex.Message);
+            return (System.Array.Empty<byte>(), false, ex.Message);
         }
     }
 
