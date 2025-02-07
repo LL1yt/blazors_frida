@@ -1,4 +1,6 @@
-﻿namespace BlazorFridaApp.Tests;
+﻿using Xunit;
+
+namespace BlazorFridaApp.Tests;
 
 public class UnitTest1
 {
