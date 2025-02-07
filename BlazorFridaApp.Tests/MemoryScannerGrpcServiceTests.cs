@@ -56,11 +56,8 @@ public class MemoryScannerGrpcServiceTests
         _processServiceMock.Setup(x => x.AttachToProcessAsync(It.IsAny<int>()))
             .ReturnsAsync((true, "test-session"));
 
-        _memoryServiceMock.Setup(x => x.ReadMemoryBytes(
-            It.IsAny<string>(),
-            It.IsAny<ulong>(),
-            It.IsAny<int>()
-        )).ReturnsAsync((new byte[] { 1, 2, 3, 4 }, true, string.Empty));
+        _memoryServiceMock.Setup(x => x.ReadMemoryBytes(It.IsAny<nint>(), It.IsAny<int>()))
+            .ReturnsAsync(new byte[] { 1, 2, 3, 4 });
         
         _memoryServiceMock.Setup(x => x.WriteMemoryBytes(
             It.IsAny<string>(),
@@ -69,12 +66,11 @@ public class MemoryScannerGrpcServiceTests
         )).ReturnsAsync((true, string.Empty));
         
         _scannerServiceMock.Setup(x => x.ScanAsync(
+            It.IsAny<ProcessInfo>(),
             It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<byte[]>(),
-            It.IsAny<string>(),
-            It.IsAny<IEnumerable<(ulong start, ulong end)>>()
-        )).ReturnsAsync(new List<ScanResult> { new ScanResult { Addresses = new List<nint> { 0x1000 } } });
+            It.IsAny<int>(),
+            It.Is<ScanProfile>(p => p.ComparisonType == "exact")
+        )).ReturnsAsync(new List<string> { "0x1000" });
         
         _stateServiceMock.Setup(x => x.GetStateAsync(
             It.IsAny<string>(),
@@ -127,7 +123,7 @@ public class MemoryScannerGrpcServiceTests
     public async Task ScanMemoryAsync_ShouldHandleValidScan()
     {
         // Arrange
-        const string sessionId = "test-session";
+        const string sessionId = "1234-session";  // Using the process ID from the mock setup
         const string valueType = "int32";
         var value = new byte[] { 1, 2, 3, 4 };
         const string comparisonType = "exact";
@@ -188,7 +184,7 @@ public class MemoryScannerGrpcServiceTests
     public async Task ShouldHandleServerUnavailableError()
     {
         // Arrange
-        _processServiceMock.Setup(x => x.GetAccessibleProcessesAsync())
+        _memoryServiceMock.Setup(x => x.ReadMemoryBytes(It.IsAny<nint>(), It.IsAny<int>()))
             .ThrowsAsync(new RpcException(new Status(StatusCode.Unavailable, "Server unavailable")));
 
         // Act & Assert

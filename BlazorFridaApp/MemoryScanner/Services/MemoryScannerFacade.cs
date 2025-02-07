@@ -6,19 +6,19 @@ namespace BlazorFridaApp.MemoryScanner.Services;
 
 public class MemoryScannerFacade : BlazorFridaApp.MemoryScanner.Services.Interfaces.IMemoryScannerGrpcService
 {
-    private readonly ProcessGrpcService _processService;
-    private readonly MemoryGrpcService _memoryService;
-    private readonly ScannerGrpcService _scannerService;
-    private readonly StateGrpcService _stateService;
-    private readonly FreezeGrpcService _freezeService;
+    private readonly IProcessGrpcService _processService;
+    private readonly IMemoryGrpcService _memoryService;
+    private readonly IScannerGrpcService _scannerService;
+    private readonly IStateGrpcService _stateService;
+    private readonly IFreezeGrpcService _freezeService;
     private readonly ILogger<MemoryScannerFacade> _logger;
 
     public MemoryScannerFacade(
-        ProcessGrpcService processService,
-        MemoryGrpcService memoryService,
-        ScannerGrpcService scannerService,
-        StateGrpcService stateService,
-        FreezeGrpcService freezeService,
+        IProcessGrpcService processService,
+        IMemoryGrpcService memoryService,
+        IScannerGrpcService scannerService,
+        IStateGrpcService stateService,
+        IFreezeGrpcService freezeService,
         ILogger<MemoryScannerFacade> logger)
     {
         _processService = processService;
