@@ -76,26 +76,18 @@ try
     // Add Python process manager
     builder.Services.AddSingleton<IPythonProcessManager, PythonProcessManager>();
 
-    // Add gRPC service
-    builder.Services.AddScoped<IMemoryScannerGrpcService, MemoryScannerGrpcService>();
+    // Register specialized gRPC services
+    builder.Services.AddScoped<ProcessGrpcService>();
+    builder.Services.AddScoped<MemoryGrpcService>();
+    builder.Services.AddScoped<ScannerGrpcService>();
+    builder.Services.AddScoped<StateGrpcService>();
+    builder.Services.AddScoped<FreezeGrpcService>();
 
-    // Add memory scanner services
-    builder.Services.AddScoped<IProcessService>(sp =>
-        new ProcessServiceAdapter(sp.GetRequiredService<IMemoryScannerGrpcService>()));
-    // Register the gRPC service first
-    builder.Services.AddScoped<IMemoryScannerGrpcService, MemoryScannerGrpcService>();
-    
-    // Register the adapters
-    builder.Services.AddScoped<IMemoryReaderService>(sp =>
-        new MemoryReaderServiceAdapter(
-            sp.GetRequiredService<IMemoryScannerGrpcService>(),
-            sp.GetRequiredService<ILogger<MemoryReaderServiceAdapter>>()));
-    
-    // Use the gRPC service directly for IMemoryScannerService
-    builder.Services.AddScoped<IMemoryScannerService>(sp =>
-        (IMemoryScannerService)sp.GetRequiredService<IMemoryScannerGrpcService>());
-    builder.Services.AddScoped<IValueFreezerService, ValueFreezerService>();
-    builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
+    // Register facade and interfaces
+    builder.Services.AddScoped<IMemoryScannerGrpcService, MemoryScannerFacade>();
+    builder.Services.AddScoped<IProcessService>(sp => sp.GetRequiredService<ProcessGrpcService>());
+    builder.Services.AddScoped<IMemoryReaderService>(sp => sp.GetRequiredService<MemoryGrpcService>());
+    builder.Services.AddScoped<IMemoryScannerService>(sp => sp.GetRequiredService<ScannerGrpcService>());
 
     // Add the main ProcessMemoryScanner that orchestrates all services
     builder.Services.AddScoped<IProcessMemoryScanner, ProcessMemoryScanner>();
