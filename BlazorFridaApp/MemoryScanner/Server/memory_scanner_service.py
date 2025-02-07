@@ -2,6 +2,7 @@ import uuid
 import logging
 from typing import Dict
 import asyncio
+import time
 import grpc
 from grpc import aio
 from opentelemetry import trace
@@ -113,6 +114,8 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     async def ScanMemory(self, request: memory_scanner_pb2.ScanRequest, context: grpc.aio.ServicerContext) -> memory_scanner_pb2.ScanResponse:
         with tracer.start_as_current_span("scan_memory") as span:
             try:
+                start_time = time.time()
+                
                 session_id = request.session_id
                 if session_id not in self.sessions:
                     raise ValueError(f"Invalid session ID: {session_id}")
@@ -121,39 +124,28 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 span.set_attribute("scan.type", request.scan_type)
                 span.set_attribute("value.type", request.value_type)
 
-                with self.operation_duration.time({"operation": "scan"}):
-                    if request.value_type == "pattern":
-                        results = await scanner.scan(
-                            request.value,
-                            request.value_type,
-                            request.compare_operation
-                        )
-                        self.operation_counter.add(1, {"operation": "pattern_scan"})
-                    else:
-                        if request.scan_type == memory_scanner_pb2.ScanType.FIRST:
-                            results = await scanner.first_scan(
-                                request.value,
-                                request.value_type,
-                                request.compare_operation
-                            )
-                        else:
-                            results = await scanner.next_scan(
-                                request.value,
-                                request.value_type,
-                                request.compare_operation
-                            )
-                        self.operation_counter.add(1, {"operation": "scan"})
+                results = await scanner.scan(
+                    request.value,
+                    request.value_type,
+                    request.comparison_type
+                )
+
+                duration = time.time() - start_time
+                operation_type = "pattern_scan" if request.value_type == "pattern" else "scan"
+                self.operation_counter.add(1, {"operation": operation_type})
+                self.operation_duration.record(duration, {"operation": operation_type})
 
                 self.state_versions[session_id] = str(uuid.uuid4())
 
-                logger.info(f"Scan completed for session {session_id}, found {len(results)} results")
+                logger.info(f"{operation_type.title()} completed for session {session_id}, found {len(results)} results")
                 return memory_scanner_pb2.ScanResponse(
                     addresses=[memory_scanner_pb2.MemoryRegion(address=addr, size=size)
                               for addr, size in results]
                 )
             except Exception as e:
-                self.error_counter.add(1, {"operation": "scan", "error": str(e)})
-                logger.error(f"Failed to perform memory scan for session {session_id}", exc_info=e)
+                operation_type = "pattern_scan" if request.value_type == "pattern" else "scan"
+                self.error_counter.add(1, {"operation": operation_type, "error": str(e)})
+                logger.error(f"Failed to perform {operation_type} for session {session_id}", exc_info=e)
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return memory_scanner_pb2.ScanResponse()

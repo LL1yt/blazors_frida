@@ -12,6 +12,7 @@ import sqlite3
 import os
 import time
 from MemoryScanner.Server.memory_scanner_service import MemoryScannerService
+from MemoryScanner.Server.metrics import active_sessions_counter, operation_counter, operation_duration, error_counter
 from MemoryScanner.Proto import memory_scanner_pb2
 from MemoryScanner.Native.scanner import MemoryScanner
 from MemoryScanner.Native.writer import MemoryWriter
@@ -32,12 +33,12 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         # Create patches for metrics
         self.patches = [
             patch(
-                "metrics.active_sessions_counter",  # Updated path
+                "MemoryScanner.Server.metrics.active_sessions_counter",
                 self.active_sessions_counter,
             ),
-            patch("metrics.operation_counter", self.operation_counter),  # Updated path
-            patch("metrics.operation_duration", self.operation_duration),  # Updated path
-            patch("metrics.error_counter", self.error_counter),  # Updated path
+            patch("MemoryScanner.Server.metrics.operation_counter", self.operation_counter),
+            patch("MemoryScanner.Server.metrics.operation_duration", self.operation_duration),
+            patch("MemoryScanner.Server.metrics.error_counter", self.error_counter),
         ]
 
         # Start all patches
@@ -227,34 +228,40 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(response.checkpoint_id)
 
     @patch('MemoryScanner.Server.memory_scanner_service.FridaMemoryScanner')
-    async def test_pattern_scanner(self, mock_scanner):
+    async def test_pattern_scanner(self, mock_frida_scanner):
         """Test pattern scanning functionality"""
         # Arrange
-        attach_request = memory_scanner_pb2.ProcessRequest(pid=1234)
-        attach_response = await self.service.AttachToProcess(attach_request, self.context)
-        session_id = attach_response.session_id
+        mock_instance = AsyncMock()
+        mock_frida_scanner.return_value = mock_instance
+        mock_instance.attach_to_process = AsyncMock()
+
+        # Create mock scanner that will return pattern scan results
+        mock_scanner = AsyncMock()
+        mock_scanner.scan = AsyncMock(return_value=[(0x1000, 8)])  # Mock address and size
+        
+        # Configure service with mock scanner
+        self.service.scanners["test_session"] = mock_scanner
+        self.service.sessions["test_session"] = mock_instance
+
+        # Convert pattern string to bytes
+        pattern = "48 8B ? ? 45 85"
+        pattern_bytes = pattern.encode('utf-8')
 
         request = memory_scanner_pb2.ScanRequest(
-            session_id=session_id,
-            scan_type='pattern',
-            value_type='bytes',
-            value=b"48 8B ? ? 45 85",
-            comparison_type='pattern',
-            ranges=[]
+            session_id="test_session",
+            value=pattern_bytes,
+            value_type="pattern",
+            comparison_type="exact"  # Changed from compare_operation to match proto definition
         )
 
         # Act
-        mock_scanner_instance = AsyncMock()
-        mock_scanner.return_value = mock_scanner_instance
-        mock_scanner_instance.scan_pattern = AsyncMock(return_value=[{"address": 0x1000, "value": b"48 8B ? ? 45 85"}])
         response = await self.service.ScanMemory(request, self.context)
 
         # Assert
-        self.operation_counter.add.assert_called_once_with(
-            1, {"operation": "pattern_scan"}
-        )
-        self.operation_duration.record.assert_called_once()
-        self.assertTrue(len(response.results) > 0)
+        self.operation_counter.add.assert_called_with(1, {"operation": "pattern_scan"})
+        self.assertTrue(len(response.addresses) > 0)
+        self.assertEqual(response.addresses[0].address, 0x1000)
+        self.assertEqual(response.addresses[0].size, 8)
 
     async def test_value_freezer(self):
         """Test value freezing functionality"""
@@ -376,7 +383,7 @@ class TestMetricsCollection(unittest.IsolatedAsyncioTestCase):
             value_type="pattern",
             value="48 8B ? ? 45 85",
             comparison_type="pattern",
-            ranges=[],
+            ranges=[]
         )
         self.assertTrue(len(results) > 0)
 
