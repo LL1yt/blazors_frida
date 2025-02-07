@@ -206,10 +206,15 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
 
             var response = await client.ScanMemoryAsync(request, CreateMetadata());
 
+            if (response?.Results == null)
+            {
+                return Enumerable.Empty<Models.ScanResult>();
+            }
+
             // Convert proto ScanResult to our Models.ScanResult
             return response.Results.Select(r => new Models.ScanResult
             {
-                ProcessId = int.Parse(sessionId),
+                ProcessId = int.Parse(sessionId.Split('-')[0]), // Assuming session ID starts with process ID
                 Addresses = new List<nint> { new nint((long)r.Address) },
                 Pattern = r.Value.ToByteArray(),
                 Mask = string.Empty // Not applicable for value scanning
@@ -269,17 +274,23 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
             };
 
             var response = await client.ReadMemoryAsync(request, CreateMetadata());
+
+            if (response == null)
+            {
+                return (Array.Empty<byte>(), false, "No response received from server");
+            }
+
             return (response.Value.ToByteArray(), response.Success, response.ErrorMessage);
         }
         catch (RpcException ex)
         {
             _logger.LogError(ex, "Failed to read memory at {Address} for session {SessionId}", address, sessionId);
-            return (System.Array.Empty<byte>(), false, ex.Status.Detail);
+            return (Array.Empty<byte>(), false, ex.Status.Detail);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to read memory at {Address} for session {SessionId}", address, sessionId);
-            return (System.Array.Empty<byte>(), false, ex.Message);
+            return (Array.Empty<byte>(), false, ex.Message);
         }
     }
 
@@ -303,6 +314,12 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
             };
 
             var response = await client.WriteMemoryAsync(request, CreateMetadata());
+
+            if (response == null)
+            {
+                return (false, "No response received from server");
+            }
+
             return (response.Success, response.ErrorMessage);
         }
         catch (RpcException ex)
@@ -374,11 +391,15 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
 
             var response = await client.GetStateAsync(request, CreateMetadata());
             
-            var state = new Dictionary<string, byte[]>();
-            foreach (var kvp in response.State)
+            if (response == null)
             {
-                state[kvp.Key] = kvp.Value.ToByteArray();
+                return (new Dictionary<string, byte[]>(), string.Empty);
             }
+
+            var state = response.State.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value.ToByteArray()
+            );
 
             return (state, response.Version);
         }
@@ -416,6 +437,12 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IProcessServi
             }
 
             var response = await client.SyncStateAsync(request, CreateMetadata());
+
+            if (response == null)
+            {
+                return (false, "No response received from server", string.Empty);
+            }
+
             return (response.Success, response.ErrorMessage, response.NewVersion);
         }
         catch (RpcException ex)
