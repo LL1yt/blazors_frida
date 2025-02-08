@@ -10,17 +10,19 @@ namespace BlazorFridaApp.Tests;
 public class MemoryScanBusinessLogicTests
 {
     private readonly Mock<IMemoryReaderService> _memoryReaderMock;
-    private readonly Mock<ILogger<MemoryScannerService>> _loggerMock;
+    private readonly Mock<ILogger<ScannerGrpcService>> _loggerMock;
+    private readonly Mock<IPythonProcessManager> _processManagerMock;
     private readonly IMemoryScannerService _scannerService;
 
     public MemoryScanBusinessLogicTests()
     {
         _memoryReaderMock = new Mock<IMemoryReaderService>();
-        _loggerMock = new Mock<ILogger<MemoryScannerService>>();
+        _loggerMock = new Mock<ILogger<ScannerGrpcService>>();
+        _processManagerMock = new Mock<IPythonProcessManager>();
         
-        _scannerService = new MemoryScannerService(
-            _memoryReaderMock.Object,
-            _loggerMock.Object);
+        _scannerService = new ScannerGrpcService(
+            _loggerMock.Object,
+            _processManagerMock.Object);
     }
 
     [Fact]

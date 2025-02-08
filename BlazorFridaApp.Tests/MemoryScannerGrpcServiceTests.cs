@@ -5,6 +5,7 @@ using BlazorFridaApp.Tests.Helpers;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -20,6 +21,7 @@ public class MemoryScannerGrpcServiceTests
     private readonly Mock<IScannerGrpcService> _scannerServiceMock;
     private readonly Mock<IStateGrpcService> _stateServiceMock;
     private readonly Mock<IFreezeGrpcService> _freezeServiceMock;
+    private readonly Mock<IOptions<MemoryScannerSettings>> _settingsMock;
     private readonly IMemoryScannerGrpcService _service;
 
     public MemoryScannerGrpcServiceTests()
@@ -30,6 +32,8 @@ public class MemoryScannerGrpcServiceTests
         _scannerServiceMock = new Mock<IScannerGrpcService>();
         _stateServiceMock = new Mock<IStateGrpcService>();
         _freezeServiceMock = new Mock<IFreezeGrpcService>();
+        _settingsMock = new Mock<IOptions<MemoryScannerSettings>>();
+        _settingsMock.Setup(x => x.Value).Returns(new MemoryScannerSettings());
         
         SetupMockResponses();
         
@@ -39,6 +43,7 @@ public class MemoryScannerGrpcServiceTests
             _scannerServiceMock.Object,
             _stateServiceMock.Object,
             _freezeServiceMock.Object,
+            _settingsMock.Object,
             _loggerMock.Object
         );
     }

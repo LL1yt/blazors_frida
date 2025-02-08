@@ -70,7 +70,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Act
-        var scanTypeDropdown = await _page.GetByText("Scan type").ClickAsync();
+        await _page.GetByText("Scan type").ClickAsync();
         await _page.GetByText("Pattern").ClickAsync();
         
         // Assert
@@ -96,9 +96,9 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Select process and perform scan
-        await _page.GetByRole("combobox").First().SelectOptionAsync(new[] { "notepad" });
-        await _page.GetByRole("combobox").Nth(1).SelectOptionAsync(new[] { "Exact" });
-        await _page.GetByRole("spinbutton").FillAsync("42");
+        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
+        await _page.GetByRole(AriaRole.Combobox).Nth(1).SelectOptionAsync(new[] { "Exact" });
+        await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
         await _page.GetByText("First Scan").ClickAsync();
         
         // Wait for results
@@ -121,9 +121,9 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // First scan
-        await _page.GetByRole("combobox").First().SelectOptionAsync(new[] { "notepad" });
-        await _page.GetByRole("combobox").Nth(1).SelectOptionAsync(new[] { "Exact" });
-        await _page.GetByRole("spinbutton").FillAsync("100");
+        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
+        await _page.GetByRole(AriaRole.Combobox).Nth(1).SelectOptionAsync(new[] { "Exact" });
+        await _page.GetByRole(AriaRole.Spinbutton).FillAsync("100");
         await _page.GetByText("First Scan").ClickAsync();
         
         // Wait for results and verify
@@ -131,7 +131,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         Assert.NotNull(firstResults);
         
         // Change value for next scan
-        await _page.GetByRole("spinbutton").FillAsync("200");
+        await _page.GetByRole(AriaRole.Spinbutton).FillAsync("200");
         await _page.GetByText("Next Scan").ClickAsync();
         
         // Verify filtered results

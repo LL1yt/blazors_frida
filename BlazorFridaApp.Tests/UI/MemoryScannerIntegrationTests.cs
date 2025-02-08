@@ -34,15 +34,15 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Select process
-        await _page.GetByRole("combobox").First().SelectOptionAsync(new[] { "notepad" });
+        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
         
         // Start scan
-        await _page.GetByRole("button", new() { Name = "First Scan" }).ClickAsync();
+        await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
         
         // Assert controls are disabled during scan
-        var scanButton = await _page.GetByRole("button", new() { Name = "First Scan" });
-        var processSelector = await _page.GetByRole("combobox").First();
-        var scanTypeDropdown = await _page.GetByRole("combobox").Nth(1);
+        var scanButton = await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        var processSelector = await _page.GetByRole(AriaRole.Combobox).First();
+        var scanTypeDropdown = await _page.GetByRole(AriaRole.Combobox).Nth(1);
         
         Assert.True(await scanButton.IsDisabledAsync());
         Assert.True(await processSelector.IsDisabledAsync());
@@ -56,7 +56,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Select pattern scan
-        await _page.GetByRole("combobox").Nth(1).SelectOptionAsync(new[] { "Pattern" });
+        await _page.GetByRole(AriaRole.Combobox).Nth(1).SelectOptionAsync(new[] { "Pattern" });
         
         // Try invalid pattern
         await _page.GetByPlaceholder("Pattern").FillAsync("invalid pattern");
@@ -71,7 +71,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GetByPlaceholder("Mask").FillAsync("xxx");
         
         // Verify scan button is enabled
-        var scanButton = await _page.GetByRole("button", new() { Name = "First Scan" });
+        var scanButton = await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
         Assert.False(await scanButton.IsDisabledAsync());
     }
 
@@ -85,8 +85,8 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         // Note: In real test we would need to properly manage the server process
         
         // Try to perform scan
-        await _page.GetByRole("combobox").First().SelectOptionAsync(new[] { "notepad" });
-        await _page.GetByRole("button", new() { Name = "First Scan" }).ClickAsync();
+        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
+        await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
         
         // Verify error notification
         var errorNotification = await _page.GetByText("Connection error");
@@ -100,15 +100,16 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Select process and perform scan
-        await _page.GetByRole("combobox").First().SelectOptionAsync(new[] { "notepad" });
-        await _page.GetByRole("spinbutton").FillAsync("42");
-        await _page.GetByRole("button", new() { Name = "First Scan" }).ClickAsync();
+        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
+        await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
+        await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
         
         // Wait for results and check sync between grid and freezer
         await _page.WaitForSelectorAsync(".results-grid");
         
         // Freeze a value
-        await _page.GetByRole("button", new() { Name = "Freeze" }).First().ClickAsync();
+        var freezeButton = await _page.GetByRole(AriaRole.Button, new() { Name = "Freeze" }).First();
+        await freezeButton.ClickAsync();
         
         // Verify sync between components
         var frozenIndicator = await _page.GetByTestId("frozen-indicator").First();
