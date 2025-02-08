@@ -16,13 +16,7 @@
     [Parameter]
     public EventCallback<(IntPtr address, bool isFrozen)> OnFreezeStateChanged { get; set; }
 
-    protected override async Task OnInitializedAsync()
-    {
-        await base.OnInitializedAsync();
-        frozenAddresses = await Freezer.GetFrozenAddresses();
-    }
-
-    public async Task OnValueChanged(IntPtr address, byte[] bytes)
+    private protected async Task OnValueChanged(IntPtr address, byte[] bytes)
     {
         try
         {
@@ -36,7 +30,7 @@
         }
     }
 
-    public async Task UnfreezeValue(IntPtr address)
+    private protected async Task UnfreezeValue(IntPtr address)
     {
         try
         {
@@ -48,6 +42,18 @@
         {
             ShowError("Failed to unfreeze value", ex.Message, ex);
         }
+    }
+
+    private protected void InitializeComponent()
+    {
+        Logger.LogInformation("ValueFreezer component initialized");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        InitializeComponent();
+        frozenAddresses = await Freezer.GetFrozenAddresses();
     }
 
     protected override void OnAfterRender(bool firstRender)

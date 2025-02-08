@@ -8,9 +8,9 @@ namespace BlazorFridaApp.Tests.UI;
 [Collection("UI Tests")]
 public class MemoryScannerIntegrationTests : IAsyncLifetime
 {
-    private IPlaywright _playwright;
-    private IBrowser _browser;
-    private IPage _page;
+    private required IPlaywright _playwright;
+    private required IBrowser _browser;
+    private required IPage _page;
 
     public async Task InitializeAsync()
     {

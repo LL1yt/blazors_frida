@@ -10,12 +10,6 @@ namespace BlazorFridaApp.MemoryScanner.Components
         private readonly SemaphoreSlim _freezeOperationLock = new(1, 1);
         private bool _disposed;
 
-        protected override async Task OnInitializedAsync()
-        {
-            await base.OnInitializedAsync();
-            Logger.LogInformation("ValueFreezer component initialized");
-        }
-
         public bool IsFrozen(IntPtr address)
         {
             ObjectDisposedException.ThrowIf(_disposed, nameof(ValueFreezer));
@@ -36,7 +30,7 @@ namespace BlazorFridaApp.MemoryScanner.Components
                     await Task.Delay(100); // Give time for the operation to stop
                     existingCts.Dispose();
                     _freezeOperations.TryRemove(address, out _);
-                    Logger.LogInformation("Unfroze value at address {Address:X}", address);
+                    await UnfreezeValue(address);
                 }
                 else
                 {
@@ -45,7 +39,6 @@ namespace BlazorFridaApp.MemoryScanner.Components
                     if (_freezeOperations.TryAdd(address, cts))
                     {
                         _ = StartFreezeOperation(address, value, cts.Token);
-                        Logger.LogInformation("Started freezing value at address {Address:X}", address);
                     }
                 }
             }

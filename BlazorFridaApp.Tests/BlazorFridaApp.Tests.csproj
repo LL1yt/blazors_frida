@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>../BlazorFridaApp.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
   <ItemGroup>

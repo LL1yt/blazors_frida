@@ -139,7 +139,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         
         // Verify filtered results
         await _page.WaitForSelectorAsync(".results-grid");
-        var resultCount = await _page.QuerySelectorAllAsync(".results-grid .rz-row").CountAsync();
+        var resultCount = (await _page.QuerySelectorAllAsync(".results-grid .rz-row")).Count;
         Assert.True(resultCount >= 0);
     }
 }
