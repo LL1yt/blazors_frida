@@ -18,7 +18,11 @@ from MemoryScanner.Native import memory_scanner_pb2, memory_scanner_pb2_grpc
 from MemoryScanner.Native.frida_module import FridaMemoryScanner
 from MemoryScanner.Native.process_list import get_process_list
 from MemoryScanner.Server.session_manager import SessionManager
-from MemoryScanner.Server.rate_limiter import RateLimiter, RateLimitDecorator
+from MemoryScanner.Server.rate_limiter import (
+    RateLimiter,
+    RateLimitDecorator,
+    rate_limit,
+)
 from MemoryScanner.Server.retry import with_retry
 from MemoryScanner.Server.metrics import (
     active_sessions_counter,

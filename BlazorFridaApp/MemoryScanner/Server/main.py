@@ -21,13 +21,17 @@ from MemoryScanner.Server.health_service import HealthServicer
 from MemoryScanner.Server.telemetry import setup_telemetry
 from MemoryScanner.Server.config import SERVER_CONFIG, MEMORY_THRESHOLDS
 
+# Create logs directory if it doesn't exist
+logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+os.makedirs(logs_dir, exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(os.path.join("logs", "server.log")),
+        logging.FileHandler(os.path.join(logs_dir, "server.log")),
     ],
 )
 logger = logging.getLogger(__name__)
