@@ -9,45 +9,15 @@
     [Parameter]
     public MemoryValueType ValueType { get; set; }
 
-    public bool IsFrozen(IntPtr address) => frozenAddresses.Contains(address);
-
-    public async Task ToggleFreeze(IntPtr address, int value)
+    private async Task OnValueChanged(IntPtr address, byte[] bytes)
     {
         try
         {
-            if (frozenAddresses.Contains(address))
-            {
-                await Freezer.UnfreezeValue(address);
-                frozenAddresses.Remove(address);
-            }
-            else
-            {
-                var bytes = ValueType switch
-                {
-                    MemoryValueType.Byte => new[] { (byte)value },
-                    MemoryValueType.Short => BitConverter.GetBytes((short)value),
-                    MemoryValueType.Int => BitConverter.GetBytes(value),
-                    MemoryValueType.Float => BitConverter.GetBytes((float)value),
-                    MemoryValueType.Long => BitConverter.GetBytes((long)value),
-                    MemoryValueType.Double => BitConverter.GetBytes((double)value),
-                    _ => BitConverter.GetBytes(value)
-                };
-
-                await Freezer.FreezeValue(address, bytes, ValueType.ToString());
-                frozenAddresses.Add(address);
-            }
+            await Freezer.FreezeValue(address, bytes, ValueType.ToString());
         }
         catch (Exception ex)
         {
-            ShowError("Failed to toggle freeze", ex.Message, ex);
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        foreach (var address in frozenAddresses)
-        {
-            await Freezer.UnfreezeValue(address);
+            ShowError("Failed to update frozen value", ex.Message, ex);
         }
     }
 }

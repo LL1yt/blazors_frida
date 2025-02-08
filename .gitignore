@@ -34,3 +34,4 @@ venv/
 logs
 *.log
 states
+playwright-browsers

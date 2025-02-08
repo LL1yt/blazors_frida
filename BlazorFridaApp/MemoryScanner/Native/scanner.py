@@ -5,6 +5,10 @@ from dataclasses import asdict
 import logging
 import re
 from enum import Enum
+import gc
+import weakref
+import psutil
+from threading import Lock
 
 logger = logging.getLogger(__name__)
 
@@ -135,10 +139,25 @@ rpc.exports = {
 
 class MemoryScanner:
     def __init__(self, frida_scanner, session_id: str):
-        self.frida_scanner = frida_scanner
-        self.session_id = session_id
+        self._scanner = frida_scanner
+        self._session_id = session_id
+        self._logger = logging.getLogger(__name__)
+        self._scan_results = weakref.WeakValueDictionary()
+        self._memory_lock = Lock()
+        self._max_chunk_size = 1024 * 1024  # 1MB chunks
+        self._process = psutil.Process()
+        self._mem_threshold = 0.8  # 80% memory threshold
         self.state_manager = StateManager(session_id)
         logger.info(f"MemoryScanner initialized for session {session_id}")
+
+    def _check_memory_usage(self):
+        """Monitor memory usage and trigger cleanup if needed"""
+        with self._memory_lock:
+            mem_percent = self._process.memory_percent()
+            if mem_percent > self._mem_threshold:
+                self._logger.warning(f"Memory usage high ({mem_percent:.1f}%), triggering cleanup")
+                self.cleanup(force=True)
+                gc.collect()
 
     async def scan(
         self,
@@ -147,59 +166,42 @@ class MemoryScanner:
         comparison_type: str,
         ranges: List[Tuple[int, int]],
     ) -> List[Dict[str, Any]]:
-        """
-        Perform a memory scan with the given parameters
-        """
-        if not self.frida_scanner:
-            return []
+        """Perform memory scan with memory usage monitoring"""
+        self._check_memory_usage()
+        
+        # Break large ranges into chunks
+        chunked_ranges = []
+        for start, end in ranges:
+            size = end - start
+            if size > self._max_chunk_size:
+                chunks = range(start, end, self._max_chunk_size)
+                chunked_ranges.extend(
+                    (chunk, min(chunk + self._max_chunk_size, end))
+                    for chunk in chunks
+                )
+            else:
+                chunked_ranges.append((start, end))
 
-        try:
-            # Ensure value is in correct format for scanning
-            scan_value = value
-            if isinstance(value, bytes):
-                if value_type == "pattern":
-                    scan_value = value.decode('utf-8')
-                elif value_type != "bytes":
-                    scan_value = value.decode('utf-8')
-            
-            # Execute the Frida script to scan memory
-            addresses = await execute_script(
-                self.frida_scanner.session, SCAN_SCRIPT, "scanMemory", value_type, scan_value
+        results = []
+        for chunk_start, chunk_end in chunked_ranges:
+            chunk_results = await self._scanner.scan_memory_range(
+                value_type,
+                value,
+                comparison_type,
+                [(chunk_start, chunk_end)]
             )
+            results.extend(chunk_results)
+            self._check_memory_usage()
 
-            # Convert addresses to scan results
-            results = []
-            for addr in addresses:
-                if isinstance(addr, str):
-                    addr = int(addr, 16)  # Convert hex string to int
-                # Ensure value is in bytes format for protobuf
-                if not isinstance(value, bytes):
-                    if isinstance(value, str):
-                        value_bytes = value.encode('utf-8')
-                    else:
-                        value_bytes = str(value).encode('utf-8')
-                else:
-                    value_bytes = value
-                results.append({"address": addr, "value": value_bytes})
-
-            # Create checkpoint and save state
-            metadata = {
-                "value_type": value_type,
-                "comparison_type": comparison_type,
-                "ranges": ranges,
-            }
-            checkpoint_id = await self.state_manager.create_checkpoint(
-                results, metadata
-            )
-            logger.info(f"Created checkpoint {checkpoint_id} for scan results")
-
-            return results
-        except Exception as e:
-            logger.error(f"Scan failed: {e}")
-            raise
+        # Store results with weak reference
+        result_key = f"{value_type}_{hash(str(value))}_{comparison_type}"
+        self._scan_results[result_key] = results
+        
+        return results
 
     async def get_state(self, checkpoint_id: Optional[str] = None) -> Dict[str, Any]:
         """Get the current scanner state or state at a specific checkpoint"""
+        self._check_memory_usage()
         try:
             state = await self.state_manager.load_state()
             if not state:
@@ -222,6 +224,7 @@ class MemoryScanner:
 
     async def update_state(self, state_updates: Dict[str, Any]) -> None:
         """Update the scanner state with the provided updates"""
+        self._check_memory_usage()
         try:
             current_state = await self.state_manager.load_state()
             if current_state:
@@ -237,10 +240,26 @@ class MemoryScanner:
             logger.error(f"Failed to update state: {e}")
             raise
 
-    def cleanup(self):
-        """Cleanup old state files"""
-        try:
-            self.state_manager.cleanup_old_states()
-            logger.info("Old states cleaned up")
-        except Exception as e:
-            logger.error(f"Failed to cleanup states: {e}")
+    def cleanup(self, force: bool = False):
+        """Cleanup old state files and memory"""
+        with self._memory_lock:
+            try:
+                # Clear scan results cache
+                self._scan_results.clear()
+                
+                if force:
+                    # Force garbage collection
+                    gc.collect(2)
+                    
+                    # Release memory back to OS if possible
+                    import ctypes
+                    if hasattr(ctypes, 'windll'):
+                        ctypes.windll.psapi.EmptyWorkingSet(-1)
+                
+                self._logger.info(f"Cleanup completed. Current memory usage: {self._process.memory_percent():.1f}%")
+            except Exception as e:
+                self._logger.error(f"Error during cleanup: {e}")
+
+    def __del__(self):
+        """Cleanup when object is destroyed"""
+        self.cleanup(force=True)
