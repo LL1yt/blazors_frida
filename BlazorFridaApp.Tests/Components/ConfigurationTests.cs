@@ -154,7 +154,7 @@ public class ConfigurationTests : TestContext
         Assert.True(loadedConfig.LastUsed > loadedConfig.Created);
     }
 
-    public override void Dispose()
+    public new void Dispose()
     {
         _dbContext.Database.EnsureDeleted();
         _dbContext.Dispose();
