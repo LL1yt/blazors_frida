@@ -16,7 +16,7 @@ namespace BlazorFridaApp.Tests;
 
 public class MemoryScannerGrpcServiceTests
 {
-    private readonly Mock<ILogger<MemoryScannerFacade>> _loggerMock;
+    private readonly Mock<ILogger<MemoryScannerGrpcService>> _loggerMock;
     private readonly Mock<IProcessGrpcService> _processServiceMock;
     private readonly Mock<IMemoryGrpcService> _memoryServiceMock;
     private readonly Mock<IScannerGrpcService> _scannerServiceMock;
@@ -27,7 +27,7 @@ public class MemoryScannerGrpcServiceTests
 
     public MemoryScannerGrpcServiceTests()
     {
-        _loggerMock = new Mock<ILogger<MemoryScannerFacade>>();
+        _loggerMock = new Mock<ILogger<MemoryScannerGrpcService>>();
         _processServiceMock = new Mock<IProcessGrpcService>();
         _memoryServiceMock = new Mock<IMemoryGrpcService>();
         _scannerServiceMock = new Mock<IScannerGrpcService>();
@@ -38,7 +38,7 @@ public class MemoryScannerGrpcServiceTests
         
         SetupMockResponses();
         
-        _service = new MemoryScannerFacade(
+        _service = new MemoryScannerGrpcService(
             _processServiceMock.Object,
             _memoryServiceMock.Object,
             _scannerServiceMock.Object,
@@ -51,17 +51,15 @@ public class MemoryScannerGrpcServiceTests
 
     private void SetupMockResponses()
     {
-        // Setup mock responses for individual services
-        var testProcess = new ProcessInfo { Id = 1234, Name = "test.exe" };
         _processServiceMock.Setup(x => x.GetAccessibleProcessesAsync())
-            .ReturnsAsync(new List<ProcessInfo> { testProcess });
-            
-        _processServiceMock.Setup(x => x.GetTargetProcessAsync())
-            .ReturnsAsync(testProcess);
-            
+            .ReturnsAsync(new List<ProcessInfo>
+            {
+                new ProcessInfo { Id = 1234, Name = "test.exe" }
+            });
+
         _processServiceMock.Setup(x => x.AttachToProcessAsync(It.IsAny<int>()))
             .ReturnsAsync((true, "test-session"));
-
+        
         _memoryServiceMock.Setup(x => x.ReadMemoryBytes(
             It.IsAny<string>(),
             It.IsAny<ulong>(),
@@ -165,21 +163,21 @@ public class MemoryScannerGrpcServiceTests
 
         // Assert
         Assert.NotNull(result.state);
-        Assert.NotNull(result.version);
-        Assert.Single(result.state);
         Assert.Equal("test-version", result.version);
+        Assert.Single(result.state);
+        Assert.Equal(new byte[] { 1, 2, 3 }, result.state["key1"]);
     }
 
     [Fact]
-    public async Task SyncStateAsync_ShouldSynchronizeState()
+    public async Task SyncStateAsync_ShouldHandleSuccessfulSync()
     {
         // Arrange
         const string sessionId = "test-session";
         var stateUpdates = new Dictionary<string, byte[]>
         {
-            { "key1", new byte[] { 1, 2, 3 } }
+            { "key1", new byte[] { 4, 5, 6 } }
         };
-        const string version = "v1";
+        const string version = "test-version";
 
         // Act
         var result = await _service.SyncStateAsync(sessionId, stateUpdates, version);
@@ -191,11 +189,14 @@ public class MemoryScannerGrpcServiceTests
     }
 
     [Fact]
-    public async Task ShouldHandleServerUnavailableError()
+    public async Task ReadMemoryAsync_ShouldHandleFailure()
     {
         // Arrange
-        _processServiceMock.Setup(x => x.GetAccessibleProcessesAsync())
-            .ThrowsAsync(new RpcException(new Status(StatusCode.Unavailable, "Server unavailable")));
+        _memoryServiceMock.Setup(x => x.ReadMemoryBytes(
+            It.IsAny<string>(),
+            It.IsAny<ulong>(),
+            It.IsAny<int>()
+        )).ReturnsAsync((Array.Empty<byte>(), false, "Server unavailable"));
 
         // Act & Assert
         var result = await _service.ReadMemoryAsync("test", 0x1000, 4, "int32");
