@@ -16,17 +16,17 @@ public class ScanExecutorTests : TestContext
 {
     private readonly Mock<IMemoryScannerService> _scannerServiceMock;
     private readonly Mock<ILogger<ScanExecutor>> _loggerMock;
-    private readonly Mock<NotificationService> _notificationServiceMock;
+    private readonly Mock<BlazorFridaApp.Services.NotificationService> _notificationServiceMock;
 
     public ScanExecutorTests()
     {
         _scannerServiceMock = new Mock<IMemoryScannerService>();
         _loggerMock = new Mock<ILogger<ScanExecutor>>();
-        _notificationServiceMock = new Mock<NotificationService>();
+        _notificationServiceMock = new Mock<BlazorFridaApp.Services.NotificationService>();
         
         Services.AddScoped<IMemoryScannerService>(_ => _scannerServiceMock.Object);
         Services.AddScoped<ILogger<ScanExecutor>>(_ => _loggerMock.Object);
-        Services.AddScoped<NotificationService>(_ => _notificationServiceMock.Object);
+        Services.AddScoped<BlazorFridaApp.Services.NotificationService>(_ => _notificationServiceMock.Object);
     }
 
     [Fact]

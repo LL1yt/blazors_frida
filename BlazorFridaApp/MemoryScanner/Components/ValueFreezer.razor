@@ -1,7 +1,11 @@
+@using System.Collections.Concurrent
 @inherits MemoryScannerComponentBase
-@implements IAsyncDisposable
 
 @inject IValueFreezerService Freezer
+
+<div class="freeze-control">
+    @* Add controls here if needed *@
+</div>
 
 @code {
     private HashSet<IntPtr> frozenAddresses = new();
@@ -9,15 +13,49 @@
     [Parameter]
     public MemoryValueType ValueType { get; set; }
 
+    [Parameter]
+    public EventCallback<(IntPtr address, bool isFrozen)> OnFreezeStateChanged { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        frozenAddresses = await Freezer.GetFrozenAddresses();
+    }
+
     public async Task OnValueChanged(IntPtr address, byte[] bytes)
     {
         try
         {
             await Freezer.FreezeValue(address, bytes, ValueType.ToString());
+            frozenAddresses.Add(address);
+            await OnFreezeStateChanged.InvokeAsync((address, true));
         }
         catch (Exception ex)
         {
             ShowError("Failed to update frozen value", ex.Message, ex);
         }
+    }
+
+    public async Task UnfreezeValue(IntPtr address)
+    {
+        try
+        {
+            await Freezer.UnfreezeValue(address);
+            frozenAddresses.Remove(address);
+            await OnFreezeStateChanged.InvokeAsync((address, false));
+        }
+        catch (Exception ex)
+        {
+            ShowError("Failed to unfreeze value", ex.Message, ex);
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender && frozenAddresses.Any())
+        {
+            frozenAddresses = Freezer.GetFrozenAddresses().Result;
+        }
+        base.OnAfterRender(firstRender);
     }
 }

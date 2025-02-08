@@ -181,6 +181,11 @@ namespace BlazorFridaApp.MemoryScanner.Services
             });
         }
 
+        public async Task<HashSet<IntPtr>> GetFrozenAddresses()
+        {
+            return await Task.FromResult(new HashSet<IntPtr>(_freezeTimers.Keys));
+        }
+
         public async ValueTask DisposeAsync()
         {
             if (!_disposed)

@@ -2,6 +2,7 @@ using Bunit;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
@@ -22,7 +23,8 @@ public class ScanResultsGridTests : TestContext
         var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, new List<IntPtr>())
             .Add(p => p.ValueType, MemoryValueType.Int)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => 0));
+            .Add(p => p.GetCurrentValue, (IntPtr addr) => 0)
+            .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert
         var grid = cut.Find(".rz-datatable");
@@ -44,7 +46,8 @@ public class ScanResultsGridTests : TestContext
         var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => values[addr]));
+            .Add(p => p.GetCurrentValue, (IntPtr addr) => values[addr])
+            .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert
         var rows = cut.FindAll(".rz-datatable-row");
@@ -64,6 +67,7 @@ public class ScanResultsGridTests : TestContext
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
+            .Add(p => p.IsFrozen, (IntPtr addr) => false)
             .Add(p => p.OnValueChanged, EventCallback.Factory.Create<(IntPtr address, int value)>(this, args =>
             {
                 valueChanged = true;
@@ -73,8 +77,8 @@ public class ScanResultsGridTests : TestContext
             })));
 
         // Act
-        // Симулируем изменение значения через компонент
-        await cut.InvokeAsync(() => cut.Instance.OnValueEdit(new(0x1000), 100));
+        var numericInput = cut.Find("input[type='number']");
+        await cut.InvokeAsync(() => numericInput.Change("100"));
 
         // Assert
         Assert.True(valueChanged);
@@ -97,8 +101,8 @@ public class ScanResultsGridTests : TestContext
             .Add(p => p.IsFrozen, (IntPtr addr) => frozenAddresses.Contains(addr)));
 
         // Assert
-        var frozenIndicator = cut.Find(".frozen-indicator");
-        Assert.NotNull(frozenIndicator);
+        var frozenButton = cut.Find(".rz-button[disabled]");
+        Assert.NotNull(frozenButton);
     }
 
     [Fact]
@@ -111,22 +115,24 @@ public class ScanResultsGridTests : TestContext
         var cutFloat = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Float)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => 42.5f));
+            .Add(p => p.GetCurrentValue, (IntPtr addr) => BitConverter.ToInt32(BitConverter.GetBytes(42.5f), 0))
+            .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert - Float
-        var floatInput = cutFloat.Find("input[type='number']");
-        Assert.NotNull(floatInput);
-        Assert.Contains("42.5", floatInput.GetAttribute("value"));
+        var floatValue = cutFloat.Find(".rz-text");
+        Assert.NotNull(floatValue);
+        Assert.Contains("42.50", floatValue.TextContent);
 
         // Act - Int
         var cutInt = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => 42));
+            .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
+            .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert - Int
-        var intInput = cutInt.Find("input[type='number']");
-        Assert.NotNull(intInput);
-        Assert.Contains("42", intInput.GetAttribute("value"));
+        var intValue = cutInt.Find(".rz-text");
+        Assert.NotNull(intValue);
+        Assert.Contains("42", intValue.TextContent);
     }
 }
