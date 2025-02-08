@@ -6,8 +6,6 @@
     <RootNamespace>BlazorFridaApp</RootNamespace>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>../BlazorFridaApp.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Grpc.AspNetCore.Server.ClientFactory" Version="2.67.0" />
@@ -86,5 +84,10 @@
     <Content Include="MemoryScanner\Proto\**\*.proto">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BlazorFridaApp.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>

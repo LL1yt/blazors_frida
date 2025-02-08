@@ -65,7 +65,7 @@ public class ConfigurationTests : TestContext
     }
 
     [Fact]
-    public async Task ShouldHandleConfigurationValidation()
+    public void ShouldHandleConfigurationValidation()
     {
         // Arrange
         var invalidConfig = new ScanProfile

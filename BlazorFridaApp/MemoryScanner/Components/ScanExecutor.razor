@@ -43,6 +43,8 @@
     [Parameter]
     public EventCallback<bool> OnLoadingChanged { get; set; }
 
+    public bool CanExecuteScan => ProcessId.HasValue && !IsLoading;
+
     protected override void OnInitialized()
     {
         Logger.LogInformation("ScanExecutor component initialized");

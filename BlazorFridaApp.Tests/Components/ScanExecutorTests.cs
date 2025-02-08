@@ -9,6 +9,7 @@ using Moq;
 using Xunit;
 using System.Collections.Generic;
 using Radzen;
+using Microsoft.AspNetCore.Components;
 
 namespace BlazorFridaApp.Tests.Components;
 

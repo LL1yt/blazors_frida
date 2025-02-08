@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "dotnet-certificate-tool": {
+      "version": "2.0.10",
+      "commands": [
+        "certificate-tool"
+      ],
+      "rollForward": false
+    }
+  }
+}
