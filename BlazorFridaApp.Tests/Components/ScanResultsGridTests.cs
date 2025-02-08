@@ -9,7 +9,7 @@ using System.Collections.Generic;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ScanResultsGridTests : TestContext
+public class ScanResultsGridTests : BunitContext
 {
     public ScanResultsGridTests()
     {
@@ -20,7 +20,7 @@ public class ScanResultsGridTests : TestContext
     public void ShouldRenderEmptyGrid()
     {
         // Act
-        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
+        var cut = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, new List<IntPtr>())
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 0)
@@ -43,7 +43,7 @@ public class ScanResultsGridTests : TestContext
         };
 
         // Act
-        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
+        var cut = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => values[addr])
@@ -63,7 +63,7 @@ public class ScanResultsGridTests : TestContext
         var changedAddr = IntPtr.Zero;
         var changedValue = 0;
 
-        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
+        var cut = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
@@ -94,7 +94,7 @@ public class ScanResultsGridTests : TestContext
         var frozenAddresses = new HashSet<IntPtr> { new(0x1000) };
 
         // Act
-        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
+        var cut = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
@@ -112,7 +112,7 @@ public class ScanResultsGridTests : TestContext
         var results = new List<IntPtr> { new(0x1000) };
 
         // Act - Float
-        var cutFloat = RenderComponent<ScanResultsGrid>(parameters => parameters
+        var cutFloat = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Float)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => BitConverter.ToInt32(BitConverter.GetBytes(42.5f), 0))
@@ -124,7 +124,7 @@ public class ScanResultsGridTests : TestContext
         Assert.Contains("42.50", floatValue.TextContent);
 
         // Act - Int
-        var cutInt = RenderComponent<ScanResultsGrid>(parameters => parameters
+        var cutInt = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)

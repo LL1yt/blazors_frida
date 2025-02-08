@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ConfigurationTests : TestContext, IDisposable
+public class ConfigurationTests : BunitContext, IDisposable
 {
     private readonly Mock<IScanProfileService> _profileServiceMock;
     private readonly AppDbContext _dbContext;

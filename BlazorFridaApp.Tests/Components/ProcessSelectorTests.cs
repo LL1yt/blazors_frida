@@ -13,7 +13,7 @@ using System.Diagnostics;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ProcessSelectorTests : TestContext
+public class ProcessSelectorTests : BunitContext
 {
     private readonly Mock<IProcessService> _processServiceMock;
 
@@ -34,7 +34,7 @@ public class ProcessSelectorTests : TestContext
         };
 
         // Act
-        var cut = RenderComponent<ProcessSelector>(parameters => parameters
+        var cut = Render<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, processes));
 
         // Assert
@@ -51,7 +51,7 @@ public class ProcessSelectorTests : TestContext
         var onRefreshCalled = false;
         
         // Act
-        var cut = RenderComponent<ProcessSelector>(parameters => parameters
+        var cut = Render<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, new List<ProcessInfo>())
             .Add(p => p.OnRefreshClick, EventCallback.Factory.Create(this, () => 
             {
@@ -75,7 +75,7 @@ public class ProcessSelectorTests : TestContext
             new() { Id = 1234, Name = "test.exe" }
         };
 
-        var cut = RenderComponent<ProcessSelector>(parameters => parameters
+        var cut = Render<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, processes)
             .Add(p => p.SelectedProcessId, selectedProcess)
             .Add(p => p.OnProcessSelected, EventCallback.Factory.Create(this, () => 
@@ -96,7 +96,7 @@ public class ProcessSelectorTests : TestContext
     public void ShouldDisableControlsWhenLoading()
     {
         // Arrange & Act
-        var cut = RenderComponent<ProcessSelector>(parameters => parameters
+        var cut = Render<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, new List<ProcessInfo>())
             .Add(p => p.IsLoading, true));
 

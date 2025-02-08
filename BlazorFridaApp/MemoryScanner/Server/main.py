@@ -103,7 +103,7 @@ async def serve():
     global server, memory_scanner_service, health_service
 
     try:
-        # Create server with configured settings
+        # Create server with configured options
         server = aio.server(
             futures.ThreadPoolExecutor(max_workers=SERVER_CONFIG["max_workers"]),
             options=[
@@ -118,7 +118,7 @@ async def serve():
             ],
         )
 
-        # Create and initialize services
+        # Initialize services
         memory_scanner_service = MemoryScannerService()
         health_service = HealthServicer()
 
@@ -128,63 +128,38 @@ async def serve():
         )
         health_pb2_grpc.add_HealthServicer_to_server(health_service, server)
 
-        # Start listening
-        listen_addr = f"[::]:{SERVER_CONFIG['port']}"
-        server.add_insecure_port(listen_addr)
+        # Configure server address
+        address = f"{SERVER_CONFIG['address']}:{SERVER_CONFIG['port']}"
+        server.add_insecure_port(address)
+        logger.info(f"Starting server on {address}")
 
-        logger.info(f"Starting server on {listen_addr}")
+        # Start server
         await server.start()
-
-        # Start the memory scanner service
-        await memory_scanner_service.start()
-
-        # Set initial health status
-        health_service.set_status(
-            "", health_pb2.HealthCheckResponse.ServingStatus.SERVING
-        )
-        health_service.set_status(
-            "memory_scanner.MemoryScanner",
-            health_pb2.HealthCheckResponse.ServingStatus.SERVING,
-        )
-
-        logger.info("Server is ready and serving")
+        logger.info("Server started successfully")
 
         # Start memory monitoring
-        monitor_task = asyncio.create_task(monitor_memory())
+        asyncio.create_task(monitor_memory())
 
         # Wait for shutdown signal
         await shutdown_event.wait()
+        logger.info("Shutdown signal received")
 
-        # Cancel monitoring and cleanup
-        monitor_task.cancel()
+        # Perform cleanup
         await cleanup()
 
     except Exception as e:
-        logger.error("Failed to start server", exc_info=e)
-        if health_service:
-            health_service.set_status(
-                "", health_pb2.HealthCheckResponse.ServingStatus.NOT_SERVING
-            )
-            health_service.set_status(
-                "memory_scanner.MemoryScanner",
-                health_pb2.HealthCheckResponse.ServingStatus.NOT_SERVING,
-            )
-        await cleanup()
+        logger.error("Error starting server", exc_info=e)
         raise
-    finally:
-        logger.info("Server shutdown complete")
 
 
-if __name__ == "__main__":
-    # Register signal handlers
+def main():
+    # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Ensure logs directory exists
-    os.makedirs("logs", exist_ok=True)
-
-    # Setup telemetry
-    setup_telemetry()
-
     # Run the server
     asyncio.run(serve())
+
+
+if __name__ == "__main__":
+    main()

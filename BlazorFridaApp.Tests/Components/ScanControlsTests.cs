@@ -7,7 +7,7 @@ using Radzen;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ScanControlsTests : TestContext
+public class ScanControlsTests : BunitContext
 {
     public ScanControlsTests()
     {
@@ -23,7 +23,7 @@ public class ScanControlsTests : TestContext
         var scanTypes = new[] { ScanType.ExactValue, ScanType.Pattern };
 
         // Act
-        var cut = RenderComponent<ScanControls>(parameters => parameters
+        var cut = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, scanTypes)
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.ScanType, ScanType.ExactValue)
@@ -42,7 +42,7 @@ public class ScanControlsTests : TestContext
         var scanTypes = new[] { ScanType.Pattern };
         
         // Act
-        var cut = RenderComponent<ScanControls>(parameters => parameters
+        var cut = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, scanTypes)
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.ScanType, ScanType.Pattern)
@@ -61,7 +61,7 @@ public class ScanControlsTests : TestContext
     public void ShouldDisableScanButtonWhenLoading()
     {
         // Arrange & Act
-        var cut = RenderComponent<ScanControls>(parameters => parameters
+        var cut = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.IsLoading, true)
@@ -76,7 +76,7 @@ public class ScanControlsTests : TestContext
     public void ShouldShowCorrectButtonTextForFirstAndNextScans()
     {
         // Arrange & Act - First Scan
-        var cutFirstScan = RenderComponent<ScanControls>(parameters => parameters
+        var cutFirstScan = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.IsFirstScan, true));
@@ -86,7 +86,7 @@ public class ScanControlsTests : TestContext
         Assert.Contains("First Scan", firstScanButton.TextContent);
 
         // Arrange & Act - Next Scan
-        var cutNextScan = RenderComponent<ScanControls>(parameters => parameters
+        var cutNextScan = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.IsFirstScan, false));

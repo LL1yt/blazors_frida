@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ScanExecutorTests : TestContext
+public class ScanExecutorTests : BunitContext
 {
     private readonly Mock<IMemoryScannerService> _scannerServiceMock;
     private readonly Mock<ILogger<ScanExecutor>> _loggerMock;
@@ -37,7 +37,7 @@ public class ScanExecutorTests : TestContext
         _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
             .ReturnsAsync(new List<nint>());
 
-        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+        var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1234)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int)
@@ -61,7 +61,7 @@ public class ScanExecutorTests : TestContext
         _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
             .ThrowsAsync(new Exception("Test error"));
 
-        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+        var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1234)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int)
@@ -96,7 +96,7 @@ public class ScanExecutorTests : TestContext
             .ReturnsAsync(largeResults);
 
         var resultCount = 0;
-        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+        var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1234)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int)
@@ -126,7 +126,7 @@ public class ScanExecutorTests : TestContext
         _scannerServiceMock.Setup(x => x.ScanForPattern(It.IsAny<int>(), pattern, mask))
             .ReturnsAsync(results);
 
-        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+        var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1234)
             .Add(p => p.ScanType, ScanType.Pattern)
             .Add(p => p.PatternHex, "AA BB CC")
@@ -145,7 +145,7 @@ public class ScanExecutorTests : TestContext
     {
         // Arrange
         var loadingStates = new List<bool>();
-        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+        var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1234)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int)
@@ -170,7 +170,7 @@ public class ScanExecutorTests : TestContext
     public void ShouldRequireValidProcessId()
     {
         // Arrange & Act
-        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+        var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, null)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int));

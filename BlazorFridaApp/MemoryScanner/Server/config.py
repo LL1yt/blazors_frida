@@ -3,6 +3,9 @@ import os
 
 # Server configuration
 SERVER_CONFIG = {
+    "address": os.getenv(
+        "MEMORY_SCANNER_ADDRESS", "[::]"
+    ),  # Use IPv6 wildcard address to bind to all interfaces
     "port": int(os.getenv("MEMORY_SCANNER_PORT", "50051")),
     "max_workers": int(os.getenv("MEMORY_SCANNER_MAX_WORKERS", "10")),
     "max_message_size_mb": int(os.getenv("MEMORY_SCANNER_MAX_MESSAGE_SIZE_MB", "512")),

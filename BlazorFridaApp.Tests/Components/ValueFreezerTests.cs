@@ -11,7 +11,7 @@ using System.Collections.Generic;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ValueFreezerTests : TestContext
+public class ValueFreezerTests : BunitContext
 {
     private readonly Mock<IValueFreezerService> _freezerServiceMock;
     private readonly Mock<NotificationService> _notificationServiceMock;
@@ -29,7 +29,7 @@ public class ValueFreezerTests : TestContext
     public void ShouldRenderWithoutErrors()
     {
         // Act
-        var cut = RenderComponent<ValueFreezer>(parameters => parameters
+        var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Assert
@@ -45,7 +45,7 @@ public class ValueFreezerTests : TestContext
         _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int"))
             .Returns(Task.CompletedTask);
 
-        var cut = RenderComponent<ValueFreezer>(parameters => parameters
+        var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Act
@@ -64,7 +64,7 @@ public class ValueFreezerTests : TestContext
         _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int"))
             .ThrowsAsync(new Exception("Test error"));
 
-        var cut = RenderComponent<ValueFreezer>(parameters => parameters
+        var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Act
@@ -87,7 +87,7 @@ public class ValueFreezerTests : TestContext
         _freezerServiceMock.Setup(x => x.GetFrozenAddresses())
             .ReturnsAsync(new HashSet<IntPtr> { address });
 
-        var cut = RenderComponent<ValueFreezer>(parameters => parameters
+        var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Act
@@ -105,7 +105,7 @@ public class ValueFreezerTests : TestContext
         _freezerServiceMock.Setup(x => x.UnfreezeValue(address))
             .Returns(Task.CompletedTask);
 
-        var cut = RenderComponent<ValueFreezer>(parameters => parameters
+        var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Act
@@ -123,7 +123,7 @@ public class ValueFreezerTests : TestContext
         _freezerServiceMock.Setup(x => x.UnfreezeValue(address))
             .ThrowsAsync(new Exception("Test error"));
 
-        var cut = RenderComponent<ValueFreezer>(parameters => parameters
+        var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Act
@@ -145,7 +145,7 @@ public class ValueFreezerTests : TestContext
         var bytes = new byte[] { 1, 2, 3, 4 };
         var stateChanged = false;
 
-        var cut = RenderComponent<ValueFreezer>(parameters => parameters
+        var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.OnFreezeStateChanged, EventCallback.Factory.Create<(IntPtr, bool)>(this, state =>
             {
@@ -164,7 +164,7 @@ public class ValueFreezerTests : TestContext
     public void ShouldRenderFreezeControls()
     {
         // Arrange & Act
-        var cut = RenderComponent<ValueFreezer>(parameters => parameters
+        var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Assert

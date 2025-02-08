@@ -44,7 +44,7 @@ public abstract class BaseGrpcService : IDisposable, IAsyncDisposable
         await _channelLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            var endpoint = $"http://localhost:{_processManager.Port}";
+            var endpoint = $"http://[::1]:{_processManager.Port}";  // Use IPv6 loopback
             if (_channels.TryGetValue(endpoint, out var existingChannel))
             {
                 if (existingChannel.State != ConnectivityState.Shutdown)
