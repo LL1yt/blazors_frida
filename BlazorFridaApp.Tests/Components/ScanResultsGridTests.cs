@@ -21,7 +21,7 @@ public class ScanResultsGridTests : TestContext
         // Act
         var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, new List<IntPtr>())
-            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 0));
 
         // Assert
@@ -43,7 +43,7 @@ public class ScanResultsGridTests : TestContext
         // Act
         var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => values[addr]));
 
         // Assert
@@ -62,7 +62,7 @@ public class ScanResultsGridTests : TestContext
 
         var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
             .Add(p => p.OnValueChanged, EventCallback.Factory.Create<(IntPtr address, int value)>(this, args =>
             {
@@ -92,7 +92,7 @@ public class ScanResultsGridTests : TestContext
         // Act
         var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
             .Add(p => p.IsFrozen, (IntPtr addr) => frozenAddresses.Contains(addr)));
 
@@ -118,13 +118,13 @@ public class ScanResultsGridTests : TestContext
         Assert.NotNull(floatInput);
         Assert.Contains("42.5", floatInput.GetAttribute("value"));
 
-        // Act - Int32
+        // Act - Int
         var cutInt = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42));
 
-        // Assert - Int32
+        // Assert - Int
         var intInput = cutInt.Find("input[type='number']");
         Assert.NotNull(intInput);
         Assert.Contains("42", intInput.GetAttribute("value"));

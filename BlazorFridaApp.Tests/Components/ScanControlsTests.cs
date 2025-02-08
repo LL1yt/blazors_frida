@@ -20,19 +20,19 @@ public class ScanControlsTests : TestContext
     public void ShouldRenderScanTypeDropdown()
     {
         // Arrange
-        var scanTypes = new[] { ScanType.Exact, ScanType.Pattern };
+        var scanTypes = new[] { ScanType.ExactValue, ScanType.Pattern };
 
         // Act
         var cut = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, scanTypes)
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
-            .Add(p => p.ScanType, ScanType.Exact)
-            .Add(p => p.ValueType, MemoryValueType.Int32));
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
+            .Add(p => p.ScanType, ScanType.ExactValue)
+            .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Assert
         var dropdown = cut.Find("select");
         Assert.NotNull(dropdown);
-        Assert.Contains("Exact", dropdown.TextContent);
+        Assert.Contains("ExactValue", dropdown.TextContent);
     }
 
     [Fact]
@@ -44,9 +44,9 @@ public class ScanControlsTests : TestContext
         // Act
         var cut = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, scanTypes)
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.ScanType, ScanType.Pattern)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.PatternHex, "AA BB CC")
             .Add(p => p.Mask, "xxx"));
 
@@ -62,8 +62,8 @@ public class ScanControlsTests : TestContext
     {
         // Arrange & Act
         var cut = RenderComponent<ScanControls>(parameters => parameters
-            .Add(p => p.ScanTypes, new[] { ScanType.Exact })
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
+            .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.IsLoading, true)
             .Add(p => p.CanScan, true));
 
@@ -77,8 +77,8 @@ public class ScanControlsTests : TestContext
     {
         // Arrange & Act - First Scan
         var cutFirstScan = RenderComponent<ScanControls>(parameters => parameters
-            .Add(p => p.ScanTypes, new[] { ScanType.Exact })
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
+            .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.IsFirstScan, true));
 
         // Assert - First Scan
@@ -87,8 +87,8 @@ public class ScanControlsTests : TestContext
 
         // Arrange & Act - Next Scan
         var cutNextScan = RenderComponent<ScanControls>(parameters => parameters
-            .Add(p => p.ScanTypes, new[] { ScanType.Exact })
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
+            .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
             .Add(p => p.IsFirstScan, false));
 
         // Assert - Next Scan
