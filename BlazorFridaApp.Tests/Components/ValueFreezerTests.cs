@@ -3,6 +3,7 @@ using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components;
 using Moq;
 using Xunit;
 using Radzen;
@@ -78,7 +79,7 @@ public class ValueFreezerTests : TestContext
     }
 
     [Fact]
-    public async Task ShouldTrackFrozenAddresses()
+    public void ShouldTrackFrozenAddresses()
     {
         // Arrange
         var address = new IntPtr(0x1000);
@@ -90,7 +91,7 @@ public class ValueFreezerTests : TestContext
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Act
-        var result = await cut.Instance.IsFrozen(address);
+        var result = cut.Instance.IsFrozen(address);
 
         // Assert
         Assert.True(result);

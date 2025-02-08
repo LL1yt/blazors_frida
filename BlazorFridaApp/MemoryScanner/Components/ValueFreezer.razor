@@ -45,11 +45,6 @@
         }
     }
 
-    public Task<bool> IsFrozen(IntPtr address)
-    {
-        return Task.FromResult(frozenAddresses.Contains(address));
-    }
-
     private void InitializeComponent()
     {
         Logger.LogInformation("ValueFreezer component initialized");

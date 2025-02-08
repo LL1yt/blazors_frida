@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ConfigurationTests : TestContext
+public class ConfigurationTests : TestContext, IDisposable
 {
     private readonly Mock<IScanProfileService> _profileServiceMock;
     private readonly AppDbContext _dbContext;
@@ -154,11 +154,14 @@ public class ConfigurationTests : TestContext
         Assert.True(loadedConfig.LastUsed > loadedConfig.Created);
     }
 
-    public new void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        _dbContext.Database.EnsureDeleted();
-        _dbContext.Dispose();
-        _serviceProvider.Dispose();
-        base.Dispose();
+        if (disposing)
+        {
+            _dbContext.Database.EnsureDeleted();
+            _dbContext.Dispose();
+            _serviceProvider.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }
