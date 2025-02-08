@@ -9,7 +9,7 @@
     [Parameter]
     public MemoryValueType ValueType { get; set; }
 
-    private async Task OnValueChanged(IntPtr address, byte[] bytes)
+    public async Task OnValueChanged(IntPtr address, byte[] bytes)
     {
         try
         {

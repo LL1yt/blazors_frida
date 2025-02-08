@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using Microsoft.Playwright.Core;
 using Xunit;
 using System.Threading.Tasks;
 
@@ -34,15 +35,16 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Select process
-        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
+        var combobox = _page.GetByRole(AriaRole.Combobox);
+        await combobox.Nth(0).SelectOptionAsync(new[] { "notepad" });
         
         // Start scan
-        await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        await scanButton.ClickAsync();
         
         // Assert controls are disabled during scan
-        var scanButton = await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
-        var processSelector = await _page.GetByRole(AriaRole.Combobox).First();
-        var scanTypeDropdown = await _page.GetByRole(AriaRole.Combobox).Nth(1);
+        var processSelector = _page.GetByRole(AriaRole.Combobox).Nth(0);
+        var scanTypeDropdown = _page.GetByRole(AriaRole.Combobox).Nth(1);
         
         Assert.True(await scanButton.IsDisabledAsync());
         Assert.True(await processSelector.IsDisabledAsync());
@@ -56,22 +58,26 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Select pattern scan
-        await _page.GetByRole(AriaRole.Combobox).Nth(1).SelectOptionAsync(new[] { "Pattern" });
+        var scanTypeCombobox = _page.GetByRole(AriaRole.Combobox).Nth(1);
+        await scanTypeCombobox.SelectOptionAsync(new[] { "Pattern" });
         
         // Try invalid pattern
-        await _page.GetByPlaceholder("Pattern").FillAsync("invalid pattern");
-        await _page.GetByPlaceholder("Mask").FillAsync("xxx");
+        var patternInput = _page.GetByPlaceholder("Pattern");
+        var maskInput = _page.GetByPlaceholder("Mask");
+        await patternInput.FillAsync("invalid pattern");
+        await maskInput.FillAsync("xxx");
         
         // Verify error message
-        var errorMessage = await _page.GetByText("Invalid pattern format");
-        Assert.NotNull(errorMessage);
+        var errorMessage = _page.GetByText("Invalid pattern format");
+        var errorElement = await errorMessage.ElementHandleAsync();
+        Assert.NotNull(errorElement);
         
         // Try valid pattern
-        await _page.GetByPlaceholder("Pattern").FillAsync("AA BB CC");
-        await _page.GetByPlaceholder("Mask").FillAsync("xxx");
+        await patternInput.FillAsync("AA BB CC");
+        await maskInput.FillAsync("xxx");
         
         // Verify scan button is enabled
-        var scanButton = await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
         Assert.False(await scanButton.IsDisabledAsync());
     }
 
@@ -85,12 +91,16 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         // Note: In real test we would need to properly manage the server process
         
         // Try to perform scan
-        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
-        await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
+        var processCombobox = _page.GetByRole(AriaRole.Combobox).Nth(0);
+        await processCombobox.SelectOptionAsync(new[] { "notepad" });
+        
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        await scanButton.ClickAsync();
         
         // Verify error notification
-        var errorNotification = await _page.GetByText("Connection error");
-        Assert.NotNull(errorNotification);
+        var errorNotification = _page.GetByText("Connection error");
+        var errorElement = await errorNotification.ElementHandleAsync();
+        Assert.NotNull(errorElement);
     }
 
     [Fact]
@@ -100,7 +110,8 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Select process and perform scan
-        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
+        var processCombobox = _page.GetByRole(AriaRole.Combobox).Nth(0);
+        await processCombobox.SelectOptionAsync(new[] { "notepad" });
         await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
         await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
         
@@ -108,15 +119,15 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.WaitForSelectorAsync(".results-grid");
         
         // Freeze a value
-        var freezeButton = await _page.GetByRole(AriaRole.Button, new() { Name = "Freeze" }).First();
+        var freezeButton = _page.GetByRole(AriaRole.Button, new() { Name = "Freeze" }).Nth(0);
         await freezeButton.ClickAsync();
         
         // Verify sync between components
-        var frozenIndicator = await _page.GetByTestId("frozen-indicator").First();
-        Assert.NotNull(frozenIndicator);
+        var frozenIndicator = _page.GetByTestId("frozen-indicator").Nth(0);
+        Assert.NotNull(await frozenIndicator.ElementHandleAsync());
         
         // Check value handler shows the same value
-        var valueDisplay = await _page.GetByTestId("current-value").First();
+        var valueDisplay = _page.GetByTestId("current-value").Nth(0);
         var displayedValue = await valueDisplay.TextContentAsync();
         Assert.Equal("42", displayedValue);
     }

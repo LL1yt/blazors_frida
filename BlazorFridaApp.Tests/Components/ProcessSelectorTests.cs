@@ -3,8 +3,12 @@ using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Moq;
 using Xunit;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Diagnostics;
 
 namespace BlazorFridaApp.Tests.Components;
@@ -55,7 +59,7 @@ public class ProcessSelectorTests : TestContext
                 return Task.CompletedTask;
             })));
 
-        await cut.Find("button").ClickAsync();
+        await cut.Find("button").ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.True(onRefreshCalled);
@@ -81,8 +85,8 @@ public class ProcessSelectorTests : TestContext
             })));
 
         // Act
-        // Note: В реальном UI это было бы через выбор в выпадающем списке
-        await cut.InvokeAsync(() => cut.Instance.OnProcessSelected(1234));
+        var select = cut.Find("select");
+        await select.ChangeAsync(new ChangeEventArgs { Value = "1234" });
 
         // Assert
         Assert.Equal(1234, selectedProcess);

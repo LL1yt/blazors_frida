@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using Microsoft.Playwright.Core;
 using Xunit;
 
 namespace BlazorFridaApp.Tests.UI;
@@ -96,8 +97,9 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Select process and perform scan
-        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
-        await _page.GetByRole(AriaRole.Combobox).Nth(1).SelectOptionAsync(new[] { "Exact" });
+        var processCombobox = _page.GetByRole(AriaRole.Combobox);
+        await processCombobox.Nth(0).SelectOptionAsync(new[] { "notepad" });
+        await processCombobox.Nth(1).SelectOptionAsync(new[] { "Exact" });
         await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
         await _page.GetByText("First Scan").ClickAsync();
         
@@ -121,8 +123,9 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // First scan
-        await _page.GetByRole(AriaRole.Combobox).First().SelectOptionAsync(new[] { "notepad" });
-        await _page.GetByRole(AriaRole.Combobox).Nth(1).SelectOptionAsync(new[] { "Exact" });
+        var processCombobox = _page.GetByRole(AriaRole.Combobox);
+        await processCombobox.Nth(0).SelectOptionAsync(new[] { "notepad" });
+        await processCombobox.Nth(1).SelectOptionAsync(new[] { "Exact" });
         await _page.GetByRole(AriaRole.Spinbutton).FillAsync("100");
         await _page.GetByText("First Scan").ClickAsync();
         

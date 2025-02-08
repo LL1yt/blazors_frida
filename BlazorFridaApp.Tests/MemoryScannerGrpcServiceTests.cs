@@ -2,6 +2,7 @@ using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using BlazorFridaApp.Tests.Helpers;
+using BlazorFridaApp.MemoryScanner.Configuration;
 using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Logging;
