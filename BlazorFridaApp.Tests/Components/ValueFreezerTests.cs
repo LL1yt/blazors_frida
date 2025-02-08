@@ -90,10 +90,10 @@ public class ValueFreezerTests : TestContext
             .Add(p => p.ValueType, MemoryValueType.Int));
 
         // Act
-        var isFrozen = await cut.Instance.IsFrozen(address);
+        var result = await cut.Instance.IsFrozen(address);
 
         // Assert
-        Assert.True(isFrozen);
+        Assert.True(result);
     }
 
     [Fact]

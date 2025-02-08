@@ -78,10 +78,9 @@ public class ProcessSelectorTests : TestContext
         var cut = RenderComponent<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, processes)
             .Add(p => p.SelectedProcessId, selectedProcess)
-            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create<int>(this, id =>
+            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create<int>(this, async (int id) => 
             {
                 selectedProcess = id;
-                return Task.CompletedTask;
             })));
 
         // Act

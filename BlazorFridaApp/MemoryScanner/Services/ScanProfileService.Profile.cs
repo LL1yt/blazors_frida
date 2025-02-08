@@ -89,5 +89,97 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 throw;
             }
         }
+
+        public async Task<ScanProfile> SaveProfileAsync(ScanProfile profile)
+        {
+            try
+            {
+                _logger.LogInformation("Saving scan profile: {ProfileName}", profile.Name);
+
+                var existingProfile = await _dbContext.ScanProfiles
+                    .FirstOrDefaultAsync(p => p.Name == profile.Name);
+
+                if (existingProfile != null)
+                {
+                    existingProfile.ProcessName = profile.ProcessName;
+                    existingProfile.Pattern = profile.Pattern;
+                    existingProfile.Mask = profile.Mask;
+                    existingProfile.Offsets = profile.Offsets;
+                    existingProfile.ComparisonType = profile.ComparisonType;
+                    existingProfile.LastUsed = DateTime.UtcNow;
+                    _dbContext.ScanProfiles.Update(existingProfile);
+                }
+                else
+                {
+                    profile.Created = DateTime.UtcNow;
+                    profile.LastUsed = DateTime.UtcNow;
+                    await _dbContext.ScanProfiles.AddAsync(profile);
+                }
+
+                await _dbContext.SaveChangesAsync();
+                _logger.LogInformation("Successfully saved scan profile {ProfileName}", profile.Name);
+                return existingProfile ?? profile;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save scan profile {ProfileName}", profile.Name);
+                throw;
+            }
+        }
+
+        public async Task<ScanProfile> GetProfileAsync(string name)
+        {
+            try
+            {
+                _logger.LogInformation("Retrieving scan profile: {ProfileName}", name);
+
+                var profile = await _dbContext.ScanProfiles
+                    .FirstOrDefaultAsync(p => p.Name == name);
+
+                if (profile == null)
+                {
+                    _logger.LogWarning("Scan profile not found: {ProfileName}", name);
+                    throw new KeyNotFoundException($"Profile '{name}' not found");
+                }
+
+                profile.LastUsed = DateTime.UtcNow;
+                _dbContext.ScanProfiles.Update(profile);
+                await _dbContext.SaveChangesAsync();
+
+                _logger.LogInformation("Successfully retrieved scan profile {ProfileName}", name);
+                return profile;
+            }
+            catch (Exception ex) when (!(ex is KeyNotFoundException))
+            {
+                _logger.LogError(ex, "Failed to retrieve scan profile {ProfileName}", name);
+                throw;
+            }
+        }
+
+        public List<string> ValidateProfile(ScanProfile profile)
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrEmpty(profile.Name))
+                errors.Add("Profile name is required");
+
+            if (string.IsNullOrEmpty(profile.ProcessName))
+                errors.Add("Process name is required");
+
+            if (profile.Pattern.Length > 256)
+                errors.Add("Pattern is too long (maximum 256 bytes)");
+
+            if (!string.IsNullOrEmpty(profile.Mask) && profile.Mask.Length != profile.Pattern.Length)
+                errors.Add("Mask length must match pattern length");
+
+            if (profile.Offsets.Length > 16)
+                errors.Add("Too many offsets (maximum 16)");
+
+            if (!string.IsNullOrEmpty(profile.ComparisonType) && 
+                !new[] { "exact", "fuzzy", "greater", "less", "between" }.Contains(profile.ComparisonType.ToLower()))
+                errors.Add("Invalid comparison type");
+
+            return errors;
+        }
     }
 }

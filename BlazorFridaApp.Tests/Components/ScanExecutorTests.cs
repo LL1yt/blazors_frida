@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
+using Radzen;
 
 namespace BlazorFridaApp.Tests.Components;
 
@@ -47,8 +48,9 @@ public class ScanExecutorTests : TestContext
 
         // Assert
         _notificationServiceMock.Verify(x => 
-            x.Notify(It.Is<NotificationMessage>(m => 
-                m.Summary.Contains("No results found"))), Times.Once);
+            x.ShowInfo(It.Is<string>(s => s.Contains("Scan Results")), 
+                      It.Is<string>(s => s.Contains("No results found"))), 
+            Times.Once);
     }
 
     [Fact]

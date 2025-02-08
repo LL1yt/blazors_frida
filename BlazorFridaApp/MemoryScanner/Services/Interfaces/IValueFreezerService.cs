@@ -4,5 +4,6 @@ namespace BlazorFridaApp.MemoryScanner.Services.Interfaces
     {
         Task FreezeValue(nint address, byte[] value, string valueType);
         Task UnfreezeValue(nint address);
+        Task<HashSet<IntPtr>> GetFrozenAddresses();
     }
 }
