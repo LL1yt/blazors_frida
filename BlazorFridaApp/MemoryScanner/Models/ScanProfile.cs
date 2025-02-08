@@ -9,6 +9,7 @@ namespace BlazorFridaApp.MemoryScanner.Models
         public string Mask { get; set; } = string.Empty;
         public int[] Offsets { get; set; } = System.Array.Empty<int>();
         public string ComparisonType { get; set; } = "exact";
+        public MemoryValueType ValueType { get; set; }
         public DateTime Created { get; set; }
         public DateTime LastUsed { get; set; }
 

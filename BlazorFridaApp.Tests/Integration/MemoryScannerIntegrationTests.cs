@@ -38,9 +38,19 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        // Note: We can't assert much about the actual results since they depend on the process memory
-        // But at least we know the call succeeded
+        Assert.Equal(expectedSize, GetValueTypeSize(valueType));
     }
+
+    private int GetValueTypeSize(MemoryValueType valueType) => valueType switch
+    {
+        MemoryValueType.Byte => 1,
+        MemoryValueType.Short => 2,
+        MemoryValueType.Int => 4,
+        MemoryValueType.Long => 8,
+        MemoryValueType.Float => 4,
+        MemoryValueType.Double => 8,
+        _ => throw new ArgumentException($"Unexpected value type: {valueType}")
+    };
 
     [Fact]
     public async Task ShouldScanWithPattern()

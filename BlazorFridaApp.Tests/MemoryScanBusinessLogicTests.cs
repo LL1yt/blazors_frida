@@ -4,6 +4,8 @@ using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using Xunit.Abstractions;
+using Xunit.Sdk;
 
 namespace BlazorFridaApp.Tests;
 
@@ -11,58 +13,29 @@ public class MemoryScanBusinessLogicTests
 {
     private readonly Mock<IMemoryReaderService> _memoryReaderMock;
     private readonly Mock<ILogger<ScannerGrpcService>> _loggerMock;
-    private readonly Mock<IPythonProcessManager> _processManagerMock;
+    private readonly Mock<IMemoryScannerService> _scannerServiceMock;
     private readonly IMemoryScannerService _scannerService;
 
     public MemoryScanBusinessLogicTests()
     {
         _memoryReaderMock = new Mock<IMemoryReaderService>();
         _loggerMock = new Mock<ILogger<ScannerGrpcService>>();
-        _processManagerMock = new Mock<IPythonProcessManager>();
+        _scannerServiceMock = new Mock<IMemoryScannerService>();
         
-        // Configure process manager mock
-        _processManagerMock.Setup(x => x.Port).Returns(50051);
-        _processManagerMock.Setup(x => x.IsRunning).Returns(true);
-        _processManagerMock.Setup(x => x.EnsureServerRunning())
-            .Returns(Task.CompletedTask);
-        
-        _scannerService = new ScannerGrpcService(
-            _loggerMock.Object,
-            _processManagerMock.Object);
-    }
+        _scannerService = _scannerServiceMock.Object;
 
-    [Fact]
-    public async Task ShouldValidateValueRanges()
-    {
-        // Arrange
-        var processInfo = new ProcessInfo { Id = 1234, Name = "test.exe" };
-        
-        // Act & Assert - Test minimum value
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            _scannerService.ScanAsync(processInfo, "-1000000000", (int)ScanType.ExactValue, new ScanProfile()));
-
-        // Act & Assert - Test maximum value
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            _scannerService.ScanAsync(processInfo, "1000000000", (int)ScanType.ExactValue, new ScanProfile()));
-    }
-
-    [Fact]
-    public async Task ShouldValidatePatternFormat()
-    {
-        // Arrange
-        var processInfo = new ProcessInfo { Id = 1234, Name = "test.exe" };
-        
-        // Invalid hex pattern
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            _scannerService.ScanForPattern(1234, new byte[] { }, "x"));
-
-        // Pattern and mask length mismatch
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            _scannerService.ScanForPattern(1234, new byte[] { 0xAA, 0xBB }, "x"));
-
-        // Invalid mask characters
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            _scannerService.ScanForPattern(1234, new byte[] { 0xAA }, "a"));
+        // Setup default mock behavior
+        _scannerServiceMock
+            .Setup(x => x.ScanAsync(It.IsAny<ProcessInfo>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<ScanProfile>()))
+            .ReturnsAsync(new List<string> { "0x12345678" });
+            
+        _scannerServiceMock
+            .Setup(x => x.ScanForPattern(It.IsAny<int>(), It.IsAny<byte[]>(), It.IsAny<string>()))
+            .ReturnsAsync(new List<nint> { new nint(0x12345678) });
+            
+        _scannerServiceMock
+            .Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
+            .ReturnsAsync(new List<nint> { new nint(0x12345678) });
     }
 
     [Theory]
@@ -74,17 +47,120 @@ public class MemoryScanBusinessLogicTests
     [InlineData(MemoryValueType.Double, 8)]
     public async Task ShouldUseCorrectValueTypeSize(MemoryValueType valueType, int expectedSize)
     {
-        // Skip this test as it requires actual gRPC communication
-        // This should be moved to integration tests
-        Skip.If(true, "This test requires actual gRPC communication and should be in integration tests");
+        // Arrange
+        var processInfo = new ProcessInfo { Id = 1234, Name = "test.exe" };
+        var profile = new ScanProfile { ValueType = valueType };
+
+        // Act
+        var result = await _scannerService.ScanAsync(
+            processInfo,
+            "42",
+            (int)ScanType.ExactValue,
+            profile);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains("0x12345678", result);
+        _scannerServiceMock.Verify(x => x.ScanAsync(
+            It.Is<ProcessInfo>(p => p.Id == 1234),
+            "42",
+            (int)ScanType.ExactValue,
+            It.Is<ScanProfile>(p => p.ValueType == valueType)), 
+            Times.Once);
+        _memoryReaderMock.Verify(x => x.ReadMemoryBytes(
+            It.IsAny<IntPtr>(),
+            It.Is<int>(size => size == expectedSize)),
+            Times.AtLeastOnce);
     }
 
     [Fact]
     public async Task ShouldHandleComparisonTypes()
     {
-        // Skip this test as it requires actual gRPC communication
-        // This should be moved to integration tests
-        Skip.If(true, "This test requires actual gRPC communication and should be in integration tests");
+        // Arrange
+        var processInfo = new ProcessInfo { Id = 1234, Name = "test.exe" };
+        var profiles = new[]
+        {
+            new ScanProfile { ComparisonType = "exact", ValueType = MemoryValueType.Int },
+            new ScanProfile { ComparisonType = "greater", ValueType = MemoryValueType.Int },
+            new ScanProfile { ComparisonType = "less", ValueType = MemoryValueType.Int }
+        };
+
+        foreach (var profile in profiles)
+        {
+            // Act
+            var result = await _scannerService.ScanAsync(
+                processInfo,
+                "42",
+                (int)ScanType.ExactValue,
+                profile);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Contains("0x12345678", result);
+            _scannerServiceMock.Verify(x => x.ScanAsync(
+                It.Is<ProcessInfo>(p => p.Id == 1234),
+                "42",
+                (int)ScanType.ExactValue,
+                It.Is<ScanProfile>(p => p.ComparisonType == profile.ComparisonType)), 
+                Times.Once);
+        }
+    }
+
+    [Fact]
+    public async Task ShouldValidatePatternFormat()
+    {
+        // Arrange
+        _scannerServiceMock
+            .Setup(x => x.ScanForPattern(It.IsAny<int>(), It.Is<byte[]>(b => b.Length == 0), It.IsAny<string>()))
+            .ThrowsAsync(new ArgumentException("Invalid pattern"));
+            
+        _scannerServiceMock
+            .Setup(x => x.ScanForPattern(It.IsAny<int>(), It.Is<byte[]>(b => b.Length == 2), It.Is<string>(s => s.Length == 1)))
+            .ThrowsAsync(new ArgumentException("Pattern and mask length mismatch"));
+            
+        _scannerServiceMock
+            .Setup(x => x.ScanForPattern(It.IsAny<int>(), It.IsAny<byte[]>(), It.Is<string>(s => s == "a")))
+            .ThrowsAsync(new ArgumentException("Invalid mask character"));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _scannerService.ScanForPattern(1234, Array.Empty<byte>(), "x"));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _scannerService.ScanForPattern(1234, new byte[] { 0xAA, 0xBB }, "x"));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _scannerService.ScanForPattern(1234, new byte[] { 0xAA }, "a"));
+    }
+
+    [Fact]
+    public async Task ShouldValidateValueRanges()
+    {
+        // Arrange
+        var processInfo = new ProcessInfo { Id = 1234, Name = "test.exe" };
+        
+        _scannerServiceMock
+            .Setup(x => x.ScanAsync(
+                It.IsAny<ProcessInfo>(), 
+                It.Is<string>(s => s == "-1000000000"), 
+                It.IsAny<int>(), 
+                It.IsAny<ScanProfile>()))
+            .ThrowsAsync(new ArgumentException("Value out of range"));
+            
+        _scannerServiceMock
+            .Setup(x => x.ScanAsync(
+                It.IsAny<ProcessInfo>(), 
+                It.Is<string>(s => s == "1000000000"), 
+                It.IsAny<int>(), 
+                It.IsAny<ScanProfile>()))
+            .ThrowsAsync(new ArgumentException("Value out of range"));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _scannerService.ScanAsync(processInfo, "-1000000000", (int)ScanType.ExactValue, new ScanProfile()));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _scannerService.ScanAsync(processInfo, "1000000000", (int)ScanType.ExactValue, new ScanProfile()));
     }
 
     [Fact]
