@@ -95,7 +95,9 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 span.set_attribute("process.id", request.pid)
                 await frida_scanner.attach_to_process(request.pid)
 
-                session = self.session_manager.create_session(client_id, frida_scanner)
+                session = self.session_manager.create_session(
+                    request.pid, frida_scanner
+                )
 
                 logger.info(
                     f"Successfully attached to process {request.pid} with session {session.session_id}"
