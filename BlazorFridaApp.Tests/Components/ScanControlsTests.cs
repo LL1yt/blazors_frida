@@ -91,7 +91,7 @@ public class ScanControlsTests : BunitContext
 
         // Assert - First Scan
         var firstScanButton = cutFirstScan.Find(".rz-button");
-        Assert.Contains("First Scan", firstScanButton.InnerHtml);
+        Assert.Contains("First Memory Scan", firstScanButton.InnerHtml);
 
         // Arrange & Act - Next Scan
         var cutNextScan = Render<ScanControls>(parameters => parameters
@@ -106,6 +106,6 @@ public class ScanControlsTests : BunitContext
 
         // Assert - Next Scan
         var nextScanButton = cutNextScan.Find(".rz-button");
-        Assert.Contains("Next Scan", nextScanButton.InnerHtml);
+        Assert.Contains("Next Memory Scan", nextScanButton.InnerHtml);
     }
 }

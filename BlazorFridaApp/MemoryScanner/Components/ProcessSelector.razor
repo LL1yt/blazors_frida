@@ -118,8 +118,8 @@
         <RadzenButton Icon="@(IsLoading ? "hourglass_empty" : "refresh")"
                      Click="@HandleRefreshClick"
                      ButtonStyle="ButtonStyle.Primary"
-                     Title="@(IsLoading ? "Loading..." : "Scan processes")"
-                     Text="@(IsLoading ? "Loading..." : "Scan")"
+                     Title="@(IsLoading ? "Loading..." : "Scan for processes")"
+                     Text="@(IsLoading ? "Loading..." : "Process Scan")"
                      Disabled="@IsLoading"/>
     </RadzenStack>
     @if (IsLoading)

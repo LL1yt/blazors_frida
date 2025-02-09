@@ -12,6 +12,24 @@ from threading import Lock
 
 logger = logging.getLogger(__name__)
 
+# Global scanner instance cache
+_scanner_instances = {}
+_scanner_lock = Lock()
+
+
+def get_or_create_scanner(session_id: str, frida_scanner) -> "MemoryScanner":
+    with _scanner_lock:
+        if (
+            session_id not in _scanner_instances
+            or _scanner_instances[session_id]() is None
+        ):
+            scanner = MemoryScanner(frida_scanner, session_id)
+            _scanner_instances[session_id] = weakref.ref(
+                scanner, lambda _: _scanner_instances.pop(session_id, None)
+            )
+            return scanner
+        return _scanner_instances[session_id]()
+
 
 class PatternType(Enum):
     EXACT = "exact"  # Exact value match
@@ -47,21 +65,21 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
         List of memory addresses where the value was found
     """
     try:
-        if value_type == "pattern":
-            if isinstance(value, bytes):
-                value = value.decode(
-                    "utf-8"
-                )  # Convert bytes to string for pattern optimization
-            value = optimize_pattern(value)
-        elif isinstance(value, bytes) and value_type != "bytes":
-            # If we got bytes but it's not meant to be raw bytes, decode it
-            value = value.decode("utf-8")
+        scanner = get_or_create_scanner(session.session_id, session)
+        # Get all readable memory ranges
+        ranges = await scanner.frida_scanner.enumerate_ranges("r--")
 
-        return await execute_script(
-            session, SCAN_SCRIPT, "scanMemory", value_type, value
-        )
+        # Convert ranges to list of tuples
+        range_tuples = [
+            (int(r.base_address, 16), int(r.base_address, 16) + r.size) for r in ranges
+        ]
+
+        # Perform the scan
+        results = await scanner.scan(value_type, value, "exact", range_tuples)
+        return [str(result["address"]) for result in results]
+
     except Exception as e:
-        logger.error(f"Memory scan failed: {e}")
+        logger.error(f"Error during memory scan: {str(e)}")
         raise
 
 
@@ -272,16 +290,16 @@ class MemoryScanner:
         """
         Scan memory for a byte pattern with mask
         Args:
-            pattern: Byte pattern to search for
-            mask: Mask string where 'x' means match and '?' means wildcard
+            pattern: Bytes to search for
+            mask: Mask string where 'x' means match exact byte, '?' means wildcard
         Returns:
-            List of memory addresses where the pattern was found
+            List of memory addresses where pattern was found
         """
         try:
-            # Convert pattern to hex string with wildcards
+            # Convert pattern and mask to the format expected by scan_memory
             pattern_str = ""
-            for i, b in enumerate(pattern):
-                if mask[i] == "x":
+            for b, m in zip(pattern, mask):
+                if m == "x":
                     pattern_str += f"{b:02X}"
                 else:
                     pattern_str += "??"

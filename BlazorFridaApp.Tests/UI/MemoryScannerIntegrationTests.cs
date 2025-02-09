@@ -39,7 +39,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await combobox.Nth(0).SelectOptionAsync(new[] { "notepad" });
         
         // Start scan
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" });
         await scanButton.ClickAsync();
         
         // Assert controls are disabled during scan
@@ -58,7 +58,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // First load the process list
-        var processListButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        var processListButton = _page.GetByRole(AriaRole.Button, new() { Name = "Process Scan" });
         await processListButton.ClickAsync();
         
         // Wait for scan controls to be fully loaded and interactive
@@ -94,7 +94,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await maskInput.FillAsync("xxx");
         
         // Verify scan button is enabled
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" });
         Assert.False(await scanButton.IsDisabledAsync());
     }
 
@@ -111,7 +111,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         var processCombobox = _page.GetByRole(AriaRole.Combobox).Nth(0);
         await processCombobox.SelectOptionAsync(new[] { "notepad" });
         
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" });
         await scanButton.ClickAsync();
         
         // Verify error notification
@@ -127,7 +127,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // First load the process list
-        var processListButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        var processListButton = _page.GetByRole(AriaRole.Button, new() { Name = "Process Scan" });
         await processListButton.ClickAsync();
         
         // Wait for process list to be loaded and select notepad
@@ -139,7 +139,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         
         // Enter search value and perform first scan
         await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" });
         await scanButton.ClickAsync();
         
         // Wait for results and check sync between grid and freezer

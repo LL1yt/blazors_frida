@@ -75,7 +75,7 @@ else
     }
 }
 
-<RadzenButton Text="@(IsFirstScan ? "First Scan" : "Next Scan")"
+<RadzenButton Text="@(IsFirstScan ? "First Memory Scan" : "Next Memory Scan")"
              Click="@OnScanClick"
              Disabled="@(!CanScan || IsLoading || !IsValid)"
              ButtonStyle="ButtonStyle.Primary"

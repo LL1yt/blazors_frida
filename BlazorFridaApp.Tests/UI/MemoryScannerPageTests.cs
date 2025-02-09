@@ -89,7 +89,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await maskInput.FillAsync("xxx");
         
         // Check scan button is enabled
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" });
         Assert.False(await scanButton.IsDisabledAsync());
     }
 
@@ -100,7 +100,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Click scan to load the process list
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Process Scan" });
         await scanButton.ClickAsync();
         
         // Wait for process list to be loaded
@@ -118,7 +118,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         
         // Enter value and start scan
         await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
-        await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
+        await _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" }).ClickAsync();
         
         // Wait for results
         await _page.WaitForSelectorAsync(".results-grid");
@@ -139,7 +139,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Wait for initial page load and scan button to be visible
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Process Scan" });
         await scanButton.WaitForAsync(new() { State = WaitForSelectorState.Visible });
         await scanButton.ClickAsync();
         
@@ -167,7 +167,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await valueInput.WaitForAsync(new() { State = WaitForSelectorState.Visible });
         await valueInput.FillAsync("100");
         
-        var firstScanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        var firstScanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" });
         await firstScanButton.WaitForAsync(new() { State = WaitForSelectorState.Visible });
         await firstScanButton.ClickAsync();
         
@@ -178,7 +178,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         
         // Change value for next scan
         await valueInput.FillAsync("200");
-        var nextScanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Next Scan" });
+        var nextScanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Next Memory Scan" });
         await nextScanButton.WaitForAsync(new() { State = WaitForSelectorState.Visible });
         await nextScanButton.ClickAsync();
         
