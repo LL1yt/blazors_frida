@@ -87,17 +87,25 @@ try
     builder.Services.AddScoped<StateGrpcService>();
     builder.Services.AddScoped<FreezeGrpcService>();
 
-    // Register missing service interfaces
+    // Register service interfaces
     builder.Services.AddScoped<IProcessGrpcService, ProcessGrpcService>();
-    builder.Services.AddScoped<IMemoryScannerService, MemoryScannerGrpcService>();
+    builder.Services.AddScoped<IMemoryGrpcService, MemoryGrpcService>();
+    builder.Services.AddScoped<IScannerGrpcService, ScannerGrpcService>();
+    builder.Services.AddScoped<IStateGrpcService, StateGrpcService>();
+    builder.Services.AddScoped<IFreezeGrpcService, FreezeGrpcService>();
     builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
 
-    // Register facade and interfaces
-    builder.Services.AddScoped<IMemoryScannerGrpcService, MemoryScannerFacade>();
+    // Register memory scanner services
+    builder.Services.AddScoped<MemoryScannerGrpcService>();
+    builder.Services.AddScoped<MemoryScannerFacade>();
+    builder.Services.AddScoped<IMemoryScannerGrpcService>(sp => sp.GetRequiredService<MemoryScannerFacade>());
+    builder.Services.AddScoped<IMemoryScannerService>(sp => (IMemoryScannerService)sp.GetRequiredService<MemoryScannerFacade>());
+    builder.Services.AddScoped<IValueFreezerService, ValueFreezerService>();
+
+    // Register process and memory services
     builder.Services.AddScoped<IProcessService, ProcessGrpcService>();
     builder.Services.AddScoped<IMemoryReaderService, MemoryGrpcService>();
     builder.Services.Decorate<IMemoryReaderService, RetryMemoryServiceDecorator>();
-    builder.Services.AddScoped<IScannerGrpcService, ScannerGrpcService>();
 
     // Add the main ProcessMemoryScanner that orchestrates all services
     builder.Services.AddScoped<IProcessMemoryScanner, ProcessMemoryScanner>();

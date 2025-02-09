@@ -36,6 +36,9 @@ namespace BlazorFridaApp.Persistence
             {
                 entity.HasKey(e => e.Name);
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.CustomSettingsJson)
+                    .HasColumnName("CustomSettings")
+                    .HasDefaultValue("{}");
             });
 
             modelBuilder.Entity<Setting>(entity =>
@@ -49,6 +52,9 @@ namespace BlazorFridaApp.Persistence
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.ProcessId).IsRequired();
+                entity.Property(e => e.AddressesJson)
+                    .HasColumnName("Addresses")
+                    .HasDefaultValue("[]");
             });
 
             modelBuilder.Entity<ProcessSettings>(entity =>

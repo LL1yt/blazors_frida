@@ -30,7 +30,7 @@ public class ValueFreezerTests : BunitContext
     {
         // Act
         var cut = Render<ValueFreezer>(parameters => parameters
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
         Assert.NotNull(cut.Instance);
@@ -42,17 +42,17 @@ public class ValueFreezerTests : BunitContext
         // Arrange
         var address = new IntPtr(0x1000);
         var bytes = new byte[] { 1, 2, 3, 4 };
-        _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int"))
+        _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int32"))
             .Returns(Task.CompletedTask);
 
         var cut = Render<ValueFreezer>(parameters => parameters
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
         await cut.Instance.OnValueChanged(address, bytes);
 
         // Assert
-        _freezerServiceMock.Verify(x => x.FreezeValue(address, bytes, "Int"), Times.Once);
+        _freezerServiceMock.Verify(x => x.FreezeValue(address, bytes, "Int32"), Times.Once);
     }
 
     [Fact]
@@ -61,11 +61,11 @@ public class ValueFreezerTests : BunitContext
         // Arrange
         var address = new IntPtr(0x1000);
         var bytes = new byte[] { 1, 2, 3, 4 };
-        _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int"))
+        _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int32"))
             .ThrowsAsync(new Exception("Test error"));
 
         var cut = Render<ValueFreezer>(parameters => parameters
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
         await cut.Instance.OnValueChanged(address, bytes);
@@ -88,7 +88,7 @@ public class ValueFreezerTests : BunitContext
             .ReturnsAsync(new HashSet<IntPtr> { address });
 
         var cut = Render<ValueFreezer>(parameters => parameters
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
         var result = cut.Instance.IsFrozen(address);
@@ -106,7 +106,7 @@ public class ValueFreezerTests : BunitContext
             .Returns(Task.CompletedTask);
 
         var cut = Render<ValueFreezer>(parameters => parameters
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
         await cut.Instance.UnfreezeValue(address);
@@ -124,7 +124,7 @@ public class ValueFreezerTests : BunitContext
             .ThrowsAsync(new Exception("Test error"));
 
         var cut = Render<ValueFreezer>(parameters => parameters
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
         await cut.Instance.UnfreezeValue(address);
@@ -146,7 +146,7 @@ public class ValueFreezerTests : BunitContext
         var stateChanged = false;
 
         var cut = Render<ValueFreezer>(parameters => parameters
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.OnFreezeStateChanged, EventCallback.Factory.Create<(IntPtr, bool)>(this, state =>
             {
                 stateChanged = true;
@@ -165,7 +165,7 @@ public class ValueFreezerTests : BunitContext
     {
         // Arrange & Act
         var cut = Render<ValueFreezer>(parameters => parameters
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
         var controls = cut.FindAll(".freeze-control");

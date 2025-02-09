@@ -40,7 +40,7 @@ public class ScanExecutorTests : BunitContext
         var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.SearchValue, 42)
             .Add(p => p.IsFirstScan, true));
 
@@ -64,7 +64,7 @@ public class ScanExecutorTests : BunitContext
         var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.SearchValue, 42)
             .Add(p => p.IsFirstScan, true));
 
@@ -99,7 +99,7 @@ public class ScanExecutorTests : BunitContext
         var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.SearchValue, 42)
             .Add(p => p.IsFirstScan, true)
             .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, results =>
@@ -148,7 +148,7 @@ public class ScanExecutorTests : BunitContext
         var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.SearchValue, 42)
             .Add(p => p.IsFirstScan, true)
             .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, isLoading =>
@@ -173,7 +173,7 @@ public class ScanExecutorTests : BunitContext
         var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, null)
             .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
         Assert.False(cut.Instance.CanExecuteScan);

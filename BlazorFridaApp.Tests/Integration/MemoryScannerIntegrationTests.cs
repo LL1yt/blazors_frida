@@ -40,9 +40,9 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
 
     [Theory]
     [InlineData(MemoryValueType.Byte, 1)]
-    [InlineData(MemoryValueType.Short, 2)]
-    [InlineData(MemoryValueType.Int, 4)]
-    [InlineData(MemoryValueType.Long, 8)]
+    [InlineData(MemoryValueType.Int16, 2)]
+    [InlineData(MemoryValueType.Int32, 4)]
+    [InlineData(MemoryValueType.Int64, 8)]
     [InlineData(MemoryValueType.Float, 4)]
     [InlineData(MemoryValueType.Double, 8)]
     public async Task ShouldScanWithDifferentValueTypes(MemoryValueType valueType, int expectedSize)
@@ -64,9 +64,9 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
     private int GetValueTypeSize(MemoryValueType valueType) => valueType switch
     {
         MemoryValueType.Byte => 1,
-        MemoryValueType.Short => 2,
-        MemoryValueType.Int => 4,
-        MemoryValueType.Long => 8,
+        MemoryValueType.Int16 => 2,
+        MemoryValueType.Int32 => 4,
+        MemoryValueType.Int64 => 8,
         MemoryValueType.Float => 4,
         MemoryValueType.Double => 8,
         _ => throw new ArgumentException($"Unexpected value type: {valueType}")
@@ -100,7 +100,7 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
         var profile = new ScanProfile 
         { 
             ComparisonType = "exact",
-            ValueType = MemoryValueType.Int
+            ValueType = MemoryValueType.Int32
         };
 
         // Act

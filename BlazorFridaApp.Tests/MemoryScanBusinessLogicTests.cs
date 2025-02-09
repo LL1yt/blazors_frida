@@ -89,9 +89,9 @@ public class MemoryScanBusinessLogicTests : IDisposable
 
     [Theory]
     [InlineData(MemoryValueType.Byte, 1)]
-    [InlineData(MemoryValueType.Short, 2)]
-    [InlineData(MemoryValueType.Int, 4)]
-    [InlineData(MemoryValueType.Long, 8)]
+    [InlineData(MemoryValueType.Int16, 2)]
+    [InlineData(MemoryValueType.Int32, 4)]
+    [InlineData(MemoryValueType.Int64, 8)]
     [InlineData(MemoryValueType.Float, 4)]
     [InlineData(MemoryValueType.Double, 8)]
     public async Task ShouldUseCorrectValueTypeSize(MemoryValueType valueType, int expectedSize)

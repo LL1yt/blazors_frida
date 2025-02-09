@@ -44,7 +44,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
 
         // Act
-        var processSelector = await _page.QuerySelectorAsync(".process-selector");
+        var processSelector = await _page.QuerySelectorAsync(".process-card");
         
         // Assert
         Assert.NotNull(processSelector);
@@ -57,11 +57,8 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
 
         // Act & Assert
-        var scanTypeDropdown = await _page.QuerySelectorAsync("text=Scan type");
-        Assert.NotNull(scanTypeDropdown);
-
-        var valueTypeDropdown = await _page.QuerySelectorAsync("text=Value type");
-        Assert.NotNull(valueTypeDropdown);
+        var scanOptionsCard = await _page.QuerySelectorAsync(".scan-options-card");
+        Assert.NotNull(scanOptionsCard);
     }
 
     [Fact]

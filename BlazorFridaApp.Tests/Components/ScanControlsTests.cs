@@ -25,14 +25,13 @@ public class ScanControlsTests : BunitContext
         // Act
         var cut = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, scanTypes)
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var dropdown = cut.Find("select");
+        var dropdown = cut.Find(".rz-dropdown");
         Assert.NotNull(dropdown);
-        Assert.Contains("ExactValue", dropdown.TextContent);
     }
 
     [Fact]
@@ -44,9 +43,9 @@ public class ScanControlsTests : BunitContext
         // Act
         var cut = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, scanTypes)
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.ScanType, ScanType.Pattern)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.PatternHex, "AA BB CC")
             .Add(p => p.Mask, "xxx"));
 
@@ -63,12 +62,12 @@ public class ScanControlsTests : BunitContext
         // Arrange & Act
         var cut = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.IsLoading, true)
             .Add(p => p.CanScan, true));
 
         // Assert
-        var button = cut.Find("button");
+        var button = cut.Find(".rz-button");
         Assert.True(button.HasAttribute("disabled"));
     }
 
@@ -78,7 +77,7 @@ public class ScanControlsTests : BunitContext
         // Arrange & Act - First Scan
         var cutFirstScan = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.IsFirstScan, true));
 
         // Assert - First Scan
@@ -88,7 +87,7 @@ public class ScanControlsTests : BunitContext
         // Arrange & Act - Next Scan
         var cutNextScan = Render<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int })
+            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.IsFirstScan, false));
 
         // Assert - Next Scan

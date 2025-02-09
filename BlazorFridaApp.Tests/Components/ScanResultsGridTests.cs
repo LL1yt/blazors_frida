@@ -22,7 +22,7 @@ public class ScanResultsGridTests : BunitContext
         // Act
         var cut = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, new List<IntPtr>())
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 0)
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
@@ -45,7 +45,7 @@ public class ScanResultsGridTests : BunitContext
         // Act
         var cut = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => values[addr])
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
@@ -65,7 +65,7 @@ public class ScanResultsGridTests : BunitContext
 
         var cut = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
             .Add(p => p.IsFrozen, (IntPtr addr) => false)
             .Add(p => p.OnValueChanged, EventCallback.Factory.Create<(IntPtr address, int value)>(this, args =>
@@ -96,7 +96,7 @@ public class ScanResultsGridTests : BunitContext
         // Act
         var cut = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
             .Add(p => p.IsFrozen, (IntPtr addr) => frozenAddresses.Contains(addr)));
 
@@ -119,20 +119,20 @@ public class ScanResultsGridTests : BunitContext
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert - Float
-        var floatValue = cutFloat.Find(".rz-text");
+        var floatValue = cutFloat.Find("rz-numeric");
         Assert.NotNull(floatValue);
-        Assert.Contains("42.50", floatValue.TextContent);
+        Assert.Contains("42.50", floatValue.GetAttribute("value"));
 
         // Act - Int
         var cutInt = Render<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert - Int
-        var intValue = cutInt.Find(".rz-text");
+        var intValue = cutInt.Find("rz-numeric");
         Assert.NotNull(intValue);
-        Assert.Contains("42", intValue.TextContent);
+        Assert.Contains("42", intValue.GetAttribute("value"));
     }
 }

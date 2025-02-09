@@ -7,7 +7,7 @@ using System.Collections.Generic;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
-public class MemoryScannerFacade : IMemoryScannerGrpcService
+public class MemoryScannerFacade : IMemoryScannerGrpcService, IMemoryScannerService
 {
     private readonly IProcessGrpcService _processService;
     private readonly IMemoryGrpcService _memoryService;
@@ -146,4 +146,56 @@ public class MemoryScannerFacade : IMemoryScannerGrpcService
         Dictionary<string, byte[]> stateUpdates,
         string version) =>
         _stateService.SyncStateAsync(sessionId, stateUpdates, version);
+
+    public async Task<IEnumerable<string>> ScanAsync(ProcessInfo process, string searchPattern, int scanType, ScanProfile profile)
+    {
+        try
+        {
+            return await _scannerService.ScanAsync(process, searchPattern, scanType, profile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to scan process {ProcessId} with pattern {Pattern}", process.Id, searchPattern);
+            return Enumerable.Empty<string>();
+        }
+    }
+
+    public async Task<List<nint>> ScanForPattern(int processId, byte[] pattern, string mask)
+    {
+        try
+        {
+            return await _scannerService.ScanForPattern(processId, pattern, mask);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to scan for pattern in process {ProcessId}", processId);
+            return new List<nint>();
+        }
+    }
+
+    public async Task<List<nint>> ScanForValue(int processId, int value, MemoryValueType valueType)
+    {
+        try
+        {
+            return await _scannerService.ScanForValue(processId, value, valueType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to scan for value in process {ProcessId}", processId);
+            return new List<nint>();
+        }
+    }
+
+    public async Task<List<nint>> GetAllAddresses(int processId, MemoryValueType valueType)
+    {
+        try
+        {
+            return await _scannerService.GetAllAddresses(processId, valueType);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get all addresses for process {ProcessId}", processId);
+            return new List<nint>();
+        }
+    }
 }
