@@ -232,12 +232,20 @@
             }
 
             var resultCount = scanResults.Count;
-            ShowSuccess("Scan completed", $"Found {resultCount} {(resultCount == 1 ? "result" : "results")}");
+            if (resultCount == 0)
+            {
+                ShowInfo("Scan Results", "No results found");
+            }
+            else
+            {
+                ShowSuccess("Scan completed", $"Found {resultCount} {(resultCount == 1 ? "result" : "results")}");
+            }
             Logger.LogInformation($"Scan completed. Found {resultCount} results");
             await OnScanComplete.InvokeAsync(scanResults);
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Error during memory scan. ProcessId: {ProcessId}, ScanType: {ScanType}", ProcessId, ScanType);
             ShowError("Scan failed", $"Error: {ex.Message}. Please try again or select different parameters.", ex);
             scanResults.Clear();
             previousValues.Clear();

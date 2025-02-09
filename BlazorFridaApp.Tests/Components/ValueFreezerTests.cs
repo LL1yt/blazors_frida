@@ -13,12 +13,11 @@ using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ValueFreezerTests : TestContext, IAsyncDisposable
+public class ValueFreezerTests : TestContextWrapper, IAsyncLifetime
 {
     private readonly Mock<IValueFreezerService> _freezerServiceMock;
     private readonly Mock<INotificationService> _notificationServiceMock;
     private readonly Mock<IProcessMemoryScanner> _scannerMock;
-    private bool _disposed;
 
     public ValueFreezerTests()
     {
@@ -35,27 +34,18 @@ public class ValueFreezerTests : TestContext, IAsyncDisposable
         Services.AddScoped<IProcessMemoryScanner>(_ => _scannerMock.Object);
     }
 
-    public async ValueTask DisposeAsync()
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
     {
-        if (!_disposed)
-        {
-            if (Services is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync();
-            }
-            else
-            {
-                Services.Dispose();
-            }
-            _disposed = true;
-        }
+        await base.DisposeAsync();
     }
 
     [Fact]
-    public void ShouldRenderWithoutErrors()
+    public async Task ShouldRenderWithoutErrors()
     {
         // Act
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
@@ -105,7 +95,7 @@ public class ValueFreezerTests : TestContext, IAsyncDisposable
     }
 
     [Fact]
-    public void ShouldTrackFrozenAddresses()
+    public async Task ShouldTrackFrozenAddresses()
     {
         // Arrange
         var address = new IntPtr(0x1000);
@@ -113,7 +103,7 @@ public class ValueFreezerTests : TestContext, IAsyncDisposable
         _freezerServiceMock.Setup(x => x.GetFrozenAddresses())
             .ReturnsAsync(new HashSet<IntPtr> { address });
 
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
@@ -187,10 +177,10 @@ public class ValueFreezerTests : TestContext, IAsyncDisposable
     }
 
     [Fact]
-    public void ShouldRenderFreezeControls()
+    public async Task ShouldRenderFreezeControls()
     {
         // Arrange & Act
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
