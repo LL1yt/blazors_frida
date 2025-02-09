@@ -4,6 +4,7 @@ from writer import write_memory
 from scanner import scan_memory, MemoryScanner
 from process_list import get_process_list
 import logging
+from typing import List
 
 
 class FridaMemoryScanner:
@@ -68,7 +69,9 @@ class FridaMemoryScanner:
         if not self._attacher.session:
             raise Exception("Not attached to any process")
         try:
-            return await write_memory(self._attacher.session, address, value, value_type)
+            return await write_memory(
+                self._attacher.session, address, value, value_type
+            )
         except Exception as e:
             raise Exception(f"Failed to write memory at {address}: {str(e)}")
 
@@ -88,8 +91,30 @@ class FridaMemoryScanner:
         except Exception as e:
             raise Exception(f"Failed to get process list: {str(e)}")
 
-    async def scan(self, value_type: str, value, comparison_type: str):
-        """Perform memory scan"""
+    async def scan(self, value, value_type: str, comparison_type: str):
+        """
+        Scan memory with the given parameters.
+        Args:
+            value: The value to search for
+            value_type: The type of value being searched
+            comparison_type: The type of comparison to perform
+        Returns:
+            List of results
+        """
+        if not self.is_initialized:
+            raise RuntimeError("Scanner not initialized")
+        return await self.scanner.scan(value, value_type, comparison_type)
+
+    async def scan_pattern(self, pattern: bytes, mask: str) -> List[int]:
+        """Scan memory for a byte pattern with mask.
+
+        Args:
+            pattern: Bytes to search for
+            mask: Mask string where 'x' means match exact byte and '?' means wildcard
+
+        Returns:
+            List of memory addresses where the pattern was found
+        """
         if not self.scanner:
             raise RuntimeError("Scanner not initialized. Call attach_to_process first.")
-        return await self.scanner.scan(value_type, value, comparison_type, [])
+        return await self.scanner.scan_pattern(pattern, mask)

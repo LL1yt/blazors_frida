@@ -93,35 +93,45 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 frida_scanner = FridaMemoryScanner()
                 span.set_attribute("process.id", request.pid)
-                
+
                 # Attach to process and wait for initialization
                 success = await frida_scanner.attach_to_process(request.pid)
                 if not success:
                     return memory_scanner_pb2.AttachResponse(
-                        success=False, error_message=f"Failed to attach to process {request.pid}"
+                        success=False,
+                        error_message=f"Failed to attach to process {request.pid}",
                     )
 
                 # Give the scanner time to fully initialize
                 retry_count = 0
                 max_retries = 5
                 while retry_count < max_retries:
-                    if hasattr(frida_scanner, 'scanner') and frida_scanner.scanner:
+                    if hasattr(frida_scanner, "scanner") and frida_scanner.scanner:
                         break
                     await asyncio.sleep(0.2)  # 200ms delay between checks
                     retry_count += 1
 
-                if not hasattr(frida_scanner, 'scanner') or not frida_scanner.scanner:
+                if not hasattr(frida_scanner, "scanner") or not frida_scanner.scanner:
                     return memory_scanner_pb2.AttachResponse(
-                        success=False, error_message=f"Scanner failed to initialize for process {request.pid}"
+                        success=False,
+                        error_message=f"Scanner failed to initialize for process {request.pid}",
                     )
 
                 # Create session only after scanner is ready
-                session = self.session_manager.create_session(request.pid, frida_scanner)
-                logger.info(f"Successfully attached to process {request.pid} with session {session.session_id}")
-                return memory_scanner_pb2.AttachResponse(success=True, session_id=session.session_id)
+                session = self.session_manager.create_session(
+                    request.pid, frida_scanner
+                )
+                logger.info(
+                    f"Successfully attached to process {request.pid} with session {session.session_id}"
+                )
+                return memory_scanner_pb2.AttachResponse(
+                    success=True, session_id=session.session_id
+                )
             except Exception as e:
                 logger.error(f"Failed to attach to process {request.pid}", exc_info=e)
-                return memory_scanner_pb2.AttachResponse(success=False, error_message=str(e))
+                return memory_scanner_pb2.AttachResponse(
+                    success=False, error_message=str(e)
+                )
 
     @with_retry(exceptions=(grpc.RpcError,))
     @rate_limit
@@ -151,6 +161,20 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         with tracer.start_as_current_span("scan_memory") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)
+                if not session:
+                    error_msg = f"Session {request.session_id} not found"
+                    logger.error(error_msg)
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details(error_msg)
+                    return memory_scanner_pb2.ScanResponse()
+
+                if not session.scanner or not session.scanner.is_initialized:
+                    error_msg = f"Scanner not properly initialized for session {request.session_id}"
+                    logger.error(error_msg)
+                    context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                    context.set_details(error_msg)
+                    return memory_scanner_pb2.ScanResponse()
+
                 span.set_attribute("scan.type", request.scan_type)
                 span.set_attribute("value.type", request.value_type)
 
@@ -178,12 +202,12 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     checkpoint_id=checkpoint_id,
                 )
             except Exception as e:
-                logger.error(
-                    f"Failed to perform scan for session {request.session_id}",
-                    exc_info=e,
+                error_msg = (
+                    f"Failed to perform scan for session {request.session_id}: {str(e)}"
                 )
+                logger.error(error_msg, exc_info=e)
                 context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
+                context.set_details(error_msg)
                 return memory_scanner_pb2.ScanResponse()
 
     @with_retry(exceptions=(grpc.RpcError,))
@@ -424,3 +448,48 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 return memory_scanner_pb2.SyncResponse(
                     needs_sync=True, error_message=str(e)
                 )
+
+    @with_retry(exceptions=(grpc.RpcError,))
+    @rate_limit
+    async def ScanPattern(
+        self,
+        request: memory_scanner_pb2.PatternScanRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> memory_scanner_pb2.PatternScanResponse:
+        with tracer.start_as_current_span("scan_pattern") as span:
+            try:
+                session = await self.session_manager.get_session(request.session_id)
+                if not session:
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details(f"Session {request.session_id} not found")
+                    return memory_scanner_pb2.PatternScanResponse()
+
+                # Convert pattern string to bytes and mask
+                pattern_parts = request.pattern.split()
+                pattern_bytes = []
+                mask = ""
+
+                for part in pattern_parts:
+                    if part == "??":
+                        pattern_bytes.append(0)
+                        mask += "?"
+                    else:
+                        pattern_bytes.append(int(part, 16))
+                        mask += "x"
+
+                pattern = bytes(pattern_bytes)
+
+                # Perform the pattern scan
+                results = await session.scanner.scan_pattern(pattern, mask)
+
+                return memory_scanner_pb2.PatternScanResponse(
+                    results=[
+                        memory_scanner_pb2.MemoryAddress(address=addr)
+                        for addr in results
+                    ]
+                )
+            except Exception as e:
+                logger.error(f"Failed to scan pattern: {e}", exc_info=e)
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return memory_scanner_pb2.PatternScanResponse()

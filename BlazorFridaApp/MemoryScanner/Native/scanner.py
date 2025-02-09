@@ -49,12 +49,14 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
     try:
         if value_type == "pattern":
             if isinstance(value, bytes):
-                value = value.decode('utf-8')  # Convert bytes to string for pattern optimization
+                value = value.decode(
+                    "utf-8"
+                )  # Convert bytes to string for pattern optimization
             value = optimize_pattern(value)
         elif isinstance(value, bytes) and value_type != "bytes":
             # If we got bytes but it's not meant to be raw bytes, decode it
-            value = value.decode('utf-8')
-            
+            value = value.decode("utf-8")
+
         return await execute_script(
             session, SCAN_SCRIPT, "scanMemory", value_type, value
         )
@@ -102,19 +104,19 @@ rpc.exports = {
             return true;
         }
         
+        // Scan memory ranges
         Process.enumerateRanges('r--').forEach(range => {
             if (!shouldScanRange(range)) return;
             
             try {
                 if (valueType === 'pattern') {
-                    // Pattern scanning
-                    const patternBytes = patternToBytes(value);
-                    const data = Memory.readByteArray(range.base, range.size);
+                    const pattern = patternToBytes(value);
+                    const data = range.readByteArray(range.size);
                     
-                    for (let offset = 0; offset < data.byteLength - patternBytes.length; offset++) {
-                        const slice = new Uint8Array(data, offset, patternBytes.length);
-                        if (matchPattern(slice, patternBytes)) {
-                            matches.push(range.base.add(offset).toString());
+                    for (let offset = 0; offset < data.byteLength - pattern.length; offset++) {
+                        const slice = new Uint8Array(data, offset, pattern.length);
+                        if (matchPattern(slice, pattern)) {
+                            matches.push(range.base.add(offset));
                         }
                     }
                 } else {
@@ -126,12 +128,13 @@ rpc.exports = {
                         matches.push(match.address.toString());
                     });
                 }
-            } catch(e) {
-                // Skip invalid memory regions
-                console.log('Error scanning range:', e.message);
+            } catch (e) {
+                // Ignore read errors and continue
+                console.log('Error scanning range:', e);
             }
         });
-        return matches;
+        
+        return matches.map(ptr => ptr.toString());
     }
 };
 """
@@ -155,7 +158,9 @@ class MemoryScanner:
         with self._memory_lock:
             mem_percent = self._process.memory_percent()
             if mem_percent > self._mem_threshold:
-                self._logger.warning(f"Memory usage high ({mem_percent:.1f}%), triggering cleanup")
+                self._logger.warning(
+                    f"Memory usage high ({mem_percent:.1f}%), triggering cleanup"
+                )
                 self.cleanup(force=True)
                 gc.collect()
 
@@ -168,7 +173,7 @@ class MemoryScanner:
     ) -> List[Dict[str, Any]]:
         """Perform memory scan with memory usage monitoring"""
         self._check_memory_usage()
-        
+
         # Break large ranges into chunks
         chunked_ranges = []
         for start, end in ranges:
@@ -176,8 +181,7 @@ class MemoryScanner:
             if size > self._max_chunk_size:
                 chunks = range(start, end, self._max_chunk_size)
                 chunked_ranges.extend(
-                    (chunk, min(chunk + self._max_chunk_size, end))
-                    for chunk in chunks
+                    (chunk, min(chunk + self._max_chunk_size, end)) for chunk in chunks
                 )
             else:
                 chunked_ranges.append((start, end))
@@ -185,10 +189,7 @@ class MemoryScanner:
         results = []
         for chunk_start, chunk_end in chunked_ranges:
             chunk_results = await self._scanner.scan_memory_range(
-                value_type,
-                value,
-                comparison_type,
-                [(chunk_start, chunk_end)]
+                value_type, value, comparison_type, [(chunk_start, chunk_end)]
             )
             results.extend(chunk_results)
             self._check_memory_usage()
@@ -196,7 +197,7 @@ class MemoryScanner:
         # Store results with weak reference
         result_key = f"{value_type}_{hash(str(value))}_{comparison_type}"
         self._scan_results[result_key] = results
-        
+
         return results
 
     async def get_state(self, checkpoint_id: Optional[str] = None) -> Dict[str, Any]:
@@ -246,20 +247,53 @@ class MemoryScanner:
             try:
                 # Clear scan results cache
                 self._scan_results.clear()
-                
+
                 if force:
                     # Force garbage collection
                     gc.collect(2)
-                    
+
                     # Release memory back to OS if possible
                     import ctypes
-                    if hasattr(ctypes, 'windll'):
+
+                    if hasattr(ctypes, "windll"):
                         ctypes.windll.psapi.EmptyWorkingSet(-1)
-                
-                self._logger.info(f"Cleanup completed. Current memory usage: {self._process.memory_percent():.1f}%")
+
+                self._logger.info(
+                    f"Cleanup completed. Current memory usage: {self._process.memory_percent():.1f}%"
+                )
             except Exception as e:
                 self._logger.error(f"Error during cleanup: {e}")
 
     def __del__(self):
         """Cleanup when object is destroyed"""
         self.cleanup(force=True)
+
+    async def scan_pattern(self, pattern: bytes, mask: str) -> List[int]:
+        """Scan memory for a byte pattern with mask.
+
+        Args:
+            pattern: Bytes to search for
+            mask: Mask string where 'x' means match exact byte and '?' means wildcard
+
+        Returns:
+            List of memory addresses where the pattern was found
+        """
+        # Convert pattern and mask to the format expected by the Frida script
+        pattern_str = ""
+        for i, b in enumerate(pattern):
+            if mask[i] == "x":
+                pattern_str += f"{b:02X}"
+            else:
+                pattern_str += "??"
+
+        # Call the scan_memory function with pattern type
+        try:
+            results = await scan_memory(
+                self._scanner._attacher.session, "pattern", pattern_str
+            )
+            return [
+                int(addr, 16) for addr in results
+            ]  # Convert hex strings to integers
+        except Exception as e:
+            self._logger.error(f"Pattern scan failed: {e}")
+            raise
