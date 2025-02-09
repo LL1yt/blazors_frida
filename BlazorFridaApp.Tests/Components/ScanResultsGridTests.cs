@@ -50,7 +50,7 @@ public class ScanResultsGridTests : BunitContext
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert
-        var rows = cut.FindAll(".rz-datatable-row");
+        var rows = cut.FindAll(".rz-grid-table tr:not(.rz-grid-table-header)");
         Assert.Equal(2, rows.Count);
     }
 

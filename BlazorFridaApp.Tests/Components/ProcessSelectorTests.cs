@@ -13,7 +13,7 @@ using System.Diagnostics;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ProcessSelectorTests : BunitContext
+public class ProcessSelectorTests : TestContext
 {
     private readonly Mock<IProcessService> _processServiceMock;
 
@@ -21,6 +21,9 @@ public class ProcessSelectorTests : BunitContext
     {
         _processServiceMock = new Mock<IProcessService>();
         Services.AddScoped<IProcessService>(_ => _processServiceMock.Object);
+        
+        // Setup JS interop for Radzen components
+        JSInterop.SetupVoid("Radzen.preventArrows", _ => true);
     }
 
     [Fact]
