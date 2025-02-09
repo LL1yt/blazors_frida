@@ -35,7 +35,7 @@
     public bool IsFrozen(IntPtr address)
     {
         ObjectDisposedException.ThrowIf(_disposed, nameof(ValueFreezer));
-        return _freezeOperations.ContainsKey(address);
+        return frozenAddresses.Contains(address);
     }
 
     public async Task OnValueChanged(IntPtr address, byte[] bytes)
@@ -43,8 +43,11 @@
         try
         {
             await Freezer.FreezeValue(address, bytes, ValueType.ToString());
-            frozenAddresses.Add(address);
-            await OnFreezeStateChanged.InvokeAsync((address, true));
+            // Add to frozen addresses before invoking callback
+            if (frozenAddresses.Add(address))
+            {
+                await OnFreezeStateChanged.InvokeAsync((address, true));
+            }
         }
         catch (Exception ex)
         {

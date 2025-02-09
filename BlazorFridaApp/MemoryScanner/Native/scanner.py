@@ -187,10 +187,14 @@ class MemoryScanner:
         value_type: str,
         value: Any,
         comparison_type: str,
-        ranges: List[Tuple[int, int]],
+        ranges: Optional[List[Tuple[int, int]]] = None
     ) -> List[Dict[str, Any]]:
         """Perform memory scan with memory usage monitoring"""
         self._check_memory_usage()
+
+        # Use all memory if no ranges specified
+        if not ranges:
+            ranges = [(0x00010000, 0x7FFFFFFF)]  # Default range from service
 
         # Break large ranges into chunks
         chunked_ranges = []
@@ -206,11 +210,15 @@ class MemoryScanner:
 
         results = []
         for chunk_start, chunk_end in chunked_ranges:
-            chunk_results = await self.frida_scanner.scan_memory_range(
-                value_type, value, comparison_type, [(chunk_start, chunk_end)]
-            )
-            results.extend(chunk_results)
-            self._check_memory_usage()
+            try:
+                chunk_results = await self.frida_scanner.scan_memory_range(
+                    value_type, value, comparison_type, [(chunk_start, chunk_end)]
+                )
+                results.extend(chunk_results)
+                self._check_memory_usage()
+            except Exception as e:
+                self._logger.warning(f"Error scanning memory range {chunk_start:x}-{chunk_end:x}: {e}")
+                continue
 
         # Store results with weak reference
         result_key = f"{value_type}_{hash(str(value))}_{comparison_type}"
@@ -246,7 +254,7 @@ class MemoryScanner:
         self._check_memory_usage()
         try:
             current_state = await self.state_manager.load_state()
-            if current_state:
+            if (current_state):
                 metadata = current_state.metadata
                 metadata.update(state_updates)
                 await self.state_manager.save_state(

@@ -62,25 +62,25 @@ public class MemoryScannerFacade : IMemoryScannerGrpcService, IMemoryScannerServ
                 return Enumerable.Empty<ScanResult>();
             }
 
+            // Ensure we have at least default memory ranges
             if (!ranges.Any())
             {
                 ranges = new[] { (_settings.DefaultMemoryRanges.DefaultStart, _settings.DefaultMemoryRanges.DefaultEnd) };
+                _logger.LogDebug("Using default memory ranges: {Start:X}-{End:X}", 
+                    _settings.DefaultMemoryRanges.DefaultStart, 
+                    _settings.DefaultMemoryRanges.DefaultEnd);
             }
 
-            var scanProfile = new ScanProfile
-            {
-                ComparisonType = comparisonType ?? _settings.DefaultComparisonType
-            };
-
-            var addresses = await _scannerService.ScanAsync(process, sessionId, value.Length, scanProfile);
-            return addresses.Select(addr => new ScanResult 
-            { 
-                Addresses = new List<nint> { new nint(Convert.ToInt64(addr, 16)) }
-            });
+            return await _scannerService.ScanAsync(
+                sessionId,
+                valueType,
+                value,
+                comparisonType ?? _settings.DefaultComparisonType,
+                ranges);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during memory scan");
+            _logger.LogError(ex, "Error during memory scan for session {SessionId}", sessionId);
             return Enumerable.Empty<ScanResult>();
         }
     }

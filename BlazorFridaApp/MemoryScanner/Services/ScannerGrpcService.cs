@@ -16,6 +16,8 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
     private readonly Dictionary<string, WeakReference<byte[]>> _resultCache;
     private readonly object _cacheLock = new();
     private const int MaxCacheSize = 100;
+    private const ulong DefaultMemoryStart = 0x00010000;  // Start of typical process memory
+    private const ulong DefaultMemoryEnd = 0x7FFFFFFF;   // End of 32-bit address space
 
     public ScannerGrpcService(
         ILogger<ScannerGrpcService> logger,
@@ -114,6 +116,13 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
                 ComparisonType = "exact",
                 ScanType = "exact"
             };
+
+            // Add default memory range
+            request.Ranges.Add(new Proto.AddressRange
+            {
+                Start = DefaultMemoryStart,
+                End = DefaultMemoryEnd
+            });
 
             var response = await client.ScanMemoryAsync(request, CreateMetadata());
             return response.Results.Select(r => new IntPtr((long)r.Address)).ToList();

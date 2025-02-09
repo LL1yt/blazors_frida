@@ -6,14 +6,16 @@ using Microsoft.AspNetCore.Components;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
+using Radzen;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ScanResultsGridTests : BunitContext
+public class ScanResultsGridTests : TestContextWrapper
 {
     public ScanResultsGridTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton<DialogService>();
     }
 
     [Fact]
@@ -50,7 +52,7 @@ public class ScanResultsGridTests : BunitContext
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert
-        var rows = cut.FindAll(".rz-datatable-data tr");
+        var rows = cut.FindAll(".rz-grid-table tr");
         Assert.Equal(2, rows.Count);
     }
 
@@ -77,8 +79,9 @@ public class ScanResultsGridTests : BunitContext
             })));
 
         // Act
-        var numericInput = cut.Find("input[type='number']");
-        await cut.InvokeAsync(() => numericInput.Change("100"));
+        var numericInput = cut.Find(".rz-numeric");
+        var changeEvent = new ChangeEventArgs { Value = "100" };
+        await cut.InvokeAsync(() => numericInput.Change(changeEvent));
 
         // Assert
         Assert.True(valueChanged);

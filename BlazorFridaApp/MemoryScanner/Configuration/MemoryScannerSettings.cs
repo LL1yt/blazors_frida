@@ -6,15 +6,15 @@ public class MemoryScannerSettings
 {
     [Required]
     [Range(1, int.MaxValue)]
-    public int DefaultReadSize { get; set; }
+    public int DefaultReadSize { get; set; } = 4096;
 
     [Required]
     [Range(1, int.MaxValue)]
-    public int MaxReadSize { get; set; }
+    public int MaxReadSize { get; set; } = 1024 * 1024; // 1MB
 
     [Required]
     [Range(1, int.MaxValue)]
-    public int MaxWriteSize { get; set; }
+    public int MaxWriteSize { get; set; } = 1024 * 1024; // 1MB
 
     [Required]
     public string DefaultValueType { get; set; } = "int32";
@@ -24,10 +24,15 @@ public class MemoryScannerSettings
 
     [Required]
     [Range(1000, int.MaxValue)]
-    public int DefaultScanTimeout { get; set; }
+    public int DefaultScanTimeout { get; set; } = 30000; // 30 seconds
 
     [Required]
-    public MemoryRangeSettings DefaultMemoryRanges { get; set; } = new();
+    public MemoryRangeSettings DefaultMemoryRanges { get; set; } = new()
+    {
+        DefaultStart = 0x00010000, // Start of typical process memory
+        DefaultEnd = 0x7FFFFFFF,   // End of 32-bit address space
+        MaxRangeSize = 1024UL * 1024UL * 1024UL // 1GB
+    };
 
     [Required]
     [Range(1, int.MaxValue)]
