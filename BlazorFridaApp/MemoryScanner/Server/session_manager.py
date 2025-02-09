@@ -8,7 +8,7 @@ class Session:
     def __init__(self, process_id: int, scanner: Any):
         if not scanner:
             raise ValueError("Scanner cannot be None")
-        if not hasattr(scanner, 'scanner') or not scanner.scanner:
+        if not hasattr(scanner, 'is_initialized') or not scanner.is_initialized:
             raise ValueError("Scanner not properly initialized")
             
         self.session_id = f"{process_id}_{datetime.now().timestamp()}"

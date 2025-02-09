@@ -3,27 +3,50 @@ from reader import read_memory
 from writer import write_memory
 from scanner import scan_memory, MemoryScanner
 from process_list import get_process_list
+import logging
 
 
 class FridaMemoryScanner:
     def __init__(self):
         self._attacher = FridaAttacher()
-        self.scanner = None  # Initialize as None
+        self.scanner = None
+        self._initialized = False
+        self._logger = logging.getLogger(__name__)
 
-    async def attach_to_process(self, pid: int):
+    async def attach_to_process(self, pid: int) -> bool:
         """Attach to a process and initialize scanner."""
-        await self._attacher.attach(pid)
-        self.scanner = MemoryScanner(self, str(pid))  # Create scanner instance
-        return True
+        try:
+            success = await self._attacher.attach_to_process(pid)
+            if not success:
+                self._logger.error(f"Failed to attach to process {pid}")
+                return False
 
-    async def detach_from_process(self):
+            self._logger.info(f"Successfully attached to process {pid}")
+            self.scanner = MemoryScanner(self, str(pid))
+            self._initialized = True
+            return True
+        except Exception as e:
+            self._logger.error(f"Error attaching to process {pid}: {e}", exc_info=e)
+            return False
+
+    @property
+    def is_initialized(self) -> bool:
+        """Check if scanner is properly initialized."""
+        return self._initialized and self.scanner is not None
+
+    async def detach_from_process(self) -> bool:
         """Detach from the currently attached process."""
         try:
             if self._attacher.session:
-                return await self._attacher.detach()
+                success = await self._attacher.detach()
+                if success:
+                    self.scanner = None
+                    self._initialized = False
+                return success
             return True
         except Exception as e:
-            raise Exception(f"Failed to detach from process: {str(e)}")
+            self._logger.error(f"Failed to detach from process: {e}", exc_info=e)
+            return False
 
     async def read_memory(self, address, size):
         """Read memory at the specified address."""

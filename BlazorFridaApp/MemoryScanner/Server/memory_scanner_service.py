@@ -94,29 +94,34 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 frida_scanner = FridaMemoryScanner()
                 span.set_attribute("process.id", request.pid)
                 
-                # Wait for scanner initialization
-                await frida_scanner.attach_to_process(request.pid)
-                await asyncio.sleep(0.5)  # Give the scanner time to fully initialize
+                # Attach to process and wait for initialization
+                success = await frida_scanner.attach_to_process(request.pid)
+                if not success:
+                    return memory_scanner_pb2.AttachResponse(
+                        success=False, error_message=f"Failed to attach to process {request.pid}"
+                    )
 
-                session = self.session_manager.create_session(
-                    request.pid, frida_scanner
-                )
+                # Give the scanner time to fully initialize
+                retry_count = 0
+                max_retries = 5
+                while retry_count < max_retries:
+                    if hasattr(frida_scanner, 'scanner') and frida_scanner.scanner:
+                        break
+                    await asyncio.sleep(0.2)  # 200ms delay between checks
+                    retry_count += 1
 
-                # Verify scanner is properly initialized
-                if not session.scanner or not hasattr(session.scanner, 'scan'):
-                    raise RuntimeError("Scanner failed to initialize properly")
+                if not hasattr(frida_scanner, 'scanner') or not frida_scanner.scanner:
+                    return memory_scanner_pb2.AttachResponse(
+                        success=False, error_message=f"Scanner failed to initialize for process {request.pid}"
+                    )
 
-                logger.info(
-                    f"Successfully attached to process {request.pid} with session {session.session_id}"
-                )
-                return memory_scanner_pb2.AttachResponse(
-                    success=True, session_id=session.session_id
-                )
+                # Create session only after scanner is ready
+                session = self.session_manager.create_session(request.pid, frida_scanner)
+                logger.info(f"Successfully attached to process {request.pid} with session {session.session_id}")
+                return memory_scanner_pb2.AttachResponse(success=True, session_id=session.session_id)
             except Exception as e:
                 logger.error(f"Failed to attach to process {request.pid}", exc_info=e)
-                return memory_scanner_pb2.AttachResponse(
-                    success=False, error_message=str(e)
-                )
+                return memory_scanner_pb2.AttachResponse(success=False, error_message=str(e))
 
     @with_retry(exceptions=(grpc.RpcError,))
     @rate_limit
