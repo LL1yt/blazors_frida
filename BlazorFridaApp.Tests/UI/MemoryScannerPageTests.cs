@@ -17,7 +17,8 @@ public class MemoryScannerPageTests : IAsyncLifetime
         {
             Headless = true
         });
-        
+        var context = await _browser.NewContextAsync();
+        _page = await context.NewPageAsync();
     }
 
     public async Task DisposeAsync()

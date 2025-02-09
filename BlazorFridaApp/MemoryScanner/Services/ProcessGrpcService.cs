@@ -2,6 +2,7 @@ using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Base;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using Grpc.Core;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
@@ -34,10 +35,47 @@ public class ProcessGrpcService : BaseGrpcService, IProcessGrpcService, IProcess
                 Path = p.Path
             }).ToList();
         }
+        catch (RpcException ex) when (ex.Status.StatusCode == StatusCode.Internal)
+        {
+            var errorMessage = ex.Status.Detail;
+            if (errorMessage.Contains("Invalid argument") || errorMessage.Contains("TimedOutError"))
+            {
+                _logger.LogWarning("Failed to connect to Frida device. Error: {Error}", errorMessage);
+                // Force channel recreation by removing it from the dictionary
+                var endpoint = $"http://127.0.0.1:{_processManager.Port}";
+                if (_channels.TryRemove(endpoint, out var oldChannel))
+                {
+                    await oldChannel.ShutdownAsync().ConfigureAwait(false);
+                }
+                
+                try 
+                {
+                    // Retry with a new channel
+                    var channel = await GetChannelAsync();
+                    var client = CreateClient(channel);
+                    var request = new Proto.Empty();
+                    var response = await client.ListProcessesAsync(request, CreateMetadata());
+                    
+                    return response.Processes.Select(p => new ProcessInfo
+                    {
+                        Id = p.Pid,
+                        Name = p.Name,
+                        Path = p.Path
+                    }).ToList();
+                }
+                catch (Exception retryEx)
+                {
+                    _logger.LogError(retryEx, "Failed to enumerate processes even after retry");
+                    throw new InvalidOperationException("Failed to access process list. Please ensure Frida server is running with sufficient privileges.", retryEx);
+                }
+            }
+            _logger.LogError(ex, "Internal error while getting accessible processes");
+            throw new InvalidOperationException("An internal error occurred while accessing the process list.", ex);
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get accessible processes");
-            throw;
+            _logger.LogError(ex, "Unexpected error while getting accessible processes");
+            throw new InvalidOperationException("An unexpected error occurred while accessing the process list.", ex);
         }
     }
 

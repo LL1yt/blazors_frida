@@ -42,10 +42,11 @@ public class ProcessSelectorTests : BunitContext
             .Add(p => p.ProcessList, processes));
 
         // Assert
-        var select = cut.Find("select");
-        Assert.NotNull(select);
-        Assert.Contains("notepad.exe", select.TextContent);
-        Assert.Contains("test2.exe", select.TextContent);
+        var dropdown = cut.Find(".rz-dropdown");
+        Assert.NotNull(dropdown);
+        var dropdownList = cut.Find(".rz-dropdown-list");
+        Assert.Contains("notepad.exe", dropdownList.TextContent);
+        Assert.Contains("test2.exe", dropdownList.TextContent);
     }
 
     [Fact]
@@ -88,8 +89,10 @@ public class ProcessSelectorTests : BunitContext
             })));
 
         // Act
-        var select = cut.Find("select");
-        await select.ChangeAsync(new ChangeEventArgs { Value = 1000 });
+        var dropdown = cut.Find(".rz-dropdown");
+        await dropdown.ClickAsync(new MouseEventArgs());
+        var option = cut.Find(".rz-dropdown-item");
+        await option.ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.Equal(1000, selectedProcess);
@@ -104,9 +107,9 @@ public class ProcessSelectorTests : BunitContext
             .Add(p => p.IsLoading, true));
 
         // Assert
-        var select = cut.Find("select");
+        var dropdown = cut.Find(".rz-dropdown");
         var button = cut.Find("button");
-        Assert.True(select.HasAttribute("disabled"));
+        Assert.True(dropdown.HasAttribute("disabled"));
         Assert.True(button.HasAttribute("disabled"));
     }
 }

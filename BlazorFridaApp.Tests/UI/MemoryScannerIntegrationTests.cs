@@ -57,8 +57,18 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
+        // First load the process list
+        var processListButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        await processListButton.ClickAsync();
+        
         // Wait for scan controls to be fully loaded and interactive
         await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
+        
+        // Select a process first to enable scan controls
+        var processCombobox = _page.GetByRole(AriaRole.Combobox).First;
+        await processCombobox.ClickAsync();
+        var notepadOption = _page.GetByText("notepad", new() { Exact = false });
+        await notepadOption.ClickAsync();
         
         // Select pattern scan
         var scanTypeCombobox = _page.GetByRole(AriaRole.Combobox).Nth(1);
@@ -116,21 +126,21 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
-        // Click scan to load the process list
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
-        await scanButton.ClickAsync();
+        // First load the process list
+        var processListButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        await processListButton.ClickAsync();
         
-        // Wait for process list to be loaded
+        // Wait for process list to be loaded and select notepad
         await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
-        
-        // Select process and perform scan
         var processCombobox = _page.GetByRole(AriaRole.Combobox).First;
         await processCombobox.ClickAsync();
         var notepadOption = _page.GetByText("notepad", new() { Exact = false });
         await notepadOption.ClickAsync();
         
+        // Enter search value and perform first scan
         await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
-        await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        await scanButton.ClickAsync();
         
         // Wait for results and check sync between grid and freezer
         await _page.WaitForSelectorAsync(".results-grid");

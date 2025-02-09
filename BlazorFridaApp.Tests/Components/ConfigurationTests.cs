@@ -103,16 +103,28 @@ public class ConfigurationTests : BunitContext, IDisposable
     public async Task ShouldHandleDuplicateConfigurationNames()
     {
         // Arrange
+        var processSettings = new ProcessSettings
+        {
+            ProcessName = "notepad.exe",
+            Notes = "Test process"
+        };
+        await _dbContext.ProcessSettings.AddAsync(processSettings);
+        await _dbContext.SaveChangesAsync();
+
         var config1 = new ScanProfile
         {
             Name = "Test Config",
-            ProcessName = "notepad.exe"
+            ProcessName = "notepad.exe",
+            ProcessSettingsId = processSettings.Id,
+            ProcessSettings = processSettings
         };
 
         var config2 = new ScanProfile
         {
             Name = "Test Config", // Same name
-            ProcessName = "calc.exe"
+            ProcessName = "notepad.exe", // Same process
+            ProcessSettingsId = processSettings.Id,
+            ProcessSettings = processSettings
         };
 
         // Act

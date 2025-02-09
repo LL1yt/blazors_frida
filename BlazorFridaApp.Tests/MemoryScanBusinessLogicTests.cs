@@ -24,6 +24,8 @@ public class MemoryScanBusinessLogicTests : IDisposable
 
     public MemoryScanBusinessLogicTests()
     {
+        Environment.SetEnvironmentVariable("BLAZOR_FRIDA_TEST", "true");
+        
         // Create real logger
         var loggerFactory = LoggerFactory.Create(builder =>
         {

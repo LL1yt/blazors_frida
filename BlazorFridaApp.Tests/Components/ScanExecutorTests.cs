@@ -10,6 +10,7 @@ using Xunit;
 using System.Collections.Generic;
 using Radzen;
 using Microsoft.AspNetCore.Components;
+using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.Tests.Components;
 
@@ -18,16 +19,20 @@ public class ScanExecutorTests : BunitContext
     private readonly Mock<IMemoryScannerService> _scannerServiceMock;
     private readonly Mock<ILogger<ScanExecutor>> _loggerMock;
     private readonly Mock<INotificationService> _notificationServiceMock;
+    private readonly Mock<IProcessMemoryScanner> _processMemoryScannerMock;
 
     public ScanExecutorTests()
     {
         _scannerServiceMock = new Mock<IMemoryScannerService>();
         _loggerMock = new Mock<ILogger<ScanExecutor>>();
         _notificationServiceMock = new Mock<INotificationService>();
+        _processMemoryScannerMock = new Mock<IProcessMemoryScanner>();
         
         Services.AddScoped<IMemoryScannerService>(_ => _scannerServiceMock.Object);
         Services.AddScoped<ILogger<ScanExecutor>>(_ => _loggerMock.Object);
+        Services.AddScoped<ILogger<MemoryScannerComponentBase>>(_ => Mock.Of<ILogger<MemoryScannerComponentBase>>());
         Services.AddScoped<INotificationService>(_ => _notificationServiceMock.Object);
+        Services.AddScoped<IProcessMemoryScanner>(_ => _processMemoryScannerMock.Object);
     }
 
     [Fact]

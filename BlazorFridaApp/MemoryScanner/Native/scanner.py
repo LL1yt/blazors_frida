@@ -270,51 +270,32 @@ class MemoryScanner:
 
     async def scan_pattern(self, pattern: bytes, mask: str) -> List[int]:
         """
-        Scan memory for a byte pattern with wildcards
+        Scan memory for a byte pattern with mask
         Args:
-            pattern: Bytes to search for
-            mask: Mask string where 'x' means match exact byte and '?' means wildcard
+            pattern: Byte pattern to search for
+            mask: Mask string where 'x' means match and '?' means wildcard
         Returns:
             List of memory addresses where the pattern was found
         """
-        if len(pattern) != len(mask):
-            raise ValueError("Pattern and mask must be the same length")
-
-        # Convert pattern and mask to JavaScript-friendly format
-        pattern_hex = " ".join(
-            [f"{b:02X}" if m == "x" else "??" for b, m in zip(pattern, mask)]
-        )
-
-        script = f"""
-        const results = [];
-        const ranges = Process.enumerateRangesSync({{protection: 'r--', coalesce: true}});
-        
-        for (const range of ranges) {{
-            try {{
-                const matches = Memory.scanSync(range.base, range.size, '{pattern_hex}');
-                for (const match of matches) {{
-                    results.push(match.address);
-                }}
-            }} catch (e) {{
-                // Skip ranges that can't be read
-                continue;
-            }}
-        }}
-        
-        send(results);
-        """
-
         try:
-            script_result = await execute_script(
-                self.frida_scanner._attacher.session, script
+            # Convert pattern to hex string with wildcards
+            pattern_str = ""
+            for i, b in enumerate(pattern):
+                if mask[i] == "x":
+                    pattern_str += f"{b:02X}"
+                else:
+                    pattern_str += "??"
+
+            # Use the existing scan_memory function with pattern type
+            results = await scan_memory(
+                self.frida_scanner.session, "pattern", pattern_str
             )
-            if script_result and isinstance(script_result, list):
-                # Convert string addresses to integers
-                return [
-                    int(addr, 16) if isinstance(addr, str) else int(addr)
-                    for addr in script_result
-                ]
-            return []
+
+            # Convert results to integers
+            return [
+                int(addr, 16) if isinstance(addr, str) else int(addr)
+                for addr in results
+            ]
         except Exception as e:
-            logger.error(f"Error during pattern scan: {e}", exc_info=e)
+            self._logger.error(f"Pattern scan failed: {e}")
             raise

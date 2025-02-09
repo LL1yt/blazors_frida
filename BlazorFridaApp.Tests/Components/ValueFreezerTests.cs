@@ -2,6 +2,7 @@ using Bunit;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using BlazorFridaApp.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components;
 using Moq;
@@ -14,15 +15,19 @@ namespace BlazorFridaApp.Tests.Components;
 public class ValueFreezerTests : BunitContext
 {
     private readonly Mock<IValueFreezerService> _freezerServiceMock;
-    private readonly Mock<NotificationService> _notificationServiceMock;
+    private readonly Mock<INotificationService> _notificationServiceMock;
 
     public ValueFreezerTests()
     {
         _freezerServiceMock = new Mock<IValueFreezerService>();
-        _notificationServiceMock = new Mock<NotificationService>();
+        _notificationServiceMock = new Mock<INotificationService>();
+        
+        // Configure async disposal
+        _freezerServiceMock.Setup(x => x.DisposeAsync())
+            .Returns(new ValueTask());
         
         Services.AddScoped<IValueFreezerService>(_ => _freezerServiceMock.Object);
-        Services.AddScoped<NotificationService>(_ => _notificationServiceMock.Object);
+        Services.AddScoped<INotificationService>(_ => _notificationServiceMock.Object);
     }
 
     [Fact]
@@ -71,10 +76,10 @@ public class ValueFreezerTests : BunitContext
         await cut.Instance.OnValueChanged(address, bytes);
 
         // Assert
-        _notificationServiceMock.Verify(x => x.Notify(
-            It.Is<NotificationMessage>(m => 
-                m.Severity == NotificationSeverity.Error && 
-                m.Summary == "Failed to update frozen value")), 
+        _notificationServiceMock.Verify(x => x.ShowError(
+            "Failed to update frozen value",
+            "Test error",
+            It.IsAny<Exception>()),
             Times.Once);
     }
 
@@ -130,10 +135,10 @@ public class ValueFreezerTests : BunitContext
         await cut.Instance.UnfreezeValue(address);
 
         // Assert
-        _notificationServiceMock.Verify(x => x.Notify(
-            It.Is<NotificationMessage>(m => 
-                m.Severity == NotificationSeverity.Error && 
-                m.Summary.Contains("unfreeze"))), 
+        _notificationServiceMock.Verify(x => x.ShowError(
+            "Failed to unfreeze value",
+            "Test error",
+            It.IsAny<Exception>()),
             Times.Once);
     }
 
