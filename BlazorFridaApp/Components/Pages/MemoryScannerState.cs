@@ -14,7 +14,7 @@ namespace BlazorFridaApp.Components.Pages
         public string Mask { get; set; } = "";
         public List<IntPtr> ScanResults { get; set; } = new();
         public ScanType SelectedScanType { get; set; } = ScanType.ExactValue;
-        public MemoryValueType SelectedValueType { get; set; } = MemoryValueType.Int;
+        public MemoryValueType SelectedValueType { get; set; } = MemoryValueType.Int32;
         public int SearchValue { get; set; }
         public bool IsFirstScan { get; set; } = true;
         public bool IsLoading { get; set; }
@@ -25,7 +25,7 @@ namespace BlazorFridaApp.Components.Pages
         public bool CanScan =>
             SelectedProcessId.HasValue &&
             SelectedValueType != MemoryValueType.String && // Strings not supported yet
-            SelectedValueType != MemoryValueType.Array &&  // Arrays not supported yet
+            SelectedValueType != MemoryValueType.ByteArray &&  // Arrays not supported yet
             (SelectedScanType == ScanType.Pattern ?
                 !string.IsNullOrWhiteSpace(PatternHex) && !string.IsNullOrWhiteSpace(Mask) :
                 SelectedScanType == ScanType.UnknownInitialValue ||

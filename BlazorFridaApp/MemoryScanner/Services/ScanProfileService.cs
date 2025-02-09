@@ -77,46 +77,6 @@ namespace BlazorFridaApp.MemoryScanner.Services
             }
         }
 
-        public async Task SaveLastProcess(int processId)
-        {
-            try
-            {
-                var setting = await _dbContext.Settings.FirstOrDefaultAsync(s => s.Key == "LastProcessId");
-                if (setting != null)
-                {
-                    setting.Value = processId.ToString();
-                }
-                else
-                {
-                    await _dbContext.Settings.AddAsync(new Setting { Key = "LastProcessId", Value = processId.ToString() });
-                }
-                await _dbContext.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to save last process ID {ProcessId}", processId);
-                throw;
-            }
-        }
-
-        public async Task<int?> GetLastProcessId()
-        {
-            try
-            {
-                var setting = await _dbContext.Settings.FirstOrDefaultAsync(s => s.Key == "LastProcessId");
-                if (setting != null && int.TryParse(setting.Value, out int processId))
-                {
-                    return processId;
-                }
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to get last process ID");
-                return null;
-            }
-        }
-
         public async Task SaveScanResults(IEnumerable<ScanResult> results)
         {
             try
@@ -129,64 +89,6 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 _logger.LogError(ex, "Failed to save scan results");
                 throw;
             }
-        }
-
-        public async Task<ScanProfile> SaveProfileAsync(ScanProfile profile)
-        {
-            try
-            {
-                var existingProfile = await _dbContext.ScanProfiles.FindAsync(profile.Name);
-                if (existingProfile != null)
-                {
-                    _dbContext.Entry(existingProfile).CurrentValues.SetValues(profile);
-                }
-                else
-                {
-                    await _dbContext.ScanProfiles.AddAsync(profile);
-                }
-                await _dbContext.SaveChangesAsync();
-                return profile;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to save scan profile {Name}", profile.Name);
-                throw;
-            }
-        }
-
-        public async Task<ScanProfile> GetProfileAsync(string name)
-        {
-            try
-            {
-                return await _dbContext.ScanProfiles.FindAsync(name);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to get scan profile {Name}", name);
-                throw;
-            }
-        }
-
-        public List<string> ValidateProfile(ScanProfile profile)
-        {
-            var errors = new List<string>();
-
-            if (string.IsNullOrWhiteSpace(profile.Name))
-            {
-                errors.Add("Profile name is required");
-            }
-
-            if (profile.ValueType == MemoryValueType.Unknown)
-            {
-                errors.Add("Value type must be specified");
-            }
-
-            if (string.IsNullOrWhiteSpace(profile.ComparisonType))
-            {
-                errors.Add("Comparison type must be specified");
-            }
-
-            return errors;
         }
     }
 }

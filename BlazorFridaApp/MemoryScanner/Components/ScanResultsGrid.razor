@@ -52,9 +52,9 @@
             MemoryValueType.Float => ((float)value).ToString("F2"),
             MemoryValueType.Double => ((double)value).ToString("F2"),
             MemoryValueType.Byte => $"0x{value:X2}",
-            MemoryValueType.Short => value.ToString(),
-            MemoryValueType.Int => value.ToString(),
-            MemoryValueType.Long => value.ToString(),
+            MemoryValueType.Int16 => value.ToString(),
+            MemoryValueType.Int32 => value.ToString(),
+            MemoryValueType.Int64 => value.ToString(),
             _ => value.ToString()
         };
     }

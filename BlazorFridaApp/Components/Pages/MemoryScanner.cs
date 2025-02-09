@@ -323,9 +323,9 @@ namespace BlazorFridaApp.Components.Pages
                 return valueType switch
                 {
                     MemoryValueType.Byte => new byte[] { 0 },
-                    MemoryValueType.Short => BitConverter.GetBytes((short)0),
-                    MemoryValueType.Int => BitConverter.GetBytes(0),
-                    MemoryValueType.Long => BitConverter.GetBytes((long)0),
+                    MemoryValueType.Int16 => BitConverter.GetBytes((short)0),
+                    MemoryValueType.Int32 => BitConverter.GetBytes(0),
+                    MemoryValueType.Int64 => BitConverter.GetBytes((long)0),
                     MemoryValueType.Float => BitConverter.GetBytes(0.0f),
                     MemoryValueType.Double => BitConverter.GetBytes(0.0),
                     _ => BitConverter.GetBytes(0)
@@ -345,9 +345,9 @@ namespace BlazorFridaApp.Components.Pages
                 var intValue = _state.SelectedValueType switch
                 {
                     MemoryValueType.Byte => (int)value[0],
-                    MemoryValueType.Short => (int)BitConverter.ToInt16(value, 0),
-                    MemoryValueType.Int => BitConverter.ToInt32(value, 0),
-                    MemoryValueType.Long => (int)BitConverter.ToInt64(value, 0),
+                    MemoryValueType.Int16 => (int)BitConverter.ToInt16(value, 0),
+                    MemoryValueType.Int32 => BitConverter.ToInt32(value, 0),
+                    MemoryValueType.Int64 => (int)BitConverter.ToInt64(value, 0),
                     MemoryValueType.Float => (int)BitConverter.ToSingle(value, 0),
                     MemoryValueType.Double => (int)BitConverter.ToDouble(value, 0),
                     _ => BitConverter.ToInt32(value, 0)

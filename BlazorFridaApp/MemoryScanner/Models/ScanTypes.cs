@@ -11,18 +11,6 @@ namespace BlazorFridaApp.MemoryScanner.Models
         UnknownInitialValue
     }
 
-    public enum MemoryValueType
-    {
-        Byte,
-        Short,
-        Int,
-        Long,
-        Float,
-        Double,
-        String,
-        Array
-    }
-
     public static class ScanTypeExtensions
     {
         public static bool RequiresInitialScan(this ScanType scanType)
@@ -56,10 +44,10 @@ namespace BlazorFridaApp.MemoryScanner.Models
             return valueType switch
             {
                 MemoryValueType.Byte => 1,
-                MemoryValueType.Short => 2,
-                MemoryValueType.Int => 4,
+                MemoryValueType.Int16 => 2,
+                MemoryValueType.Int32 => 4,
                 MemoryValueType.Float => 4,
-                MemoryValueType.Long => 8,
+                MemoryValueType.Int64 => 8,
                 MemoryValueType.Double => 8,
                 _ => throw new ArgumentException($"Unsupported value type: {valueType}")
             };
@@ -70,7 +58,7 @@ namespace BlazorFridaApp.MemoryScanner.Models
             return valueType switch
             {
                 MemoryValueType.String => false,
-                MemoryValueType.Array => false,
+                MemoryValueType.ByteArray => false,
                 _ => true
             };
         }

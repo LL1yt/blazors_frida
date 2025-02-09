@@ -12,7 +12,7 @@
     {
         try
         {
-            if (ValueType == MemoryValueType.String || ValueType == MemoryValueType.Array)
+            if (ValueType == MemoryValueType.String || ValueType == MemoryValueType.ByteArray)
             {
                 ShowWarning("Unsupported type", $"Type {ValueType} is not supported yet");
                 return Array.Empty<byte>();
@@ -21,10 +21,10 @@
             int size = ValueType switch
             {
                 MemoryValueType.Byte => 1,
-                MemoryValueType.Short => 2,
-                MemoryValueType.Int => 4,
+                MemoryValueType.Int16 => 2,
+                MemoryValueType.Int32 => 4,
                 MemoryValueType.Float => 4,
-                MemoryValueType.Long => 8,
+                MemoryValueType.Int64 => 8,
                 MemoryValueType.Double => 8,
                 _ => throw new ArgumentException($"Unsupported value type: {ValueType}")
             };
@@ -57,10 +57,10 @@
             int computedValue = ValueType switch
             {
                 MemoryValueType.Byte => change.value[0],
-                MemoryValueType.Short => BitConverter.ToInt16(change.value, 0),
-                MemoryValueType.Int => BitConverter.ToInt32(change.value, 0),
+                MemoryValueType.Int16 => BitConverter.ToInt16(change.value, 0),
+                MemoryValueType.Int32 => BitConverter.ToInt32(change.value, 0),
                 MemoryValueType.Float => (int)BitConverter.ToSingle(change.value, 0),
-                MemoryValueType.Long => (int)BitConverter.ToInt64(change.value, 0),
+                MemoryValueType.Int64 => (int)BitConverter.ToInt64(change.value, 0),
                 MemoryValueType.Double => (int)BitConverter.ToDouble(change.value, 0),
                 _ => 0
             };
