@@ -20,7 +20,7 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
         _scannerService = new ScannerGrpcService(_scannerLogger, ProcessManager);
     }
 
-    private async Task<ProcessInfo> GetTestProcess()
+    private ProcessInfo GetTestProcess()
     {
         var notepadProcess = System.Diagnostics.Process.GetProcessesByName("notepad").FirstOrDefault();
         
@@ -48,7 +48,7 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
     public async Task ShouldScanWithDifferentValueTypes(MemoryValueType valueType, int expectedSize)
     {
         // Arrange
-        var processInfo = await GetTestProcess();
+        var processInfo = GetTestProcess();
         // Attach to process first
         await _scannerService.AttachToProcessAsync(processInfo);
         var value = 42;
@@ -76,7 +76,7 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
     public async Task ShouldScanWithPattern()
     {
         // Arrange
-        var processInfo = await GetTestProcess();
+        var processInfo = GetTestProcess();
         // Attach to process first
         await _scannerService.AttachToProcessAsync(processInfo);
         var pattern = new byte[] { 0xAA, 0xBB, 0xCC };
@@ -93,7 +93,7 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
     public async Task ShouldScanWithProfile()
     {
         // Arrange
-        var processInfo = await GetTestProcess();
+        var processInfo = GetTestProcess();
         // Attach to process first
         await _scannerService.AttachToProcessAsync(processInfo);
 

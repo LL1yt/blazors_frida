@@ -109,9 +109,19 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
+        // Click scan to load the process list
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        await scanButton.ClickAsync();
+        
+        // Wait for process list to be loaded
+        await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
+        
         // Select process and perform scan
-        var processCombobox = _page.GetByRole(AriaRole.Combobox).Nth(0);
-        await processCombobox.SelectOptionAsync(new[] { "notepad" });
+        var processCombobox = _page.GetByRole(AriaRole.Combobox).First;
+        await processCombobox.ClickAsync();
+        var notepadOption = _page.GetByText("notepad", new() { Exact = false });
+        await notepadOption.ClickAsync();
+        
         await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
         await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
         
@@ -119,15 +129,15 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.WaitForSelectorAsync(".results-grid");
         
         // Freeze a value
-        var freezeButton = _page.GetByRole(AriaRole.Button, new() { Name = "Freeze" }).Nth(0);
+        var freezeButton = _page.GetByRole(AriaRole.Button, new() { Name = "Freeze" }).First;
         await freezeButton.ClickAsync();
         
         // Verify sync between components
-        var frozenIndicator = _page.GetByTestId("frozen-indicator").Nth(0);
+        var frozenIndicator = _page.GetByTestId("frozen-indicator").First;
         Assert.NotNull(await frozenIndicator.ElementHandleAsync());
         
         // Check value handler shows the same value
-        var valueDisplay = _page.GetByTestId("current-value").Nth(0);
+        var valueDisplay = _page.GetByTestId("current-value").First;
         var displayedValue = await valueDisplay.TextContentAsync();
         Assert.Equal("42", displayedValue);
     }

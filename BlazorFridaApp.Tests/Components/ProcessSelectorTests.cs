@@ -13,7 +13,7 @@ using System.Diagnostics;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ProcessSelectorTests : TestContext
+public class ProcessSelectorTests : BunitTestContext
 {
     private readonly Mock<IProcessService> _processServiceMock;
 

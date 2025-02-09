@@ -9,6 +9,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
     public required IPlaywright _playwright;
     public required IBrowser _browser;
     public required IPage _page;
+    private const int DEFAULT_TIMEOUT = 45000; // 45 seconds timeout for UI operations
 
     public async Task InitializeAsync()
     {
@@ -17,7 +18,10 @@ public class MemoryScannerPageTests : IAsyncLifetime
         {
             Headless = true
         });
-        _page = await _browser.NewPageAsync();
+        _page = await _browser.NewPageAsync(new BrowserNewPageOptions 
+        { 
+            Timeout = DEFAULT_TIMEOUT 
+        });
     }
 
     public async Task DisposeAsync()
@@ -67,23 +71,28 @@ public class MemoryScannerPageTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
-        // Act
-        await _page.GetByText("Scan type").ClickAsync();
-        await _page.GetByText("Pattern").ClickAsync();
+        // Wait for scan controls to be loaded
+        await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
         
-        // Assert
-        var patternInput = await _page.QuerySelectorAsync("textarea[placeholder*='Pattern']");
-        var maskInput = await _page.QuerySelectorAsync("textarea[placeholder*='Mask']");
-        Assert.NotNull(patternInput);
-        Assert.NotNull(maskInput);
+        // Select pattern scan type
+        var scanTypeCombobox = _page.GetByRole(AriaRole.Combobox).Nth(1);
+        await scanTypeCombobox.SelectOptionAsync(new[] { "Pattern" });
+        
+        // Wait for pattern inputs to be visible
+        await _page.WaitForSelectorAsync("[placeholder*='Pattern']");
+        
+        // Get pattern and mask inputs
+        var patternInput = _page.GetByPlaceholder("Pattern");
+        var maskInput = _page.GetByPlaceholder("Mask");
+        Assert.NotNull(await patternInput.ElementHandleAsync());
+        Assert.NotNull(await maskInput.ElementHandleAsync());
         
         // Enter pattern and mask
         await patternInput.FillAsync("AA BB CC");
         await maskInput.FillAsync("xxx");
         
         // Check scan button is enabled
-        var scanButton = await _page.QuerySelectorAsync("button:has-text('First Scan')");
-        Assert.NotNull(scanButton);
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
         Assert.False(await scanButton.IsDisabledAsync());
     }
 
@@ -93,24 +102,37 @@ public class MemoryScannerPageTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
+        // Click scan to load the process list
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        await scanButton.ClickAsync();
+        
+        // Wait for process list to be loaded
+        await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
+        
         // Select process and perform scan
-        var processCombobox = _page.GetByRole(AriaRole.Combobox);
-        await processCombobox.Nth(0).SelectOptionAsync(new[] { "notepad" });
-        await processCombobox.Nth(1).SelectOptionAsync(new[] { "Exact" });
+        var processCombobox = _page.GetByRole(AriaRole.Combobox).First;
+        await processCombobox.ClickAsync();
+        var notepadOption = _page.GetByText("notepad", new() { Exact = false });
+        await notepadOption.ClickAsync();
+        
+        // Select scan type
+        var scanTypeCombobox = _page.GetByRole(AriaRole.Combobox).Nth(1);
+        await scanTypeCombobox.SelectOptionAsync(new[] { "Exact" });
+        
+        // Enter value and start scan
         await _page.GetByRole(AriaRole.Spinbutton).FillAsync("42");
-        await _page.GetByText("First Scan").ClickAsync();
+        await _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" }).ClickAsync();
         
         // Wait for results
         await _page.WaitForSelectorAsync(".results-grid");
         
         // Try to freeze a value
-        var freezeButton = await _page.QuerySelectorAsync(".freeze-button");
-        Assert.NotNull(freezeButton);
+        var freezeButton = _page.GetByRole(AriaRole.Button, new() { Name = "Freeze" }).First;
         await freezeButton.ClickAsync();
         
         // Verify freeze status indicator
-        var frozenIndicator = await _page.QuerySelectorAsync(".frozen-indicator");
-        Assert.NotNull(frozenIndicator);
+        var frozenIndicator = _page.GetByTestId("frozen-indicator").First;
+        Assert.NotNull(await frozenIndicator.ElementHandleAsync());
     }
 
     [Fact]
@@ -119,23 +141,58 @@ public class MemoryScannerPageTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
-        // First scan
-        var processCombobox = _page.GetByRole(AriaRole.Combobox);
-        await processCombobox.Nth(0).SelectOptionAsync(new[] { "notepad" });
-        await processCombobox.Nth(1).SelectOptionAsync(new[] { "Exact" });
-        await _page.GetByRole(AriaRole.Spinbutton).FillAsync("100");
-        await _page.GetByText("First Scan").ClickAsync();
+        // Wait for initial page load and scan button to be visible
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        await scanButton.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await scanButton.ClickAsync();
+        
+        // Wait for process list to be loaded and combobox to be enabled
+        var processCombobox = _page.GetByRole(AriaRole.Combobox).First;
+        await processCombobox.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
+        
+        // Wait a bit for the process list to be populated
+        await Task.Delay(2000);
+        
+        // Select process
+        await processCombobox.ClickAsync();
+        var notepadOption = _page.GetByText("notepad", new() { Exact = false });
+        await notepadOption.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await notepadOption.ClickAsync();
+        
+        // Wait for and select scan type
+        var scanTypeCombobox = _page.GetByRole(AriaRole.Combobox).Nth(1);
+        await scanTypeCombobox.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await scanTypeCombobox.SelectOptionAsync(new[] { "Exact" });
+        
+        // Enter value and start first scan
+        var valueInput = _page.GetByRole(AriaRole.Spinbutton);
+        await valueInput.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await valueInput.FillAsync("100");
+        
+        var firstScanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
+        await firstScanButton.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await firstScanButton.ClickAsync();
         
         // Wait for results and verify
+        await _page.WaitForSelectorAsync(".results-grid", new() { State = WaitForSelectorState.Visible });
         var firstResults = await _page.QuerySelectorAsync(".results-grid");
         Assert.NotNull(firstResults);
         
         // Change value for next scan
-        await _page.GetByRole(AriaRole.Spinbutton).FillAsync("200");
-        await _page.GetByText("Next Scan").ClickAsync();
+        await valueInput.FillAsync("200");
+        var nextScanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Next Scan" });
+        await nextScanButton.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await nextScanButton.ClickAsync();
+        
+        // Wait for updated results with timeout
+        await _page.WaitForSelectorAsync(".results-grid .rz-row", new() 
+        { 
+            State = WaitForSelectorState.Visible,
+            Timeout = DEFAULT_TIMEOUT
+        });
         
         // Verify filtered results
-        await _page.WaitForSelectorAsync(".results-grid");
         var resultCount = (await _page.QuerySelectorAllAsync(".results-grid .rz-row")).Count;
         Assert.True(resultCount >= 0);
     }
