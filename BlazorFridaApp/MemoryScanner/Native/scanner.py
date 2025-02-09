@@ -269,31 +269,49 @@ class MemoryScanner:
         self.cleanup(force=True)
 
     async def scan_pattern(self, pattern: bytes, mask: str) -> List[int]:
-        """Scan memory for a byte pattern with mask.
-
+        """
+        Scan memory for a byte pattern with wildcards
         Args:
             pattern: Bytes to search for
             mask: Mask string where 'x' means match exact byte and '?' means wildcard
-
         Returns:
             List of memory addresses where the pattern was found
         """
-        # Convert pattern and mask to the format expected by the Frida script
-        pattern_str = ""
-        for i, b in enumerate(pattern):
-            if mask[i] == "x":
-                pattern_str += f"{b:02X}"
-            else:
-                pattern_str += "??"
+        if len(pattern) != len(mask):
+            raise ValueError("Pattern and mask must be the same length")
 
-        # Call the scan_memory function with pattern type
+        # Convert pattern and mask to JavaScript-friendly format
+        pattern_hex = " ".join(
+            [f"{b:02X}" if m == "x" else "??" for b, m in zip(pattern, mask)]
+        )
+
+        script = f"""
+        const results = [];
+        const ranges = Process.enumerateRangesSync({{protection: 'r--', coalesce: true}});
+        
+        const pattern = "{pattern_hex}";
+        
+        for (const range of ranges) {{
+            try {{
+                const matches = Memory.scanSync(range.base, range.size, pattern);
+                for (const match of matches) {{
+                    results.push(match.address.toString());
+                }}
+            }} catch (e) {{
+                // Skip ranges that can't be read
+                continue;
+            }}
+        }}
+        
+        results;
+        """
+
         try:
-            results = await scan_memory(
-                self._scanner._attacher.session, "pattern", pattern_str
-            )
-            return [
-                int(addr, 16) for addr in results
-            ]  # Convert hex strings to integers
+            # Execute the pattern scanning script
+            addresses = await execute_script(self._scanner._attacher.session, script)
+
+            # Convert string addresses to integers
+            return [int(addr, 16) for addr in addresses]
         except Exception as e:
-            self._logger.error(f"Pattern scan failed: {e}")
+            logger.error(f"Pattern scan failed: {e}", exc_info=e)
             raise

@@ -456,12 +456,12 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         request: memory_scanner_pb2.PatternScanRequest,
         context: grpc.aio.ServicerContext,
     ) -> memory_scanner_pb2.PatternScanResponse:
+        """Scan memory for a specific pattern."""
         with tracer.start_as_current_span("scan_pattern") as span:
             try:
                 session = await self.session_manager.get_session(request.session_id)
                 if not session:
-                    context.set_code(grpc.StatusCode.NOT_FOUND)
-                    context.set_details(f"Session {request.session_id} not found")
+                    context.abort(grpc.StatusCode.NOT_FOUND, "Session not found")
                     return memory_scanner_pb2.PatternScanResponse()
 
                 # Convert pattern string to bytes and mask
@@ -479,17 +479,24 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 pattern = bytes(pattern_bytes)
 
-                # Perform the pattern scan
+                # Perform the pattern scan using the session's scanner
                 results = await session.scanner.scan_pattern(pattern, mask)
 
-                return memory_scanner_pb2.PatternScanResponse(
-                    results=[
-                        memory_scanner_pb2.MemoryAddress(address=addr)
-                        for addr in results
-                    ]
-                )
+                # Convert results to response format
+                response = memory_scanner_pb2.PatternScanResponse()
+                for address in results:
+                    result = memory_scanner_pb2.ScanResult()
+                    result.address = address
+                    response.results.append(result)
+
+                operation_counter.inc({"operation": "scan_pattern"})
+                return response
+
             except Exception as e:
-                logger.error(f"Failed to scan pattern: {e}", exc_info=e)
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
+                error_counter.inc({"operation": "scan_pattern", "error": str(e)})
+                logger.exception("Error during pattern scan")
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                context.abort(
+                    grpc.StatusCode.INTERNAL, f"Pattern scan failed: {str(e)}"
+                )
                 return memory_scanner_pb2.PatternScanResponse()

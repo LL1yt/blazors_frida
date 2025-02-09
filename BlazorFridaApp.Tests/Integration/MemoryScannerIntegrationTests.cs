@@ -20,6 +20,24 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
         _scannerService = new ScannerGrpcService(_scannerLogger, ProcessManager);
     }
 
+    private async Task<ProcessInfo> GetTestProcess()
+    {
+        var notepadProcess = System.Diagnostics.Process.GetProcessesByName("notepad").FirstOrDefault();
+        
+        if (notepadProcess == null)
+        {
+            _scannerLogger.LogWarning("Notepad.exe process not found. Please start Notepad.exe before running tests.");
+            throw new InvalidOperationException("Notepad.exe process not found. Please start Notepad.exe before running tests.");
+        }
+
+        return new ProcessInfo 
+        { 
+            Id = notepadProcess.Id,
+            Name = notepadProcess.ProcessName,
+            Path = notepadProcess.MainModule?.FileName ?? "notepad.exe"
+        };
+    }
+
     [Theory]
     [InlineData(MemoryValueType.Byte, 1)]
     [InlineData(MemoryValueType.Short, 2)]
@@ -30,11 +48,13 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
     public async Task ShouldScanWithDifferentValueTypes(MemoryValueType valueType, int expectedSize)
     {
         // Arrange
-        var processId = 1234; // Use a test process ID
+        var processInfo = await GetTestProcess();
+        // Attach to process first
+        await _scannerService.AttachToProcessAsync(processInfo);
         var value = 42;
 
         // Act
-        var result = await _scannerService.ScanForValue(processId, value, valueType);
+        var result = await _scannerService.ScanForValue(processInfo.Id, value, valueType);
 
         // Assert
         Assert.NotNull(result);
@@ -56,12 +76,14 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
     public async Task ShouldScanWithPattern()
     {
         // Arrange
-        var processId = 1234;
+        var processInfo = await GetTestProcess();
+        // Attach to process first
+        await _scannerService.AttachToProcessAsync(processInfo);
         var pattern = new byte[] { 0xAA, 0xBB, 0xCC };
         var mask = "xxx";
 
         // Act
-        var result = await _scannerService.ScanForPattern(processId, pattern, mask);
+        var result = await _scannerService.ScanForPattern(processInfo.Id, pattern, mask);
 
         // Assert
         Assert.NotNull(result);
@@ -71,7 +93,10 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
     public async Task ShouldScanWithProfile()
     {
         // Arrange
-        var processInfo = new ProcessInfo { Id = 1234, Name = "test.exe" };
+        var processInfo = await GetTestProcess();
+        // Attach to process first
+        await _scannerService.AttachToProcessAsync(processInfo);
+
         var profile = new ScanProfile 
         { 
             ComparisonType = "exact",

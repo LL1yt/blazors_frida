@@ -26,6 +26,27 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
         _resultCache = new Dictionary<string, WeakReference<byte[]>>();
     }
 
+    public async Task<(bool success, string sessionId)> AttachToProcessAsync(ProcessInfo process)
+    {
+        try
+        {
+            var channel = await GetChannelAsync();
+            var client = CreateClient(channel);
+            var request = new Proto.ProcessRequest
+            {
+                Pid = process.Id
+            };
+
+            var response = await client.AttachToProcessAsync(request, CreateMetadata());
+            return (response.Success, response.SessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to attach to process {ProcessId}", process.Id);
+            throw;
+        }
+    }
+
     public async Task<IEnumerable<string>> ScanAsync(ProcessInfo process, string searchPattern, int scanType, ScanProfile profile)
     {
         try
