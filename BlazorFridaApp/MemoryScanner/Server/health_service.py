@@ -2,14 +2,15 @@ import asyncio
 from typing import Dict
 import grpc
 from grpc import aio
-import health_pb2
-import health_pb2_grpc
-from health_pb2 import HealthCheckRequest, HealthCheckResponse
+from MemoryScanner.Native import health_pb2
+from MemoryScanner.Native import health_pb2_grpc
+from MemoryScanner.Native.health_pb2 import HealthCheckRequest, HealthCheckResponse
 
 
 class HealthServicer(health_pb2_grpc.HealthServicer):
     def __init__(self):
         self._server_status: Dict[str, HealthCheckResponse.ServingStatus] = {}
+        self._server_info = {}
         self._server_status[""] = HealthCheckResponse.ServingStatus.SERVING
         self._server_status["memory_scanner.MemoryScanner"] = (
             HealthCheckResponse.ServingStatus.SERVING
@@ -22,6 +23,11 @@ class HealthServicer(health_pb2_grpc.HealthServicer):
         self._server_status[service] = status
         self._notify_watchers()
 
+    def set_server_info(self, info: dict):
+        """Set additional server information to be included in health checks"""
+        self._server_info = info
+        self._notify_watchers()
+
     def _notify_watchers(self) -> None:
         for watcher in self._watchers:
             if not watcher.done():
@@ -31,6 +37,10 @@ class HealthServicer(health_pb2_grpc.HealthServicer):
         self, request: HealthCheckRequest, context: grpc.aio.ServicerContext
     ) -> HealthCheckResponse:
         if request.service in self._server_status:
+            # Add server info to response metadata
+            if self._server_info:
+                for key, value in self._server_info.items():
+                    context.set_trailing_metadata(((f"server-{key}", str(value)),))
             return HealthCheckResponse(
                 status=self._server_status[request.service]
             )

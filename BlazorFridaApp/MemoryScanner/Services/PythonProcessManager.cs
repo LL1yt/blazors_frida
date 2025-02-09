@@ -24,7 +24,7 @@ public class PythonProcessManager : IPythonProcessManager
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly CancellationTokenSource _processTokenSource = new();
 
-    public bool IsRunning => _isRunning && _pythonProcess?.HasExited == false;
+    public bool IsRunning => _isRunning || (_serverProcessId.HasValue && Process.GetProcesses().Any(p => p.Id == _serverProcessId.Value && !p.HasExited));
     public int Port => _port;
 
     public PythonProcessManager(ILogger<PythonProcessManager> logger)
@@ -64,32 +64,7 @@ public class PythonProcessManager : IPythonProcessManager
 
             _logger.LogInformation("Starting Python gRPC server on port {Port}...", _port);
 
-            // Kill existing server process if we have its ID
-            if (_serverProcessId.HasValue)
-            {
-                try
-                {
-                    var existingProcess = Process.GetProcessById(_serverProcessId.Value);
-                    _logger.LogWarning("Found existing server process (PID: {Pid}), attempting to kill it", _serverProcessId.Value);
-                    existingProcess.Kill(true);
-                    await existingProcess.WaitForExitAsync();
-                }
-                catch (ArgumentException)
-                {
-                    _logger.LogInformation("No process found with PID {Pid}", _serverProcessId.Value);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error while trying to kill existing server process");
-                }
-                _serverProcessId = null;
-            }
-
-            // Install requirements if needed
-            await InstallRequirements();
-
-            // Start the Python process with unique identifier in arguments
-            var processId = Process.GetCurrentProcess().Id;
+            // First check if there's an existing server we can use
             var startInfo = new ProcessStartInfo
             {
                 FileName = _pythonPath,
@@ -101,7 +76,8 @@ public class PythonProcessManager : IPythonProcessManager
                 WorkingDirectory = Path.GetDirectoryName(_serverScript) ?? string.Empty
             };
 
-            _logger.LogDebug("Starting process with command: {Command} {Args}", startInfo.FileName, startInfo.Arguments);
+            // Install requirements if needed
+            await InstallRequirements();
 
             _pythonProcess = new Process { StartInfo = startInfo };
 
@@ -110,6 +86,16 @@ public class PythonProcessManager : IPythonProcessManager
             {
                 if (e.Data != null)
                 {
+                    if (e.Data.Contains("Server already running on PID"))
+                    {
+                        // Extract PID from the message
+                        var pidStr = e.Data.Split("PID")[1].Split()[0].Trim();
+                        if (int.TryParse(pidStr, out int pid))
+                        {
+                            _serverProcessId = pid;
+                            _isRunning = true;
+                        }
+                    }
                     _logger.LogInformation("Python Server: {Output}", e.Data);
                 }
             };
@@ -124,23 +110,30 @@ public class PythonProcessManager : IPythonProcessManager
 
             _pythonProcess.Exited += (sender, e) =>
             {
-                var exitCode = _pythonProcess?.ExitCode ?? -1;
-                _logger.LogWarning("Python server process exited unexpectedly with code {ExitCode}", exitCode);
-                _isRunning = false;
+                // Only log warning if we haven't detected existing server
+                if (!_isRunning)
+                {
+                    var exitCode = _pythonProcess?.ExitCode ?? -1;
+                    _logger.LogWarning("Python server process exited unexpectedly with code {ExitCode}", exitCode);
+                    _isRunning = false;
+                }
             };
 
             // Start the process and store its ID
             _pythonProcess.Start();
-            _serverProcessId = _pythonProcess.Id;
             _pythonProcess.BeginOutputReadLine();
             _pythonProcess.BeginErrorReadLine();
 
             // Wait for the server to be ready
-            _logger.LogDebug("Waiting for server to be ready on port {Port} (PID: {Pid})...", _port, _serverProcessId);
+            _logger.LogDebug("Waiting for server to be ready on port {Port} (PID: {Pid})...", _port, _pythonProcess.Id);
             await WaitForServerReady();
 
-            _isRunning = true;
-            _logger.LogInformation("Python gRPC server started successfully on port {Port} (PID: {Pid})", _port, _serverProcessId);
+            if (!_isRunning)
+            {
+                _serverProcessId = _pythonProcess.Id;
+                _isRunning = true;
+            }
+            _logger.LogInformation("Python gRPC server ready on port {Port} (PID: {Pid})", _port, _serverProcessId);
         }
         catch (Exception ex)
         {
@@ -220,10 +213,26 @@ public class PythonProcessManager : IPythonProcessManager
                 
                 // Use empty string to check overall service health
                 var request = new Proto.Health.HealthCheckRequest { Service = "" };
-                var response = await client.CheckAsync(request, cancellationToken: cts.Token);
+                var headers = new Metadata();
+                AsyncUnaryCall<Proto.Health.HealthCheckResponse> call = client.CheckAsync(request, headers,
+                    deadline: DateTime.UtcNow.AddMilliseconds(timeoutMs),
+                    cancellationToken: cts.Token);
                 
+                var response = await call;
+                var trailers = await call.ResponseHeadersAsync;
+
                 if (response.Status == Proto.Health.HealthCheckResponse.Types.ServingStatus.Serving)
                 {
+                    // Extract server info from response metadata
+                    if (trailers != null)
+                    {
+                        var pidEntry = trailers.FirstOrDefault(x => x.Key == "server-pid");
+                        if (pidEntry != null && int.TryParse(pidEntry.Value, out int pid))
+                        {
+                            _serverProcessId = pid;
+                        }
+                    }
+
                     _logger.LogInformation("Server health check passed after {Attempts} attempts", retryCount + 1);
                     return;
                 }
@@ -241,11 +250,6 @@ public class PythonProcessManager : IPythonProcessManager
                     throw new PythonServerException("Server failed to start within the expected timeframe", ex);
                 }
                 await Task.Delay(retryDelayMs);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unexpected error while waiting for server");
-                throw;
             }
         }
     }

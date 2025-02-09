@@ -17,9 +17,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../Native")
 
-import health_pb2
-import health_pb2_grpc
-import memory_scanner_pb2_grpc
+from MemoryScanner.Native import health_pb2, health_pb2_grpc, memory_scanner_pb2_grpc
 from MemoryScanner.Server.memory_scanner_service import MemoryScannerService
 from MemoryScanner.Server.health_service import HealthServicer
 from MemoryScanner.Server.telemetry import setup_telemetry
@@ -58,8 +56,9 @@ def is_port_in_use(port: int) -> bool:
         except socket.error:
             return True
 
-def check_server_running() -> bool:
-    """Check if another server instance is running."""
+def check_server_running() -> tuple[bool, dict]:
+    """Check if another server instance is running.
+    Returns (is_running, server_info)"""
     try:
         if os.path.exists(LOCK_FILE):
             with open(LOCK_FILE, 'r') as f:
@@ -73,7 +72,7 @@ def check_server_running() -> bool:
                     process = psutil.Process(pid)
                     if "python" in process.name().lower() and is_port_in_use(port):
                         logger.info(f"Server already running on PID {pid} using port {port}")
-                        return True
+                        return True, data
                 
             # Lock file exists but process is not running
             os.remove(LOCK_FILE)
@@ -81,7 +80,7 @@ def check_server_running() -> bool:
         logger.error(f"Error checking server status: {e}")
         if os.path.exists(LOCK_FILE):
             os.remove(LOCK_FILE)
-    return False
+    return False, {}
 
 def create_server_lock():
     """Create a lock file for the server instance."""
@@ -164,8 +163,13 @@ async def serve():
     """Start and run the gRPC server."""
     global server, memory_scanner_service, health_service
 
-    if check_server_running():
-        logger.info("Server instance already running. Exiting.")
+    is_running, server_info = check_server_running()
+    if is_running:
+        logger.info("Using existing server instance")
+        SERVER_CONFIG["port"] = server_info.get("port", SERVER_CONFIG["port"])
+        # Initialize health service to report existing server info
+        health_service = HealthServicer()
+        health_service.set_server_info(server_info)
         return
 
     try:
@@ -192,6 +196,14 @@ async def serve():
         # Initialize services
         memory_scanner_service = MemoryScannerService()
         health_service = HealthServicer()
+
+        # Set server info for health checks
+        server_info = {
+            'pid': os.getpid(),
+            'port': SERVER_CONFIG['port'],
+            'started': str(datetime.now())
+        }
+        health_service.set_server_info(server_info)
 
         # Add services to server
         memory_scanner_pb2_grpc.add_MemoryScannerServicer_to_server(
