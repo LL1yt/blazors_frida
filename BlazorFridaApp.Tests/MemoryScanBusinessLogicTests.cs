@@ -22,6 +22,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
 
     public MemoryScanBusinessLogicTests() : base()
     {
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] Constructor started");
         Environment.SetEnvironmentVariable("BLAZOR_FRIDA_TEST", "true");
         
         // Create real logger
@@ -31,6 +32,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
             builder.SetMinimumLevel(LogLevel.Debug);
         });
         
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] Creating service loggers");
         _processLogger = loggerFactory.CreateLogger<ProcessGrpcService>();
         _memoryLogger = loggerFactory.CreateLogger<MemoryGrpcService>();
         _scannerLogger = loggerFactory.CreateLogger<ScannerGrpcService>();
@@ -39,10 +41,12 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
         _memoryScannerLogger = loggerFactory.CreateLogger<MemoryScannerGrpcService>();
 
         // Create settings
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] Creating settings and services");
         var settings = new MemoryScannerSettings();
         var options = Options.Create(settings);
 
         // Create real services
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] Creating gRPC services using ProcessManager from base");
         var scannerService = new ScannerGrpcService(_scannerLogger, ProcessManager);
         var processService = new ProcessGrpcService(_processLogger, ProcessManager);
         var memoryService = new MemoryGrpcService(_memoryLogger, ProcessManager);
@@ -50,6 +54,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
         var freezeService = new FreezeGrpcService(_freezeLogger, ProcessManager);
 
         // Create memory scanner service
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] Creating MemoryScannerGrpcService");
         _memoryScannerService = new MemoryScannerGrpcService(
             processService,
             memoryService,
@@ -60,17 +65,30 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
             _memoryScannerLogger);
 
         // Find Notepad process
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] Looking for Notepad process");
         _notepadProcess = FindNotepadProcess().GetAwaiter().GetResult();
         if (_notepadProcess == null)
         {
+            Logger.LogError("[MemoryScanBusinessLogicTests] Notepad process not found");
             throw new InvalidOperationException("Please start Notepad.exe before running tests");
         }
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] Constructor completed. Found Notepad process with ID: {ProcessId}", _notepadProcess.Id);
     }
 
     private async Task<ProcessInfo> FindNotepadProcess()
     {
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] FindNotepadProcess started");
         var processes = await _memoryScannerService.ListProcessesAsync();
+        Logger.LogInformation("[MemoryScanBusinessLogicTests] Found {Count} processes", processes.Count());
         var notepad = processes.FirstOrDefault(p => p.Name.Equals("notepad.exe", StringComparison.OrdinalIgnoreCase));
+        if (notepad != null)
+        {
+            Logger.LogInformation("[MemoryScanBusinessLogicTests] Found Notepad process with ID: {ProcessId}", notepad.Id);
+        }
+        else
+        {
+            Logger.LogWarning("[MemoryScanBusinessLogicTests] Notepad process not found in process list");
+        }
         return notepad ?? throw new InvalidOperationException("Notepad.exe process not found");
     }
 
@@ -202,7 +220,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        _logger.LogInformation("Memory scan completed successfully");
+        Logger.LogInformation("Memory scan completed successfully");
     }
 
     [Fact]
@@ -218,6 +236,6 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
 
         // Assert
         Assert.NotNull(result);
-        _logger.LogInformation("Scan execution completed in expected order");
+        Logger.LogInformation("Scan execution completed in expected order");
     }
 }
