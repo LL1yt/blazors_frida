@@ -2,10 +2,11 @@ using BlazorFridaApp.MemoryScanner.Services.Base;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
+using System;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
-public class MemoryGrpcService : BaseGrpcService, IMemoryGrpcService
+public class MemoryGrpcService : BaseGrpcService, IMemoryGrpcService, IMemoryReaderService, IMemoryScannerBaseService
 {
     private string _currentSessionId = string.Empty;
     private nint _processHandle;
@@ -40,7 +41,7 @@ public class MemoryGrpcService : BaseGrpcService, IMemoryGrpcService
         catch (Exception ex)
         {
             _memoryLogger.LogError(ex, "Failed to read memory at address {Address}", address);
-            return (Array.Empty<byte>(), false, ex.Message);
+            return (System.Array.Empty<byte>(), false, ex.Message);
         }
     }
 
@@ -75,6 +76,7 @@ public class MemoryGrpcService : BaseGrpcService, IMemoryGrpcService
             throw new ArgumentException("Process ID must be a positive number", nameof(processId));
         }
         _processHandle = new nint(processId);
+        _currentSessionId = processId.ToString();
     }
 
     public async Task<byte[]> ReadMemoryBytes(nint address, int length)

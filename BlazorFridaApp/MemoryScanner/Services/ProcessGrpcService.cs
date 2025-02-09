@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
-public class ProcessGrpcService : BaseGrpcService, IProcessGrpcService
+public class ProcessGrpcService : BaseGrpcService, IProcessGrpcService, IProcessService
 {
     private string _currentSessionId = string.Empty;
     private nint _processHandle;

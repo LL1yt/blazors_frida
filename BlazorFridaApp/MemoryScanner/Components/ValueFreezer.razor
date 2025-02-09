@@ -1,13 +1,29 @@
 @using System.Collections.Concurrent
+@using System.Threading
+@using System.Runtime.InteropServices
 @inherits MemoryScannerComponentBase
 
 @inject IValueFreezerService Freezer
 
 <div class="freeze-control">
-    @* Add controls here if needed *@
+    @if (frozenAddresses?.Any() == true)
+    {
+        <div class="frozen-addresses">
+            <h4>Frozen Addresses</h4>
+            <ul>
+                @foreach (var address in frozenAddresses)
+                {
+                    <li>@($"{address:X8}")</li>
+                }
+            </ul>
+        </div>
+    }
 </div>
 
 @code {
+    private readonly ConcurrentDictionary<IntPtr, CancellationTokenSource> _freezeOperations = new();
+    private readonly SemaphoreSlim _freezeOperationLock = new(1, 1);
+    private bool _disposed;
     private HashSet<IntPtr> frozenAddresses = new();
 
     [Parameter]
@@ -16,7 +32,13 @@
     [Parameter]
     public EventCallback<(IntPtr address, bool isFrozen)> OnFreezeStateChanged { get; set; }
 
-    private protected async Task OnValueChanged(IntPtr address, byte[] bytes)
+    public bool IsFrozen(IntPtr address)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(ValueFreezer));
+        return _freezeOperations.ContainsKey(address);
+    }
+
+    public async Task OnValueChanged(IntPtr address, byte[] bytes)
     {
         try
         {
@@ -30,7 +52,7 @@
         }
     }
 
-    private protected async Task UnfreezeValue(IntPtr address)
+    public async Task UnfreezeValue(IntPtr address)
     {
         try
         {
@@ -44,24 +66,110 @@
         }
     }
 
-    private protected void InitializeComponent()
+    public async Task ToggleFreeze(IntPtr address, int value)
     {
-        Logger.LogInformation("ValueFreezer component initialized");
+        ObjectDisposedException.ThrowIf(_disposed, nameof(ValueFreezer));
+        
+        await _freezeOperationLock.WaitAsync();
+        try
+        {
+            if (_freezeOperations.TryGetValue(address, out var existingCts))
+            {
+                // Cancel existing freeze
+                existingCts.Cancel();
+                await Task.Delay(100); // Give time for the operation to stop
+                existingCts.Dispose();
+                _freezeOperations.TryRemove(address, out _);
+                await UnfreezeValue(address);
+            }
+            else
+            {
+                // Start new freeze
+                var cts = new CancellationTokenSource();
+                if (_freezeOperations.TryAdd(address, cts))
+                {
+                    _ = StartFreezeOperation(address, value, cts.Token);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling freeze state for address {Address:X}", address);
+            throw;
+        }
+        finally
+        {
+            _freezeOperationLock.Release();
+        }
+    }
+
+    private async Task StartFreezeOperation(IntPtr address, int value, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var periodicTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(100));
+            var valueBytes = BitConverter.GetBytes(value);
+
+            while (!cancellationToken.IsCancellationRequested && await periodicTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                try
+                {
+                    await OnValueChanged(address, valueBytes);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Error during freeze operation for address {Address:X}", address);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.LogInformation("Freeze operation cancelled for address {Address:X}", address);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Freeze operation failed for address {Address:X}", address);
+        }
     }
 
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
-        InitializeComponent();
+        Logger.LogInformation("ValueFreezer component initialized");
         frozenAddresses = await Freezer.GetFrozenAddresses();
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender && frozenAddresses.Any())
         {
-            frozenAddresses = Freezer.GetFrozenAddresses().Result;
+            frozenAddresses = await Freezer.GetFrozenAddresses();
         }
-        base.OnAfterRender(firstRender);
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_disposed)
+        {
+            try
+            {
+                // Cancel all freeze operations
+                foreach (var cts in _freezeOperations.Values)
+                {
+                    cts.Cancel();
+                    await Task.Delay(100); // Give operations time to stop
+                    cts.Dispose();
+                }
+                _freezeOperations.Clear();
+
+                _freezeOperationLock.Dispose();
+                _disposed = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error disposing ValueFreezer component");
+            }
+        }
     }
 }

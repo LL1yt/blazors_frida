@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using Grpc.Core;
 using Google.Protobuf;
+using System.Collections.Generic;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
@@ -35,33 +36,38 @@ public class FreezeGrpcService : BaseGrpcService, IFreezeGrpcService
         string valueType,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        var results = new List<(bool active, byte[] currentValue, string error)>();
+        var channel = await GetChannelAsync();
+        var client = CreateClient(channel);
+        var request = new Proto.FreezeRequest
+        {
+            SessionId = sessionId,
+            Address = address,
+            Value = ByteString.CopyFrom(value),
+            ValueType = valueType
+        };
+
         try
         {
-            var channel = await GetChannelAsync();
-            var client = CreateClient(channel);
-
-            var request = new Proto.FreezeRequest
-            {
-                SessionId = sessionId,
-                Address = address,
-                Value = ByteString.CopyFrom(value),
-                ValueType = valueType
-            };
-
             using var freezeStream = client.FreezeValue(request, CreateMetadata(), cancellationToken: cancellationToken);
             await foreach (var response in freezeStream.ResponseStream.ReadAllAsync(cancellationToken))
             {
-                yield return (
+                results.Add((
                     response.Active,
                     response.CurrentValue.ToByteArray(),
                     response.ErrorMessage
-                );
+                ));
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Error during freeze operation for address {Address:X}", address);
-            yield return (false, Array.Empty<byte>(), ex.Message);
+            results.Add((false, System.Array.Empty<byte>(), ex.Message));
+        }
+
+        foreach (var result in results)
+        {
+            yield return result;
         }
     }
 
