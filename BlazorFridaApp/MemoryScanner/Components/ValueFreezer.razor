@@ -1,5 +1,4 @@
 @using System.Collections.Concurrent
-@using Microsoft.AspNetCore.Components
 @inherits MemoryScannerComponentBase
 
 @inject IValueFreezerService Freezer
@@ -17,7 +16,7 @@
     [Parameter]
     public EventCallback<(IntPtr address, bool isFrozen)> OnFreezeStateChanged { get; set; }
 
-    public async Task OnValueChanged(IntPtr address, byte[] bytes)
+    private protected async Task OnValueChanged(IntPtr address, byte[] bytes)
     {
         try
         {
@@ -31,7 +30,7 @@
         }
     }
 
-    public async Task UnfreezeValue(IntPtr address)
+    private protected async Task UnfreezeValue(IntPtr address)
     {
         try
         {
@@ -45,7 +44,7 @@
         }
     }
 
-    private void InitializeComponent()
+    private protected void InitializeComponent()
     {
         Logger.LogInformation("ValueFreezer component initialized");
     }
@@ -65,4 +64,4 @@
         }
         base.OnAfterRender(firstRender);
     }
-} 
+}

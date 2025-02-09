@@ -1,10 +1,11 @@
 using BlazorFridaApp.MemoryScanner.Services.Base;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Google.Protobuf;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
-public class StateGrpcService : BaseGrpcService
+public class StateGrpcService : BaseGrpcService, IStateGrpcService
 {
     private string _currentSessionId = string.Empty;
 

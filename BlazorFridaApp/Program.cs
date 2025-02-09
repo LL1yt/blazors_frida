@@ -92,7 +92,7 @@ try
     builder.Services.AddScoped<IProcessService>(sp => sp.GetRequiredService<ProcessGrpcService>());
     builder.Services.AddScoped<IMemoryReaderService, MemoryGrpcService>();
     builder.Services.Decorate<IMemoryReaderService, RetryMemoryServiceDecorator>();
-    builder.Services.AddScoped<IMemoryScannerService>(sp => sp.GetRequiredService<ScannerGrpcService>());
+    builder.Services.AddScoped<IScannerGrpcService, ScannerGrpcService>();
 
     // Add the main ProcessMemoryScanner that orchestrates all services
     builder.Services.AddScoped<IProcessMemoryScanner, ProcessMemoryScanner>();

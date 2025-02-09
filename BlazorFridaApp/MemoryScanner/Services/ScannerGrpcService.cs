@@ -170,7 +170,7 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
         }
     }
 
-    private Proto.MemoryScanner.MemoryScannerClient CreateClient(GrpcChannel channel)
+    protected override Proto.MemoryScanner.MemoryScannerClient CreateClient(GrpcChannel channel)
     {
         return new Proto.MemoryScanner.MemoryScannerClient(channel);
     }

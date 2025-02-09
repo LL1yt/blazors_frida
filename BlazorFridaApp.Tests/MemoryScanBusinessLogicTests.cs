@@ -10,7 +10,11 @@ namespace BlazorFridaApp.Tests;
 
 public class MemoryScanBusinessLogicTests : IDisposable
 {
-    private readonly ILogger<ScannerGrpcService> _logger;
+    private readonly ILogger<ProcessGrpcService> _processLogger;
+    private readonly ILogger<MemoryGrpcService> _memoryLogger;
+    private readonly ILogger<ScannerGrpcService> _scannerLogger;
+    private readonly ILogger<StateGrpcService> _stateLogger;
+    private readonly ILogger<FreezeGrpcService> _freezeLogger;
     private readonly ILogger<PythonProcessManager> _processManagerLogger;
     private readonly ILogger<MemoryScannerGrpcService> _memoryScannerLogger;
     private readonly PythonProcessManager _processManager;
@@ -25,7 +29,12 @@ public class MemoryScanBusinessLogicTests : IDisposable
             builder.AddConsole();
             builder.SetMinimumLevel(LogLevel.Debug);
         });
-        _logger = loggerFactory.CreateLogger<ScannerGrpcService>();
+        
+        _processLogger = loggerFactory.CreateLogger<ProcessGrpcService>();
+        _memoryLogger = loggerFactory.CreateLogger<MemoryGrpcService>();
+        _scannerLogger = loggerFactory.CreateLogger<ScannerGrpcService>();
+        _stateLogger = loggerFactory.CreateLogger<StateGrpcService>();
+        _freezeLogger = loggerFactory.CreateLogger<FreezeGrpcService>();
         _processManagerLogger = loggerFactory.CreateLogger<PythonProcessManager>();
         _memoryScannerLogger = loggerFactory.CreateLogger<MemoryScannerGrpcService>();
 
@@ -37,11 +46,11 @@ public class MemoryScanBusinessLogicTests : IDisposable
         var options = Options.Create(settings);
 
         // Create real services
-        var scannerService = new ScannerGrpcService(_logger, _processManager);
-        var processService = new ProcessGrpcService(_logger, _processManager);
-        var memoryService = new MemoryGrpcService(_logger, _processManager);
-        var stateService = new StateGrpcService(_logger, _processManager);
-        var freezeService = new FreezeGrpcService(_logger, _processManager);
+        var scannerService = new ScannerGrpcService(_scannerLogger, _processManager);
+        var processService = new ProcessGrpcService(_processLogger, _processManager);
+        var memoryService = new MemoryGrpcService(_memoryLogger, _processManager);
+        var stateService = new StateGrpcService(_stateLogger, _processManager);
+        var freezeService = new FreezeGrpcService(_freezeLogger, _processManager);
 
         // Create memory scanner service
         _memoryScannerService = new MemoryScannerGrpcService(
