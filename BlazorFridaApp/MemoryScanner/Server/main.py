@@ -51,9 +51,9 @@ LOCK_FILE = os.path.join(tempfile.gettempdir(), "memory_scanner_server.lock")
 
 def is_port_in_use(port: int) -> bool:
     """Check if a port is in use."""
-    with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.bind(('::', port))
+            s.bind(('127.0.0.1', port))
             return False
         except socket.error:
             return True
