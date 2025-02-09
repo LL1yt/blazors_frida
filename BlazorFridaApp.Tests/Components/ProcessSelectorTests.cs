@@ -73,15 +73,19 @@ public class ProcessSelectorTests : BunitContext
         {
             new() { Id = 1000, Name = "notepad.exe" }
         };
-        int selectedProcess = 0;
+        int? selectedProcess = null;
         var cut = Render<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, processes)
             .Add(p => p.SelectedProcessId, selectedProcess)
-            .Add(p => p.OnProcessSelected, (int id) => selectedProcess = id));
+            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create(this, async () => 
+            {
+                selectedProcess = 1000;
+                await Task.CompletedTask;
+            })));
 
         // Act
         var select = cut.Find("select");
-        await select.ChangeAsync(new ChangeEventArgs { Value = "1000" });
+        await select.ChangeAsync(new ChangeEventArgs { Value = 1000 });
 
         // Assert
         Assert.Equal(1000, selectedProcess);

@@ -7,8 +7,8 @@ namespace BlazorFridaApp.MemoryScanner.Services.Interfaces
 {
     public interface IScanProfileService
     {
-        Task<Dictionary<string, ScannerConfig>> GetScannerConfigs();
-        Task SaveScannerConfig(string name, ScannerConfig config);
+        Task<Dictionary<string, Models.ScannerConfig>> GetScannerConfigs();
+        Task SaveScannerConfig(string name, Models.ScannerConfig config);
         Task DeleteScannerConfig(string name);
         Task SaveLastProcess(int processId);
         Task<int?> GetLastProcessId();

@@ -2,25 +2,26 @@
 @using Radzen.Blazor
 @using BlazorFridaApp.Components.Pages
 @using BlazorFridaApp.MemoryScanner.Services.Interfaces
+@using BlazorFridaApp.MemoryScanner.Models
 
 <div class="load-config-dialog">
     <RadzenDataGrid Data="@Configs" 
-                   TItem="KeyValuePair<string, ScannerConfig>"
+                   TItem="KeyValuePair<string, Models.ScannerConfig>"
                    AllowFiltering="true"
                    AllowSorting="true"
                    RowSelect="@(args => selectedConfig = args)"
                    Style="margin-bottom: 1rem;">
         <Columns>
-            <RadzenDataGridColumn TItem="KeyValuePair<string, ScannerConfig>" 
+            <RadzenDataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>" 
                                 Property="Key" 
                                 Title="Name" />
-            <RadzenDataGridColumn TItem="KeyValuePair<string, ScannerConfig>" 
+            <RadzenDataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>" 
                                 Property="Value.ScanType" 
                                 Title="Scan Type" />
-            <RadzenDataGridColumn TItem="KeyValuePair<string, ScannerConfig>" 
+            <RadzenDataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>" 
                                 Property="Value.ValueType" 
                                 Title="Value Type" />
-            <RadzenDataGridColumn TItem="KeyValuePair<string, ScannerConfig>" 
+            <RadzenDataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>" 
                                 Context="config" 
                                 Filterable="false" 
                                 Sortable="false" 
@@ -48,7 +49,7 @@
 
 @code {
     [Parameter]
-    public required Dictionary<string, ScannerConfig> Configs { get; set; }
+    public required Dictionary<string, Models.ScannerConfig> Configs { get; set; }
 
     [Inject]
     public required DialogService DialogService { get; set; }
@@ -56,7 +57,7 @@
     [Inject]
     public required IScanProfileService ProfileService { get; set; }
 
-    private KeyValuePair<string, ScannerConfig>? selectedConfig;
+    private KeyValuePair<string, Models.ScannerConfig>? selectedConfig;
 
     private async Task DeleteConfig(string name)
     {

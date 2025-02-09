@@ -142,7 +142,7 @@ rpc.exports = {
 
 class MemoryScanner:
     def __init__(self, frida_scanner, session_id: str):
-        self._scanner = frida_scanner
+        self.frida_scanner = frida_scanner
         self._session_id = session_id
         self._logger = logging.getLogger(__name__)
         self._scan_results = weakref.WeakValueDictionary()
@@ -188,7 +188,7 @@ class MemoryScanner:
 
         results = []
         for chunk_start, chunk_end in chunked_ranges:
-            chunk_results = await self._scanner.scan_memory_range(
+            chunk_results = await self.frida_scanner.scan_memory_range(
                 value_type, value, comparison_type, [(chunk_start, chunk_end)]
             )
             results.extend(chunk_results)
@@ -289,13 +289,11 @@ class MemoryScanner:
         const results = [];
         const ranges = Process.enumerateRangesSync({{protection: 'r--', coalesce: true}});
         
-        const pattern = "{pattern_hex}";
-        
         for (const range of ranges) {{
             try {{
-                const matches = Memory.scanSync(range.base, range.size, pattern);
+                const matches = Memory.scanSync(range.base, range.size, '{pattern_hex}');
                 for (const match of matches) {{
-                    results.push(match.address.toString());
+                    results.push(match.address);
                 }}
             }} catch (e) {{
                 // Skip ranges that can't be read
@@ -303,15 +301,20 @@ class MemoryScanner:
             }}
         }}
         
-        results;
+        send(results);
         """
 
         try:
-            # Execute the pattern scanning script
-            addresses = await execute_script(self._scanner._attacher.session, script)
-
-            # Convert string addresses to integers
-            return [int(addr, 16) for addr in addresses]
+            script_result = await execute_script(
+                self.frida_scanner._attacher.session, script
+            )
+            if script_result and isinstance(script_result, list):
+                # Convert string addresses to integers
+                return [
+                    int(addr, 16) if isinstance(addr, str) else int(addr)
+                    for addr in script_result
+                ]
+            return []
         except Exception as e:
-            logger.error(f"Pattern scan failed: {e}", exc_info=e)
+            logger.error(f"Error during pattern scan: {e}", exc_info=e)
             raise

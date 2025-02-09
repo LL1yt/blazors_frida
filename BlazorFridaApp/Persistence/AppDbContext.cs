@@ -13,6 +13,9 @@ namespace BlazorFridaApp.Persistence
         public DbSet<LockedAddress> LockedAddresses { get; set; } = null!;
         public DbSet<ProcessSettings> ProcessSettings { get; set; } = null!;
         public DbSet<ScanProfile> ScanProfiles { get; set; } = null!;
+        public DbSet<ScannerConfig> ScannerConfigs { get; set; } = null!;
+        public DbSet<Setting> Settings { get; set; } = null!;
+        public DbSet<ScanResult> ScanResults { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -27,6 +30,25 @@ namespace BlazorFridaApp.Persistence
                 entity.HasIndex(e => e.Key).IsUnique();
                 entity.Property(e => e.Key).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.Value).IsRequired();
+            });
+
+            modelBuilder.Entity<ScannerConfig>(entity =>
+            {
+                entity.HasKey(e => e.Name);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<Setting>(entity =>
+            {
+                entity.HasKey(e => e.Key);
+                entity.Property(e => e.Key).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Value).IsRequired();
+            });
+
+            modelBuilder.Entity<ScanResult>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ProcessId).IsRequired();
             });
 
             modelBuilder.Entity<ProcessSettings>(entity =>

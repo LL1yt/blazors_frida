@@ -87,6 +87,11 @@ try
     builder.Services.AddScoped<StateGrpcService>();
     builder.Services.AddScoped<FreezeGrpcService>();
 
+    // Register missing service interfaces
+    builder.Services.AddScoped<IProcessGrpcService, ProcessGrpcService>();
+    builder.Services.AddScoped<IMemoryScannerService, MemoryScannerGrpcService>();
+    builder.Services.AddScoped<IScanProfileService, ScanProfileService>();
+
     // Register facade and interfaces
     builder.Services.AddScoped<IMemoryScannerGrpcService, MemoryScannerFacade>();
     builder.Services.AddScoped<IProcessService, ProcessGrpcService>();
