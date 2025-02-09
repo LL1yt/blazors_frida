@@ -187,7 +187,7 @@ public class MemoryScanBusinessLogicTests : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                "1234",
+                "notepad_1000",
                 "int32",
                 BitConverter.GetBytes(-1000000000),
                 "exact",
@@ -195,7 +195,7 @@ public class MemoryScanBusinessLogicTests : IDisposable
 
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                "1234",
+                "notepad_1000",
                 "int32",
                 BitConverter.GetBytes(1000000000),
                 "exact",
@@ -207,7 +207,7 @@ public class MemoryScanBusinessLogicTests : IDisposable
     {
         // Act
         var result = await _memoryScannerService.ScanMemoryAsync(
-            "1234",
+            "notepad_1000",
             "int32",
             BitConverter.GetBytes(42),
             "exact",
@@ -223,7 +223,7 @@ public class MemoryScanBusinessLogicTests : IDisposable
     {
         // Act
         var result = await _memoryScannerService.ScanMemoryAsync(
-            "1234",
+            "notepad_1000",
             "int32",
             BitConverter.GetBytes(42),
             "exact",

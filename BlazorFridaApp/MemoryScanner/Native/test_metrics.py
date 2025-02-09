@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # Constants
 ASYNC_TIMEOUT = 5.0  # Default timeout for async operations
 TEST_SESSION_ID = "test_session"
-TEST_PID = 1234
+TEST_PID = 1000  # Test process ID for Notepad.exe
 TEST_ADDRESS = 0x1000
 TEST_MODULE = "test_module"
 

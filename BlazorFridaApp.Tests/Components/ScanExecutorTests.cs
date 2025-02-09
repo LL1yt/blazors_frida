@@ -38,7 +38,7 @@ public class ScanExecutorTests : BunitContext
             .ReturnsAsync(new List<nint>());
 
         var cut = Render<ScanExecutor>(parameters => parameters
-            .Add(p => p.ProcessId, 1234)
+            .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.SearchValue, 42)
@@ -62,7 +62,7 @@ public class ScanExecutorTests : BunitContext
             .ThrowsAsync(new Exception("Test error"));
 
         var cut = Render<ScanExecutor>(parameters => parameters
-            .Add(p => p.ProcessId, 1234)
+            .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.SearchValue, 42)
@@ -97,7 +97,7 @@ public class ScanExecutorTests : BunitContext
 
         var resultCount = 0;
         var cut = Render<ScanExecutor>(parameters => parameters
-            .Add(p => p.ProcessId, 1234)
+            .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.SearchValue, 42)
@@ -127,7 +127,7 @@ public class ScanExecutorTests : BunitContext
             .ReturnsAsync(results);
 
         var cut = Render<ScanExecutor>(parameters => parameters
-            .Add(p => p.ProcessId, 1234)
+            .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.Pattern)
             .Add(p => p.PatternHex, "AA BB CC")
             .Add(p => p.Mask, mask)
@@ -137,7 +137,7 @@ public class ScanExecutorTests : BunitContext
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 0));
 
         // Assert
-        _scannerServiceMock.Verify(x => x.ScanForPattern(1234, pattern, mask), Times.Once);
+        _scannerServiceMock.Verify(x => x.ScanForPattern(1000, pattern, mask), Times.Once);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public class ScanExecutorTests : BunitContext
         // Arrange
         var loadingStates = new List<bool>();
         var cut = Render<ScanExecutor>(parameters => parameters
-            .Add(p => p.ProcessId, 1234)
+            .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int)
             .Add(p => p.SearchValue, 42)

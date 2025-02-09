@@ -29,8 +29,8 @@ public class ProcessSelectorTests : BunitContext
         // Arrange
         var processes = new List<ProcessInfo>
         {
-            new() { Id = 1234, Name = "test1.exe" },
-            new() { Id = 5678, Name = "test2.exe" }
+            new() { Id = 1000, Name = "notepad.exe" },
+            new() { Id = 2000, Name = "test2.exe" }
         };
 
         // Act
@@ -40,7 +40,7 @@ public class ProcessSelectorTests : BunitContext
         // Assert
         var select = cut.Find("select");
         Assert.NotNull(select);
-        Assert.Contains("test1.exe", select.TextContent);
+        Assert.Contains("notepad.exe", select.TextContent);
         Assert.Contains("test2.exe", select.TextContent);
     }
 
@@ -69,27 +69,22 @@ public class ProcessSelectorTests : BunitContext
     public async Task ShouldNotifyOnProcessSelected()
     {
         // Arrange
-        var selectedProcess = 0;
         var processes = new List<ProcessInfo>
         {
-            new() { Id = 1234, Name = "test.exe" }
+            new() { Id = 1000, Name = "notepad.exe" }
         };
-
+        int selectedProcess = 0;
         var cut = Render<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, processes)
             .Add(p => p.SelectedProcessId, selectedProcess)
-            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create(this, () => 
-            {
-                selectedProcess = 1234;
-                return Task.CompletedTask;
-            })));
+            .Add(p => p.OnProcessSelected, (int id) => selectedProcess = id));
 
         // Act
         var select = cut.Find("select");
-        await select.ChangeAsync(new ChangeEventArgs { Value = "1234" });
+        await select.ChangeAsync(new ChangeEventArgs { Value = "1000" });
 
         // Assert
-        Assert.Equal(1234, selectedProcess);
+        Assert.Equal(1000, selectedProcess);
     }
 
     [Fact]
