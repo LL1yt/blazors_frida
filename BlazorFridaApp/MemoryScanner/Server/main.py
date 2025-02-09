@@ -4,9 +4,13 @@ import logging
 import signal
 import sys
 import os
+import socket
 from concurrent import futures
 from grpc import aio
 import psutil
+import tempfile
+import json
+from datetime import datetime
 
 # Change to the script's directory and add parent paths
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -42,6 +46,62 @@ memory_scanner_service = None
 health_service = None
 shutdown_event = asyncio.Event()
 
+# Server instance management
+LOCK_FILE = os.path.join(tempfile.gettempdir(), "memory_scanner_server.lock")
+
+def is_port_in_use(port: int) -> bool:
+    """Check if a port is in use."""
+    with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(('::', port))
+            return False
+        except socket.error:
+            return True
+
+def check_server_running() -> bool:
+    """Check if another server instance is running."""
+    try:
+        if os.path.exists(LOCK_FILE):
+            with open(LOCK_FILE, 'r') as f:
+                data = json.load(f)
+                pid = data.get('pid')
+                port = data.get('port')
+
+                # Check if process is still running
+                if pid and psutil.pid_exists(pid):
+                    # Verify it's our server process
+                    process = psutil.Process(pid)
+                    if "python" in process.name().lower() and is_port_in_use(port):
+                        logger.info(f"Server already running on PID {pid} using port {port}")
+                        return True
+                
+            # Lock file exists but process is not running
+            os.remove(LOCK_FILE)
+    except Exception as e:
+        logger.error(f"Error checking server status: {e}")
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+    return False
+
+def create_server_lock():
+    """Create a lock file for the server instance."""
+    try:
+        with open(LOCK_FILE, 'w') as f:
+            json.dump({
+                'pid': os.getpid(),
+                'port': SERVER_CONFIG['port'],
+                'started': str(datetime.now())
+            }, f)
+    except Exception as e:
+        logger.error(f"Error creating lock file: {e}")
+
+def remove_server_lock():
+    """Remove the server lock file."""
+    try:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+    except Exception as e:
+        logger.error(f"Error removing lock file: {e}")
 
 async def monitor_memory():
     """Monitor memory usage and log warnings."""
@@ -59,7 +119,6 @@ async def monitor_memory():
         except Exception as e:
             logger.error("Error monitoring memory", exc_info=e)
             await asyncio.sleep(60)
-
 
 async def cleanup():
     """Perform cleanup tasks during shutdown."""
@@ -93,20 +152,28 @@ async def cleanup():
         except Exception as e:
             logger.error("Error during server shutdown", exc_info=e)
 
+    remove_server_lock()
     logger.info("Cleanup completed")
-
 
 def signal_handler(signum, frame):
     """Handle shutdown signals."""
     logger.info(f"Received signal {signum}, initiating graceful shutdown...")
     shutdown_event.set()
 
-
 async def serve():
     """Start and run the gRPC server."""
     global server, memory_scanner_service, health_service
 
+    if check_server_running():
+        logger.info("Server instance already running. Exiting.")
+        return
+
     try:
+        # Try to bind to the port before starting
+        if is_port_in_use(SERVER_CONFIG['port']):
+            logger.error(f"Port {SERVER_CONFIG['port']} is already in use")
+            return
+
         # Create server with configured options
         server = aio.server(
             futures.ThreadPoolExecutor(max_workers=SERVER_CONFIG["max_workers"]),
@@ -137,6 +204,9 @@ async def serve():
         server.add_insecure_port(address)
         logger.info(f"Starting server on {address}")
 
+        # Create lock file
+        create_server_lock()
+
         # Start server
         await server.start()
         logger.info("Server started successfully")
@@ -153,8 +223,8 @@ async def serve():
 
     except Exception as e:
         logger.error("Error starting server", exc_info=e)
+        remove_server_lock()
         raise
-
 
 def main():
     # Set up signal handlers
@@ -163,7 +233,6 @@ def main():
 
     # Run the server
     asyncio.run(serve())
-
 
 if __name__ == "__main__":
     main()

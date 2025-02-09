@@ -6,6 +6,11 @@ import asyncio
 
 class Session:
     def __init__(self, process_id: int, scanner: Any):
+        if not scanner:
+            raise ValueError("Scanner cannot be None")
+        if not hasattr(scanner, 'scanner') or not scanner.scanner:
+            raise ValueError("Scanner not properly initialized")
+            
         self.session_id = f"{process_id}_{datetime.now().timestamp()}"
         self.process_id = process_id
         self.created_at = datetime.now()

@@ -10,6 +10,7 @@ namespace BlazorFridaApp.Tests;
 
 public class MemoryScanBusinessLogicTests : IDisposable
 {
+    private readonly ILogger<MemoryScanBusinessLogicTests> _logger;
     private readonly ILogger<ProcessGrpcService> _processLogger;
     private readonly ILogger<MemoryGrpcService> _memoryLogger;
     private readonly ILogger<ScannerGrpcService> _scannerLogger;
@@ -30,6 +31,7 @@ public class MemoryScanBusinessLogicTests : IDisposable
             builder.SetMinimumLevel(LogLevel.Debug);
         });
         
+        _logger = loggerFactory.CreateLogger<MemoryScanBusinessLogicTests>();
         _processLogger = loggerFactory.CreateLogger<ProcessGrpcService>();
         _memoryLogger = loggerFactory.CreateLogger<MemoryGrpcService>();
         _scannerLogger = loggerFactory.CreateLogger<ScannerGrpcService>();

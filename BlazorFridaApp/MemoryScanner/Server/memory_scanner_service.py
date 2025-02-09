@@ -93,11 +93,18 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 frida_scanner = FridaMemoryScanner()
                 span.set_attribute("process.id", request.pid)
+                
+                # Wait for scanner initialization
                 await frida_scanner.attach_to_process(request.pid)
+                await asyncio.sleep(0.5)  # Give the scanner time to fully initialize
 
                 session = self.session_manager.create_session(
                     request.pid, frida_scanner
                 )
+
+                # Verify scanner is properly initialized
+                if not session.scanner or not hasattr(session.scanner, 'scan'):
+                    raise RuntimeError("Scanner failed to initialize properly")
 
                 logger.info(
                     f"Successfully attached to process {request.pid} with session {session.session_id}"
