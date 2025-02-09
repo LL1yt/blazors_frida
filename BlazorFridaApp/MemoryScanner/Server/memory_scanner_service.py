@@ -104,17 +104,20 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 # Give the scanner time to fully initialize
                 retry_count = 0
-                max_retries = 5
+                max_retries = 10  # Increased from 5
                 while retry_count < max_retries:
-                    if hasattr(frida_scanner, "scanner") and frida_scanner.scanner:
+                    if hasattr(frida_scanner, "scanner") and frida_scanner.scanner and frida_scanner.scanner.is_initialized:
                         break
-                    await asyncio.sleep(0.2)  # 200ms delay between checks
+                    await asyncio.sleep(0.5)  # Increased from 0.2
                     retry_count += 1
+                    logger.debug(f"Waiting for scanner to initialize (attempt {retry_count}/{max_retries})")
 
-                if not hasattr(frida_scanner, "scanner") or not frida_scanner.scanner:
+                if not hasattr(frida_scanner, "scanner") or not frida_scanner.scanner or not frida_scanner.scanner.is_initialized:
+                    error_msg = f"Scanner failed to initialize for process {request.pid} after {max_retries} attempts"
+                    logger.error(error_msg)
                     return memory_scanner_pb2.AttachResponse(
                         success=False,
-                        error_message=f"Scanner failed to initialize for process {request.pid}",
+                        error_message=error_msg
                     )
 
                 # Create session only after scanner is ready
@@ -455,14 +458,24 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         self,
         request: memory_scanner_pb2.PatternScanRequest,
         context: grpc.aio.ServicerContext,
-    ) -> memory_scanner_pb2.PatternScanResponse:
+    ) -> memory_scanner_pb2.ScanResponse:
         """Scan memory for a specific pattern."""
         with tracer.start_as_current_span("scan_pattern") as span:
             try:
-                session = await self.session_manager.get_session(request.session_id)
+                session = self.session_manager.get_session(request.session_id)
                 if not session:
-                    context.abort(grpc.StatusCode.NOT_FOUND, "Session not found")
-                    return memory_scanner_pb2.PatternScanResponse()
+                    error_msg = f"Session {request.session_id} not found"
+                    logger.error(error_msg)
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details(error_msg)
+                    return memory_scanner_pb2.ScanResponse()
+
+                if not session.scanner or not session.scanner.is_initialized:
+                    error_msg = f"Scanner not properly initialized for session {request.session_id}"
+                    logger.error(error_msg)
+                    context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                    context.set_details(error_msg)
+                    return memory_scanner_pb2.ScanResponse()
 
                 # Convert pattern string to bytes and mask
                 pattern_parts = request.pattern.split()
@@ -483,20 +496,21 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 results = await session.scanner.scan_pattern(pattern, mask)
 
                 # Convert results to response format
-                response = memory_scanner_pb2.PatternScanResponse()
+                response_results = []
                 for address in results:
-                    result = memory_scanner_pb2.ScanResult()
-                    result.address = address
-                    response.results.append(result)
+                    response_results.append(
+                        memory_scanner_pb2.ScanResult(address=address)
+                    )
 
-                operation_counter.inc({"operation": "scan_pattern"})
-                return response
+                logger.info(
+                    f"Pattern scan completed for session {request.session_id}, found {len(results)} results"
+                )
+                return memory_scanner_pb2.ScanResponse(results=response_results)
 
             except Exception as e:
-                error_counter.inc({"operation": "scan_pattern", "error": str(e)})
-                logger.exception("Error during pattern scan")
+                error_msg = f"Pattern scan failed: {str(e)}"
+                logger.error(error_msg, exc_info=e)
                 span.set_status(Status(StatusCode.ERROR, str(e)))
-                context.abort(
-                    grpc.StatusCode.INTERNAL, f"Pattern scan failed: {str(e)}"
-                )
-                return memory_scanner_pb2.PatternScanResponse()
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(error_msg)
+                return memory_scanner_pb2.ScanResponse()
