@@ -35,6 +35,15 @@ logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
+def log_client_info(context: grpc.aio.ServicerContext, method_name: str) -> str:
+    """Log client information from metadata and return client ID."""
+    metadata = dict(context.invocation_metadata())
+    client_id = metadata.get("client-id", "unknown")
+    test_name = metadata.get("test-name", "unknown")
+    logger.info(f"[{method_name}] Request from client {client_id} (test: {test_name})")
+    return client_id
+
+
 class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     def __init__(self):
         from MemoryScanner.Server import metrics
@@ -59,11 +68,14 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     async def ListProcesses(
         self, request: memory_scanner_pb2.Empty, context: grpc.aio.ServicerContext
     ) -> memory_scanner_pb2.ProcessList:
+        client_id = log_client_info(context, "ListProcesses")
+        logger.info(f"Starting process list enumeration for client {client_id}...")
         with tracer.start_as_current_span("list_processes") as span:
             try:
-                logger.info("Starting process list enumeration...")
                 processes = get_process_list()
-                logger.info(f"Found {len(processes)} processes")
+                logger.info(
+                    f"Process list enumeration completed for client {client_id}"
+                )
                 return memory_scanner_pb2.ProcessList(
                     processes=[
                         memory_scanner_pb2.ProcessInfo(
@@ -73,7 +85,9 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                     ]
                 )
             except Exception as e:
-                logger.error("Failed to list processes", exc_info=e)
+                logger.error(
+                    f"Error in process list enumeration for client {client_id}: {str(e)}"
+                )
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return memory_scanner_pb2.ProcessList()
@@ -85,12 +99,9 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         request: memory_scanner_pb2.ProcessRequest,
         context: grpc.aio.ServicerContext,
     ) -> memory_scanner_pb2.AttachResponse:
+        client_id = log_client_info(context, "AttachToProcess")
         with tracer.start_as_current_span("attach_to_process") as span:
             try:
-                client_id = dict(context.invocation_metadata()).get(
-                    "client-id", context.peer()
-                )
-
                 frida_scanner = FridaMemoryScanner()
                 span.set_attribute("process.id", request.pid)
 
@@ -106,18 +117,27 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 retry_count = 0
                 max_retries = 10  # Increased from 5
                 while retry_count < max_retries:
-                    if hasattr(frida_scanner, "scanner") and frida_scanner.scanner and frida_scanner.scanner.is_initialized:
+                    if (
+                        hasattr(frida_scanner, "scanner")
+                        and frida_scanner.scanner
+                        and frida_scanner.scanner.is_initialized
+                    ):
                         break
                     await asyncio.sleep(0.5)  # Increased from 0.2
                     retry_count += 1
-                    logger.debug(f"Waiting for scanner to initialize (attempt {retry_count}/{max_retries})")
+                    logger.debug(
+                        f"Waiting for scanner to initialize (attempt {retry_count}/{max_retries})"
+                    )
 
-                if not hasattr(frida_scanner, "scanner") or not frida_scanner.scanner or not frida_scanner.scanner.is_initialized:
+                if (
+                    not hasattr(frida_scanner, "scanner")
+                    or not frida_scanner.scanner
+                    or not frida_scanner.scanner.is_initialized
+                ):
                     error_msg = f"Scanner failed to initialize for process {request.pid} after {max_retries} attempts"
                     logger.error(error_msg)
                     return memory_scanner_pb2.AttachResponse(
-                        success=False,
-                        error_message=error_msg
+                        success=False, error_message=error_msg
                     )
 
                 # Create session only after scanner is ready
@@ -143,6 +163,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         request: memory_scanner_pb2.DetachRequest,
         context: grpc.aio.ServicerContext,
     ) -> memory_scanner_pb2.DetachResponse:
+        client_id = log_client_info(context, "DetachFromProcess")
         with tracer.start_as_current_span("detach_from_process") as span:
             try:
                 await self.session_manager.remove_session(request.session_id)
@@ -161,6 +182,8 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     async def ScanMemory(
         self, request: memory_scanner_pb2.ScanRequest, context: grpc.aio.ServicerContext
     ) -> memory_scanner_pb2.ScanResponse:
+        client_id = log_client_info(context, "ScanMemory")
+        logger.info(f"Starting memory scan for client {client_id}...")
         with tracer.start_as_current_span("scan_memory") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)
@@ -218,6 +241,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     async def ReadMemory(
         self, request: memory_scanner_pb2.ReadRequest, context: grpc.aio.ServicerContext
     ) -> memory_scanner_pb2.ReadResponse:
+        client_id = log_client_info(context, "ReadMemory")
         with tracer.start_as_current_span("read_memory") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)
@@ -248,6 +272,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         request: memory_scanner_pb2.WriteRequest,
         context: grpc.aio.ServicerContext,
     ) -> memory_scanner_pb2.WriteResponse:
+        client_id = log_client_info(context, "WriteMemory")
         with tracer.start_as_current_span("write_memory") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)
@@ -279,6 +304,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         context: grpc.aio.ServicerContext,
     ):
         """Stream status updates while freezing a value at the specified address."""
+        client_id = log_client_info(context, "FreezeValue")
         with tracer.start_as_current_span("freeze_value") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)
@@ -389,6 +415,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         request: memory_scanner_pb2.UnfreezeRequest,
         context: grpc.aio.ServicerContext,
     ) -> memory_scanner_pb2.Empty:
+        client_id = log_client_info(context, "UnfreezeValue")
         with tracer.start_as_current_span("unfreeze_value") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)
@@ -413,6 +440,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         request: memory_scanner_pb2.StateRequest,
         context: grpc.aio.ServicerContext,
     ) -> memory_scanner_pb2.StateResponse:
+        client_id = log_client_info(context, "GetState")
         with tracer.start_as_current_span("get_state") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)
@@ -435,6 +463,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
     async def SyncState(
         self, request: memory_scanner_pb2.SyncRequest, context: grpc.aio.ServicerContext
     ) -> memory_scanner_pb2.SyncResponse:
+        client_id = log_client_info(context, "SyncState")
         with tracer.start_as_current_span("sync_state") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)
@@ -460,6 +489,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
         context: grpc.aio.ServicerContext,
     ) -> memory_scanner_pb2.ScanResponse:
         """Scan memory for a specific pattern."""
+        client_id = log_client_info(context, "ScanPattern")
         with tracer.start_as_current_span("scan_pattern") as span:
             try:
                 session = self.session_manager.get_session(request.session_id)

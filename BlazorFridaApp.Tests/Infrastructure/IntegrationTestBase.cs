@@ -4,6 +4,10 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Tasks;
 using Xunit;
+using Grpc.Net.Client;
+using System.Collections.Concurrent;
+using OpenTelemetry.Context.Propagation;
+using Grpc.Core;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 
@@ -11,6 +15,11 @@ public class IntegrationTestBase : IAsyncLifetime
 {
     protected readonly IPythonProcessManager ProcessManager;
     protected readonly ILogger<IntegrationTestBase> Logger;
+    private readonly ConcurrentDictionary<string, GrpcChannel> _channels = new();
+    private readonly SemaphoreSlim _channelLock = new(1, 1);
+    private readonly GrpcChannelOptions _channelOptions;
+    protected static readonly TextMapPropagator Propagator = new TraceContextPropagator();
+    private bool _disposed;
 
     public IntegrationTestBase()
     {
@@ -21,35 +30,121 @@ public class IntegrationTestBase : IAsyncLifetime
         Logger.LogInformation("[IntegrationTestBase] Constructor started");
         
         var processManagerLogger = factory.CreateLogger<PythonProcessManager>();
-        ProcessManager = new PythonProcessManager(processManagerLogger);
+        ProcessManager = new PythonProcessManager(processManagerLogger, 50051); // Hardcoded port since we're connecting to existing server
+
+        _channelOptions = new GrpcChannelOptions
+        {
+            MaxReceiveMessageSize = null, // Remove message size limits
+            MaxSendMessageSize = null,
+        };
+
         Logger.LogInformation("[IntegrationTestBase] Created PythonProcessManager instance");
     }
 
-    public async Task InitializeAsync()
+    protected async Task<GrpcChannel> GetChannelAsync()
     {
-        Logger.LogInformation("[IntegrationTestBase] InitializeAsync started");
-        await ProcessManager.EnsureServerRunning();
-        Logger.LogInformation("[IntegrationTestBase] Server startup completed");
-        await Task.Delay(2000); // Give server some time to fully initialize
-        Logger.LogInformation("[IntegrationTestBase] InitializeAsync completed after delay");
-    }
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(IntegrationTestBase));
 
-    public async Task DisposeAsync()
-    {
+        await _channelLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            Logger.LogInformation("[IntegrationTestBase] DisposeAsync started");
-            if (ProcessManager is IDisposable disposable)
+            var endpoint = $"http://127.0.0.1:{ProcessManager.Port}";
+            if (_channels.TryGetValue(endpoint, out var existingChannel))
             {
-                disposable.Dispose();
-                Logger.LogInformation("[IntegrationTestBase] ProcessManager disposed");
+                if (existingChannel.State != ConnectivityState.Shutdown)
+                {
+                    return existingChannel;
+                }
+                
+                if (_channels.TryRemove(endpoint, out var oldChannel))
+                {
+                    await oldChannel.ShutdownAsync().ConfigureAwait(false);
+                }
             }
-            await Task.CompletedTask;
-            Logger.LogInformation("[IntegrationTestBase] DisposeAsync completed");
+
+            var channel = GrpcChannel.ForAddress(endpoint, _channelOptions);
+            if (_channels.TryAdd(endpoint, channel))
+            {
+                return channel;
+            }
+
+            await channel.ShutdownAsync().ConfigureAwait(false);
+            return _channels[endpoint];
+        }
+        finally
+        {
+            _channelLock.Release();
+        }
+    }
+
+    protected Metadata CreateMetadata()
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(IntegrationTestBase));
+
+        var metadata = new Metadata();
+        var context = Activity.Current?.Context ?? default;
+        Propagator.Inject(new PropagationContext(context, default), metadata,
+            (m, k, v) => m.Add(k, v));
+        return metadata;
+    }
+
+    public virtual async Task InitializeAsync()
+    {
+        Logger.LogInformation("[IntegrationTestBase] InitializeAsync started");
+        try
+        {
+            await Task.Delay(100); // Small delay before first connection attempt
+            Logger.LogInformation("[IntegrationTestBase] Verifying gRPC server connection");
+            await ProcessManager.VerifyConnection();
+            Logger.LogInformation("[IntegrationTestBase] Successfully connected to gRPC server");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "[IntegrationTestBase] Error during test cleanup");
+            Logger.LogError(ex, "[IntegrationTestBase] Failed to connect to gRPC server. Make sure the server is running on port 50051");
+            throw new InvalidOperationException("Failed to connect to gRPC server. Make sure to start the server manually before running tests.", ex);
+        }
+    }
+
+    public virtual async Task DisposeAsync()
+    {
+        if (!_disposed)
+        {
+            try
+            {
+                Logger.LogInformation("[IntegrationTestBase] DisposeAsync started");
+                
+                foreach (var channel in _channels.Values)
+                {
+                    try
+                    {
+                        await channel.ShutdownAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Error shutting down gRPC channel");
+                    }
+                }
+                _channels.Clear();
+                _channelLock.Dispose();
+
+                if (ProcessManager is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                    Logger.LogInformation("[IntegrationTestBase] ProcessManager disposed");
+                }
+                
+                Logger.LogInformation("[IntegrationTestBase] DisposeAsync completed");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[IntegrationTestBase] Error during test cleanup");
+            }
+            finally
+            {
+                _disposed = true;
+            }
         }
     }
 } 
