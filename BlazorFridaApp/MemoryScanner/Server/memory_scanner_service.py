@@ -117,11 +117,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                 retry_count = 0
                 max_retries = 10  # Increased from 5
                 while retry_count < max_retries:
-                    if (
-                        hasattr(frida_scanner, "scanner")
-                        and frida_scanner.scanner
-                        and frida_scanner.scanner.is_initialized
-                    ):
+                    if frida_scanner.is_initialized:
                         break
                     await asyncio.sleep(0.5)  # Increased from 0.2
                     retry_count += 1
@@ -129,11 +125,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
                         f"Waiting for scanner to initialize (attempt {retry_count}/{max_retries})"
                     )
 
-                if (
-                    not hasattr(frida_scanner, "scanner")
-                    or not frida_scanner.scanner
-                    or not frida_scanner.scanner.is_initialized
-                ):
+                if not frida_scanner.is_initialized:
                     error_msg = f"Scanner failed to initialize for process {request.pid} after {max_retries} attempts"
                     logger.error(error_msg)
                     return memory_scanner_pb2.AttachResponse(

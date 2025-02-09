@@ -9,18 +9,22 @@ using Moq;
 using Xunit;
 using Radzen;
 using System.Collections.Generic;
+using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ValueFreezerTests : BunitContext
+public class ValueFreezerTests : TestContext, IAsyncDisposable
 {
     private readonly Mock<IValueFreezerService> _freezerServiceMock;
     private readonly Mock<INotificationService> _notificationServiceMock;
+    private readonly Mock<IProcessMemoryScanner> _scannerMock;
+    private bool _disposed;
 
     public ValueFreezerTests()
     {
         _freezerServiceMock = new Mock<IValueFreezerService>();
         _notificationServiceMock = new Mock<INotificationService>();
+        _scannerMock = new Mock<IProcessMemoryScanner>();
         
         // Configure async disposal
         _freezerServiceMock.Setup(x => x.DisposeAsync())
@@ -28,6 +32,23 @@ public class ValueFreezerTests : BunitContext
         
         Services.AddScoped<IValueFreezerService>(_ => _freezerServiceMock.Object);
         Services.AddScoped<INotificationService>(_ => _notificationServiceMock.Object);
+        Services.AddScoped<IProcessMemoryScanner>(_ => _scannerMock.Object);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!_disposed)
+        {
+            if (Services is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync();
+            }
+            else
+            {
+                Services.Dispose();
+            }
+            _disposed = true;
+        }
     }
 
     [Fact]

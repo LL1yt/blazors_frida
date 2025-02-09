@@ -149,6 +149,9 @@ public class ScanExecutorTests : BunitContext
     public async Task ShouldUpdateLoadingState()
     {
         // Arrange
+        _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
+            .ReturnsAsync(new List<nint>());
+            
         var loadingStates = new List<bool>();
         var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)

@@ -148,10 +148,17 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
         Logger.LogInformation("[ShouldUseCorrectValueTypeSize] Test completed for {ValueType}", valueType);
     }
 
-    /*
     [Fact]
     public async Task ShouldHandleComparisonTypes()
     {
+        if (_memoryScannerService == null || _notepadProcess == null)
+            throw new InvalidOperationException("Test not properly initialized");
+
+        // First attach to the process
+        var (success, sessionId) = await _memoryScannerService.AttachToProcessAsync(_notepadProcess.Id);
+        Assert.True(success, "Failed to attach to process");
+        Assert.NotNull(sessionId);
+
         // Arrange
         var comparisonTypes = new[] { "exact", "greater", "less" };
 
@@ -159,7 +166,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
         {
             // Act
             var result = await _memoryScannerService.ScanMemoryAsync(
-                _notepadProcess.Id.ToString(),
+                sessionId,
                 "int32",
                 BitConverter.GetBytes(42),
                 comparisonType,
@@ -174,10 +181,18 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
     [Fact]
     public async Task ShouldValidatePatternFormat()
     {
+        if (_memoryScannerService == null || _notepadProcess == null)
+            throw new InvalidOperationException("Test not properly initialized");
+
+        // First attach to the process
+        var (success, sessionId) = await _memoryScannerService.AttachToProcessAsync(_notepadProcess.Id);
+        Assert.True(success, "Failed to attach to process");
+        Assert.NotNull(sessionId);
+
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                _notepadProcess.Id.ToString(),
+                sessionId,
                 "pattern",
                 Array.Empty<byte>(),
                 "exact",
@@ -185,7 +200,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
 
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                _notepadProcess.Id.ToString(),
+                sessionId,
                 "pattern",
                 new byte[] { 0xAA, 0xBB },
                 "exact",
@@ -193,7 +208,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
 
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                _notepadProcess.Id.ToString(),
+                sessionId,
                 "pattern",
                 new byte[] { 0xAA },
                 "exact",
@@ -203,10 +218,18 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
     [Fact]
     public async Task ShouldValidateValueRanges()
     {
+        if (_memoryScannerService == null || _notepadProcess == null)
+            throw new InvalidOperationException("Test not properly initialized");
+
+        // First attach to the process
+        var (success, sessionId) = await _memoryScannerService.AttachToProcessAsync(_notepadProcess.Id);
+        Assert.True(success, "Failed to attach to process");
+        Assert.NotNull(sessionId);
+
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                _notepadProcess.Id.ToString(),
+                sessionId,
                 "int32",
                 BitConverter.GetBytes(-1000000000),
                 "exact",
@@ -214,7 +237,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
 
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                _notepadProcess.Id.ToString(),
+                sessionId,
                 "int32",
                 BitConverter.GetBytes(1000000000),
                 "exact",
@@ -224,10 +247,18 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
     [Fact]
     public async Task ShouldRespectMemoryBoundaries()
     {
+        if (_memoryScannerService == null || _notepadProcess == null)
+            throw new InvalidOperationException("Test not properly initialized");
+
+        // First attach to the process
+        var (success, sessionId) = await _memoryScannerService.AttachToProcessAsync(_notepadProcess.Id);
+        Assert.True(success, "Failed to attach to process");
+        Assert.NotNull(sessionId);
+
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                "notepad_1000",
+                sessionId,
                 "int32",
                 BitConverter.GetBytes(-1000000000),
                 "exact",
@@ -235,7 +266,7 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
 
         await Assert.ThrowsAsync<ArgumentException>(() => 
             _memoryScannerService.ScanMemoryAsync(
-                "notepad_1000",
+                sessionId,
                 "int32",
                 BitConverter.GetBytes(1000000000),
                 "exact",
@@ -245,9 +276,17 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
     [Fact]
     public async Task ShouldOptimizeMemoryAccess()
     {
+        if (_memoryScannerService == null || _notepadProcess == null)
+            throw new InvalidOperationException("Test not properly initialized");
+
+        // First attach to the process
+        var (success, sessionId) = await _memoryScannerService.AttachToProcessAsync(_notepadProcess.Id);
+        Assert.True(success, "Failed to attach to process");
+        Assert.NotNull(sessionId);
+
         // Act
         var result = await _memoryScannerService.ScanMemoryAsync(
-            "notepad_1000",
+            sessionId,
             "int32",
             BitConverter.GetBytes(42),
             "exact",
@@ -261,9 +300,17 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
     [Fact]
     public async Task ShouldPreserveExecutionOrder()
     {
+        if (_memoryScannerService == null || _notepadProcess == null)
+            throw new InvalidOperationException("Test not properly initialized");
+
+        // First attach to the process
+        var (success, sessionId) = await _memoryScannerService.AttachToProcessAsync(_notepadProcess.Id);
+        Assert.True(success, "Failed to attach to process");
+        Assert.NotNull(sessionId);
+
         // Act
         var result = await _memoryScannerService.ScanMemoryAsync(
-            "notepad_1000",
+            sessionId,
             "int32",
             BitConverter.GetBytes(42),
             "exact",
@@ -273,5 +320,4 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
         Assert.NotNull(result);
         Logger.LogInformation("Scan execution completed in expected order");
     }
-    */
 }
