@@ -1,4 +1,5 @@
 using Bunit;
+using Bunit.TestDoubles;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
@@ -13,7 +14,7 @@ using System.Diagnostics;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ProcessSelectorTests : BunitTestContext
+public class ProcessSelectorTests : BunitContext
 {
     private readonly Mock<IProcessService> _processServiceMock;
 

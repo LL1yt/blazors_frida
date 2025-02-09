@@ -110,7 +110,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
         // Click scan to load the process list
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "Scan" });
+        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Scan" });
         await scanButton.ClickAsync();
         
         // Wait for process list to be loaded

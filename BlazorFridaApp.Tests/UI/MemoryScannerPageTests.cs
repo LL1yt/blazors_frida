@@ -9,7 +9,6 @@ public class MemoryScannerPageTests : IAsyncLifetime
     public required IPlaywright _playwright;
     public required IBrowser _browser;
     public required IPage _page;
-    private const int DEFAULT_TIMEOUT = 45000; // 45 seconds timeout for UI operations
 
     public async Task InitializeAsync()
     {
@@ -18,10 +17,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         {
             Headless = true
         });
-        _page = await _browser.NewPageAsync(new BrowserNewPageOptions 
-        { 
-            Timeout = DEFAULT_TIMEOUT 
-        });
+        
     }
 
     public async Task DisposeAsync()
@@ -188,8 +184,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         // Wait for updated results with timeout
         await _page.WaitForSelectorAsync(".results-grid .rz-row", new() 
         { 
-            State = WaitForSelectorState.Visible,
-            Timeout = DEFAULT_TIMEOUT
+            State = WaitForSelectorState.Visible
         });
         
         // Verify filtered results
