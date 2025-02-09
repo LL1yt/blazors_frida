@@ -78,7 +78,8 @@ try
         });
 
     // Add Python process manager
-    builder.Services.AddSingleton<IPythonProcessManager, PythonProcessManager>();
+    builder.Services.AddSingleton<IPythonProcessManager>(sp => 
+        new PythonProcessManager(sp.GetRequiredService<ILogger<PythonProcessManager>>(), 50051));
 
     // Register specialized gRPC services
     builder.Services.AddScoped<ProcessGrpcService>();

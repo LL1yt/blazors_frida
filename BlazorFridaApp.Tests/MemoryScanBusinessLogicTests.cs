@@ -9,9 +9,11 @@ using Xunit;
 using BlazorFridaApp.MemoryScanner.Proto;
 using Grpc.Core;
 using System.Diagnostics;
+using ProcessInfo = BlazorFridaApp.MemoryScanner.Models.ProcessInfo;
 
 namespace BlazorFridaApp.Tests;
 
+[Collection("Integration Tests")]
 public class MemoryScanBusinessLogicTests : IntegrationTestBase
 {
     private ILogger<ProcessGrpcService>? _processLogger;
@@ -126,10 +128,15 @@ public class MemoryScanBusinessLogicTests : IntegrationTestBase
 
         using var activity = new Activity("ShouldUseCorrectValueTypeSize").Start();
         Logger.LogInformation("[ShouldUseCorrectValueTypeSize] Starting test for {ValueType} with size {Size}", valueType, expectedSize);
+        
+        // First attach to the process
+        var (success, sessionId) = await _memoryScannerService.AttachToProcessAsync(_notepadProcess.Id);
+        Assert.True(success, "Failed to attach to process");
+        Assert.NotNull(sessionId);
             
         // Act
         var result = await _memoryScannerService.ScanMemoryAsync(
-            _notepadProcess.Id.ToString(),
+            sessionId,  // Use the session ID instead of process ID
             valueType.ToString(),
             BitConverter.GetBytes(42),
             "exact",

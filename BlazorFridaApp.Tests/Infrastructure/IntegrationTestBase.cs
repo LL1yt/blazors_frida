@@ -8,6 +8,7 @@ using Grpc.Net.Client;
 using System.Collections.Concurrent;
 using OpenTelemetry.Context.Propagation;
 using Grpc.Core;
+using System.Diagnostics;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 
