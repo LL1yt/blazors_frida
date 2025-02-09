@@ -57,13 +57,20 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
+        // Wait for scan controls to be fully loaded and interactive
+        await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
+        
         // Select pattern scan
         var scanTypeCombobox = _page.GetByRole(AriaRole.Combobox).Nth(1);
+        await scanTypeCombobox.WaitForAsync(new() { State = WaitForSelectorState.Visible });
         await scanTypeCombobox.SelectOptionAsync(new[] { "Pattern" });
         
+        // Wait for pattern input fields to appear
+        await _page.WaitForSelectorAsync("[placeholder='Pattern (hex, space-separated)']");
+        
         // Try invalid pattern
-        var patternInput = _page.GetByPlaceholder("Pattern");
-        var maskInput = _page.GetByPlaceholder("Mask");
+        var patternInput = _page.GetByPlaceholder("Pattern (hex, space-separated)");
+        var maskInput = _page.GetByPlaceholder("Mask (x - match, ? - wildcard)");
         await patternInput.FillAsync("invalid pattern");
         await maskInput.FillAsync("xxx");
         

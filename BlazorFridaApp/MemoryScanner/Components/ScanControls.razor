@@ -11,6 +11,7 @@
                           Data="@ScanTypes"
                           AllowClear="true"
                           Style="width: 200px"
+                          Change="@(args => OnScanTypeChanged.InvokeAsync(args))"
                           Placeholder="Scan type"/>
         </ChildContent>
         <ErrorContent>
@@ -28,6 +29,7 @@
                           Data="@ValueTypes"
                           Style="width: 200px"
                           AllowClear="true"
+                          Change="@(args => OnValueTypeChanged.InvokeAsync(args))"
                           Placeholder="Value type"/>
         </ChildContent>
         <ErrorContent>
@@ -41,13 +43,22 @@
 
 @if (ScanType == ScanType.Pattern)
 {
-    <RadzenTextArea @bind-Value="@PatternHex"
-                   Placeholder="Pattern (hex, space-separated)"
-                   Rows="2"/>
+    <div class="pattern-inputs">
+        <RadzenTextArea @bind-Value="@PatternHex"
+                       Placeholder="Pattern (hex, space-separated)"
+                       Change="@ValidatePattern"
+                       Rows="2"/>
                    
-    <RadzenTextArea @bind-Value="@Mask"
-                   Placeholder="Mask (x - match, ? - wildcard)"
-                   Rows="2"/>
+        <RadzenTextArea @bind-Value="@Mask"
+                       Placeholder="Mask (x - match, ? - wildcard)"
+                       Change="@ValidateMask"
+                       Rows="2"/>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="alert alert-danger mt-2">@_errorMessage</div>
+        }
+    </div>
 }
 else
 {
@@ -66,7 +77,7 @@ else
 
 <RadzenButton Text="@(IsFirstScan ? "First Scan" : "Next Scan")"
              Click="@OnScanClick"
-             Disabled="@(!CanScan || IsLoading)"
+             Disabled="@(!CanScan || IsLoading || !IsValid)"
              ButtonStyle="ButtonStyle.Primary"
              Icon="@(IsLoading ? "refresh" : "search")"
              class="@(IsLoading ? "rz-button-loading" : "")"
@@ -78,6 +89,9 @@ else
 }
 
 @code {
+    private string? _errorMessage;
+    private bool IsValid => string.IsNullOrEmpty(_errorMessage);
+
     [Parameter] public ScanType ScanType { get; set; }
     [Parameter] public MemoryValueType ValueType { get; set; }
     [Parameter] public required Array ScanTypes { get; set; }
@@ -92,4 +106,54 @@ else
     [Parameter] public EventCallback<ScanType> OnScanTypeChanged { get; set; }
     [Parameter] public EventCallback<MemoryValueType> OnValueTypeChanged { get; set; }
     [Parameter] public EventCallback OnScanClick { get; set; }
+
+    private void ValidatePattern(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _errorMessage = "Pattern cannot be empty";
+            return;
+        }
+
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in parts)
+        {
+            if (!byte.TryParse(part, System.Globalization.NumberStyles.HexNumber, null, out _))
+            {
+                _errorMessage = "Invalid pattern format";
+                return;
+            }
+        }
+
+        ValidateMaskLength(parts.Length);
+    }
+
+    private void ValidateMask(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _errorMessage = "Mask cannot be empty";
+            return;
+        }
+
+        if (!value.All(c => c == 'x' || c == '?'))
+        {
+            _errorMessage = "Mask can only contain 'x' or '?'";
+            return;
+        }
+
+        var patternLength = PatternHex?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0;
+        ValidateMaskLength(patternLength);
+    }
+
+    private void ValidateMaskLength(int patternLength)
+    {
+        if (patternLength > 0 && Mask?.Length != patternLength)
+        {
+            _errorMessage = "Pattern and mask must have the same length";
+            return;
+        }
+
+        _errorMessage = null;
+    }
 }
