@@ -158,13 +158,16 @@ public class ValueFreezerTests : TestContextWrapper, IAsyncLifetime
         // Arrange
         var address = new IntPtr(0x1000);
         var bytes = new byte[] { 1, 2, 3, 4 };
-        var stateChanged = false;
+        var stateChangeTask = new TaskCompletionSource<bool>();
+
+        _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int32"))
+            .Returns(Task.CompletedTask);
 
         var cut = Render<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.OnFreezeStateChanged, EventCallback.Factory.Create<(IntPtr, bool)>(this, state =>
             {
-                stateChanged = true;
+                stateChangeTask.SetResult(state.Item2);
                 return Task.CompletedTask;
             })));
 
@@ -172,7 +175,9 @@ public class ValueFreezerTests : TestContextWrapper, IAsyncLifetime
         await cut.Instance.OnValueChanged(address, bytes);
 
         // Assert
+        var stateChanged = await stateChangeTask.Task;
         Assert.True(stateChanged);
+        _freezerServiceMock.Verify(x => x.FreezeValue(address, bytes, "Int32"), Times.Once);
     }
 
     [Fact]

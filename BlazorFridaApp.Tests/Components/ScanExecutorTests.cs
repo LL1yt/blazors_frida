@@ -77,13 +77,17 @@ public class ScanExecutorTests : BunitContext
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
 
         // Assert
-        _loggerMock.Verify(
-            x => x.Log(
-                LogLevel.Error,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((o, t) => true),
-                It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+        _loggerMock.Verify(x => x.Log(
+            LogLevel.Error,
+            It.IsAny<EventId>(),
+            It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Error during memory scan")),
+            It.IsAny<Exception>(),
+            It.Is<Func<It.IsAnyType, Exception, string>>((v, t) => true)),
+        Times.Once());
+
+        _notificationServiceMock.Verify(x => 
+            x.ShowError(It.Is<string>(s => s.Contains("Scan failed")), 
+                       It.Is<string>(s => s.Contains("Test error"))),
             Times.Once);
     }
 

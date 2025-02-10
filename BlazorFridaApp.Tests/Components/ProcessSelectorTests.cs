@@ -25,6 +25,10 @@ public class ProcessSelectorTests : BunitContext
         
         // Setup JS interop for Radzen components
         JSInterop.SetupVoid("Radzen.preventArrows", _ => true);
+        JSInterop.SetupVoid("Radzen.togglePopup", _ => true);
+        JSInterop.SetupVoid("Radzen.closePopup", _ => true);
+        JSInterop.SetupVoid("Radzen.toggleMenuItem", _ => true);
+        JSInterop.SetupVoid("Radzen.destroyPopup", _ => true);
     }
 
     [Fact]

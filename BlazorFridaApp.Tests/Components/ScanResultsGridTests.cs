@@ -80,9 +80,8 @@ public class ScanResultsGridTests : TestContextWrapper
             })));
 
         // Act
-        var numericInput = cut.Find(".rz-numeric");
-        var changeEvent = new ChangeEventArgs { Value = "100" };
-        await cut.InvokeAsync(() => numericInput.Change(changeEvent));
+        var numericInput = cut.FindComponent<RadzenNumeric<int>>();
+        await numericInput.InvokeAsync(() => numericInput.Instance.ValueChanged.InvokeAsync(100));
 
         // Assert
         Assert.True(valueChanged);
@@ -123,9 +122,9 @@ public class ScanResultsGridTests : TestContextWrapper
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert - Float
-        var floatValue = cutFloat.Find("rz-numeric");
+        var floatValue = cutFloat.Find(".rz-spinner");  // Updated selector
         Assert.NotNull(floatValue);
-        Assert.Contains("42.50", floatValue.GetAttribute("value"));
+        Assert.Contains("42.50", floatValue.GetAttribute("value") ?? "");
 
         // Act - Int
         var cutInt = Render<ScanResultsGrid>(parameters => parameters
@@ -135,8 +134,8 @@ public class ScanResultsGridTests : TestContextWrapper
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert - Int
-        var intValue = cutInt.Find("rz-numeric");
+        var intValue = cutInt.Find(".rz-spinner");  // Updated selector
         Assert.NotNull(intValue);
-        Assert.Contains("42", intValue.GetAttribute("value"));
+        Assert.Contains("42", intValue.GetAttribute("value") ?? "");
     }
 }

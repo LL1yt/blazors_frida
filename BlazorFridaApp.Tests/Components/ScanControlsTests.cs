@@ -6,21 +6,25 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
 using Radzen;
+using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class ScanControlsTests : BunitContext
 {
     private readonly Mock<INotificationService> _notificationServiceMock;
+    private readonly Mock<IProcessMemoryScanner> _scannerMock;
 
     public ScanControlsTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         _notificationServiceMock = new Mock<INotificationService>();
+        _scannerMock = new Mock<IProcessMemoryScanner>();
         
         Services.AddScoped<DialogService>();
-        Services.AddScoped<NotificationService>();
+        Services.AddScoped<Radzen.NotificationService>();
         Services.AddScoped<INotificationService>(_ => _notificationServiceMock.Object);
+        Services.AddScoped<IProcessMemoryScanner>(_ => _scannerMock.Object);
     }
 
     [Fact]
