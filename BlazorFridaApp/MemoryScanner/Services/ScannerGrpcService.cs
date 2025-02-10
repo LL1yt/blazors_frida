@@ -19,6 +19,7 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
     private const int MaxCacheSize = 100;
     private const ulong DefaultMemoryStart = 0x00010000;  // Start of typical process memory
     private const ulong DefaultMemoryEnd = 0x7FFFFFFF;   // End of 32-bit address space
+    private readonly Dictionary<string, List<nint>> _scanCache = new(); // Strong reference cache
 
     public ScannerGrpcService(
         ILogger<ScannerGrpcService> logger,
@@ -143,7 +144,9 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
             });
 
             var response = await client.ScanMemoryAsync(request, CreateMetadata());
-            return response.Results.Select(r => new IntPtr((long)r.Address)).ToList();
+            var results = response.Results.Select(r => new IntPtr((long)r.Address)).ToList();
+            _scanCache[sessionId] = results; // Strong reference cache
+            return results;
         }
         catch (Exception ex)
         {
@@ -262,6 +265,7 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
                 }
             }
             _resultCache.Clear();
+            _scanCache.Clear();
         }
         base.Dispose(disposing);
     }

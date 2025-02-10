@@ -100,43 +100,22 @@ public class ConfigurationTests : BunitContext, IDisposable
     }
 
     [Fact]
-    public async Task ShouldHandleDuplicateConfigurationNames()
+    public void ShouldHandleDuplicateConfigurationNames()
     {
         // Arrange
-        var processSettings = new ProcessSettings
-        {
-            ProcessName = "notepad.exe",
-            Notes = "Test process"
-        };
-        await _dbContext.ProcessSettings.AddAsync(processSettings);
-        await _dbContext.SaveChangesAsync();
+        var context = _dbContextFactory.CreateContext();
+        
+        var config1 = new ScannerConfig { Name = "TestConfig" };
+        var config2 = new ScannerConfig { Name = "TestConfig" };
 
-        var config1 = new ScanProfile
-        {
-            Name = "Test Config",
-            ProcessName = "notepad.exe",
-            ProcessSettingsId = processSettings.Id,
-            ProcessSettings = processSettings
-        };
+        // Act & Assert
+        context.ScannerConfigs.Add(config1);
+        context.SaveChanges();
 
-        var config2 = new ScanProfile
-        {
-            Name = "Test Config", // Same name
-            ProcessName = "notepad.exe", // Same process
-            ProcessSettingsId = processSettings.Id,
-            ProcessSettings = processSettings
-        };
-
-        // Act
-        await _dbContext.ScanProfiles.AddAsync(config1);
-        await _dbContext.SaveChangesAsync();
-
-        // Assert
-        await Assert.ThrowsAsync<DbUpdateException>(async () =>
-        {
-            await _dbContext.ScanProfiles.AddAsync(config2);
-            await _dbContext.SaveChangesAsync();
-        });
+        context.ScannerConfigs.Add(config2);
+        var exception = Assert.Throws<DbUpdateException>(() => context.SaveChanges());
+        
+        Assert.Contains("SQLite Error 19: UNIQUE constraint failed", exception.InnerException?.Message);
     }
 
     [Fact]

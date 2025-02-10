@@ -202,10 +202,10 @@
             catch (Exception ex)
             {
                 errorCount++;
-                Logger.LogWarning(ex, "Failed to read value at address {Address}", address);
+                Logger.LogError(ex, "Failed to read value at address {Address}", address);
                 if (errorCount % 100 == 0)
                 {
-                    Logger.LogWarning("Encountered {ErrorCount} read errors so far", errorCount);
+                    Logger.LogError("Encountered {ErrorCount} read errors so far", errorCount);
                 }
             }
         }
@@ -268,10 +268,10 @@
             catch (Exception ex)
             {
                 errorCount++;
-                Logger.LogWarning(ex, "Failed to process address {Address}", address);
+                Logger.LogError(ex, "Failed to process address {Address}", address);
                 if (errorCount % 100 == 0)
                 {
-                    Logger.LogWarning("Encountered {ErrorCount} processing errors so far", errorCount);
+                    Logger.LogError("Encountered {ErrorCount} processing errors so far", errorCount);
                 }
             }
         }
