@@ -18,6 +18,13 @@ echo.
 cd %~dp0
 set PYTHONPATH=%PYTHONPATH%;%~dp0..;%~dp0..\Native
 
+
+echo.
+echo Generating gRPC code...
+python ..\Native\generate_protos.py
+popd
+echo.
+
 REM Install requirements if needed
 echo Checking/installing Python requirements...
 python -m pip install -r ..\Native\requirements.txt
