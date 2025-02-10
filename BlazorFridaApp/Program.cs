@@ -25,6 +25,9 @@ using BlazorFridaApp.MemoryScanner.Base;
 using Microsoft.Extensions.Http;
 using Scrutor;
 using Microsoft.Extensions.Options;
+using Blazorise;
+using Blazorise.Bootstrap;
+using Blazorise.Icons.FontAwesome;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -48,6 +51,11 @@ try
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
 
+    // Add Blazorise
+    builder.Services.AddBlazorise()
+        .AddBootstrapProviders()
+        .AddFontAwesomeIcons();
+
     // Add assets service
     builder.Services.AddScoped<AssetsService>();
 
@@ -57,7 +65,7 @@ try
     builder.Services.AddScoped<Radzen.NotificationService>();
 
     // Add notification service
-    builder.Services.AddScoped<INotificationService, AppNotificationService>();
+    builder.Services.AddScoped<BlazorFridaApp.Services.INotificationService, BlazorFridaApp.Services.AppNotificationService>();
 
     // Configure OpenTelemetry
     builder.Services.AddOpenTelemetry()

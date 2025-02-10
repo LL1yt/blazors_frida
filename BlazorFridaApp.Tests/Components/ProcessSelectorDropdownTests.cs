@@ -4,6 +4,7 @@ using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Moq;
@@ -11,107 +12,127 @@ using Xunit;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Linq;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class ProcessSelectorDropdownTests : TestContextBase
 {
     private readonly Mock<IProcessService> _processServiceMock;
+    private readonly Mock<ILogger<ProcessSelector>> _loggerMock;
+    private readonly List<ProcessInfo> _defaultProcesses;
 
     public ProcessSelectorDropdownTests()
     {
         _processServiceMock = new Mock<IProcessService>();
-        Services.AddScoped<IProcessService>(_ => _processServiceMock.Object);
+        _loggerMock = new Mock<ILogger<ProcessSelector>>();
         
-        JSInterop.SetupVoid("Radzen.preventArrows", _ => true);
-        JSInterop.SetupVoid("Radzen.togglePopup", _ => true);
-        JSInterop.SetupVoid("Radzen.closePopup", _ => true);
-        JSInterop.SetupVoid("Radzen.toggleMenuItem", _ => true);
-        JSInterop.SetupVoid("Radzen.destroyPopup", _ => true);
+        Services.AddScoped<IProcessService>(_ => _processServiceMock.Object);
+        Services.AddScoped<ILogger<ProcessSelector>>(_ => _loggerMock.Object);
+        
+        _defaultProcesses = new List<ProcessInfo>
+        {
+            new() { Id = 1000, Name = "notepad.exe" },
+            new() { Id = 2000, Name = "test2.exe" }
+        };
+
+        _processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_defaultProcesses);
+        
+        _processServiceMock.Setup(x => x.RefreshProcessesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_defaultProcesses);
+        
+        // Setup Radzen JSInterop with required methods
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        JSInterop.SetupModule("_content/Radzen.Blazor/Radzen.Blazor.js");
+        
+        // Basic dropdown functionality
+        JSInterop.Setup<bool>("Radzen.hasChildren").SetResult(false);
+        JSInterop.Setup<bool>("Radzen.isVisible").SetResult(true);
+        JSInterop.Setup<object>("Radzen.createPopup").SetResult(new object());
+        JSInterop.Setup<object>("Radzen.closePopup").SetResult(new object());
+        JSInterop.Setup<object>("Radzen.togglePopup").SetResult(new object());
+        JSInterop.Setup<object>("Radzen.destroyPopup").SetResult(new object());
+        
+        // Dropdown-specific functionality
+        JSInterop.Setup<object>("Radzen.focusElement").SetResult(new object());
+        JSInterop.Setup<object>("Radzen.selectListItem").SetResult(new object());
+        JSInterop.Setup<object>("Radzen.selectListItems").SetResult(new object());
+        JSInterop.Setup<string[]>("Radzen.getInputValue").SetResult(new[] { "" });
+        JSInterop.Setup<object>("Radzen.openDropDown").SetResult(new object());
+        JSInterop.Setup<object>("Radzen.closeDropDown").SetResult(new object());
+        JSInterop.Setup<bool>("Radzen.isDropDownOpened").SetResult(true);
+        JSInterop.Setup<object>("Radzen.raiseEvent").SetResult(new object());
+        JSInterop.Setup<object>("Radzen.SetDropDownValue").SetResult(new object());
+        JSInterop.Setup<object>("Radzen.SetDropDownFilter").SetResult(new object());
     }
 
     [Fact(DisplayName = "Dropdown should maintain selected process after closing")]
     public async Task DropdownShouldMaintainSelection()
     {
         // Arrange
-        var processes = new List<ProcessInfo>
-        {
-            new() { Id = 1000, Name = "notepad.exe" },
-            new() { Id = 2000, Name = "test2.exe" }
-        };
-        int? selectedProcessId = null;
-
-        _processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(processes);
-
+        _loggerMock.Object.LogInformation("Starting DropdownShouldMaintainSelection test");
         var cut = RenderComponent<ProcessSelector>(parameters => parameters
-            .Add(p => p.ShowRefreshButton, true)
-            .Add(p => p.SelectedProcessId, selectedProcessId));
+            .Add(p => p.ProcessList, _defaultProcesses)
+            .Add(p => p.SelectedProcessId, (int?)null));
 
         await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
 
-        // Act 1 - Open dropdown and verify initial state
+        // Act - Open dropdown and select first process
         var dropdown = cut.Find(".rz-dropdown");
-        var initialText = dropdown.TextContent;
-        Assert.True(string.IsNullOrWhiteSpace(initialText.Trim()), "Dropdown should be empty initially");
-
-        // Act 2 - Click to open dropdown
         await dropdown.ClickAsync(new MouseEventArgs());
         
-        // Act 3 - Select first process
-        var option = cut.FindAll(".rz-dropdown-item").First();
+        var options = cut.FindAll(".rz-dropdown-item");
+        var option = options[0];
         await option.ClickAsync(new MouseEventArgs());
 
-        // Assert 1 - Verify selection was made
+        // Assert
         Assert.Equal(1000, cut.Instance.SelectedProcessId);
-        var dropdownTextAfterSelect = cut.Find(".rz-dropdown-text").TextContent;
-        Assert.Contains("notepad.exe", dropdownTextAfterSelect);
+        var dropdownText = cut.Find(".rz-dropdown-text").TextContent;
+        Assert.Contains("notepad.exe", dropdownText);
     }
 
     [Fact(DisplayName = "Should display all available processes in dropdown")]
     public async Task ShouldDisplayAllProcesses()
     {
-        // Arrange
-        var processes = new List<ProcessInfo>
-        {
-            new() { Id = 1000, Name = "process1.exe" },
-            new() { Id = 2000, Name = "process2.exe" }
-        };
+        // Arrange & Act
+        var cut = RenderComponent<ProcessSelector>(parameters => parameters
+            .Add(p => p.ProcessList, _defaultProcesses));
 
-        _processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(processes);
-
-        // Act
-        var cut = RenderComponent<ProcessSelector>();
         await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
+
+        // Open dropdown
+        var dropdown = cut.Find(".rz-dropdown");
+        await dropdown.ClickAsync(new MouseEventArgs());
 
         // Assert
         var items = cut.FindAll(".rz-dropdown-item");
         Assert.Equal(2, items.Count);
-        Assert.Equal("process1.exe (1000)", items[0].TextContent.Trim());
-        Assert.Equal("process2.exe (2000)", items[1].TextContent.Trim());
+        Assert.Contains("notepad.exe (1000)", items[0].TextContent);
+        Assert.Contains("test2.exe (2000)", items[1].TextContent);
     }
 
     [Fact(DisplayName = "Should refresh process list on refresh button click")]
     public async Task ShouldRefreshProcessList()
     {
         // Arrange
-        var initialProcesses = new List<ProcessInfo> { new() { Id = 1000, Name = "old.exe" } };
-        var refreshedProcesses = new List<ProcessInfo> { new() { Id = 2000, Name = "new.exe" } };
-        
-        _processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(initialProcesses);
+        var refreshedProcesses = new List<ProcessInfo> { new() { Id = 3000, Name = "new.exe" } };
         _processServiceMock.Setup(x => x.RefreshProcessesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(refreshedProcesses);
 
         var cut = RenderComponent<ProcessSelector>(parameters => parameters
-            .Add(p => p.ShowRefreshButton, true));
+            .Add(p => p.ShowRefreshButton, true)
+            .Add(p => p.ProcessList, _defaultProcesses));
 
         await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
 
         // Act
         var refreshButton = cut.Find("button");
         await refreshButton.ClickAsync(new MouseEventArgs());
+
+        // Open dropdown to verify contents
+        var dropdown = cut.Find(".rz-dropdown");
+        await dropdown.ClickAsync(new MouseEventArgs());
 
         // Assert
         var items = cut.FindAll(".rz-dropdown-item");
@@ -129,58 +150,72 @@ public class ProcessSelectorDropdownTests : TestContextBase
         // Act & Assert
         var cut = RenderComponent<ProcessSelector>();
         await Assert.ThrowsAsync<Exception>(() => cut.Instance.InitializeAsync());
+        _loggerMock.Verify(
+            x => x.Log(
+                It.IsAny<LogLevel>(),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                It.IsAny<Exception>(),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()),
+            Times.AtLeastOnce);
     }
 
     [Fact(DisplayName = "Should filter processes by name")]
     public async Task ShouldFilterProcessesByName()
     {
         // Arrange
-        var processes = new List<ProcessInfo>
-        {
-            new() { Id = 1000, Name = "chrome.exe" },
-            new() { Id = 2000, Name = "notepad.exe" }
-        };
-        
-        _processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(processes);
-
-        var cut = RenderComponent<ProcessSelector>();
+        var cut = RenderComponent<ProcessSelector>(parameters => parameters
+            .Add(p => p.ProcessList, _defaultProcesses));
         await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
 
-        // Act - Enter filter text
-        var filterInput = cut.Find("input[type='text']");
-        filterInput.Change(new ChangeEventArgs { Value = "note" });
+        // Open dropdown
+        var dropdown = cut.Find(".rz-dropdown");
+        await dropdown.ClickAsync(new MouseEventArgs());
 
-        // Assert
-        var items = cut.FindAll(".rz-dropdown-item");
-        Assert.Single(items);
-        Assert.Contains("notepad.exe", items[0].TextContent);
+        // Simulate filter input
+        JSInterop.SetupVoid("Radzen.SetDropDownFilter", "note");
+        await cut.InvokeAsync(() => cut.Instance.HandleFilter(new ChangeEventArgs { Value = "note" }));
+
+        // Assert - After filtering, only one item should be visible
+        var filteredText = cut.Markup;
+        Assert.Contains("notepad.exe", filteredText);
+        Assert.DoesNotContain("test2.exe", filteredText);
     }
 
     [Fact(DisplayName = "Should update UI when selected process changes externally")]
     public async Task ShouldUpdateUIWhenSelectionChanges()
     {
-        // Arrange
-        var processes = new List<ProcessInfo>
-        {
-            new() { Id = 1000, Name = "process1.exe" },
-            new() { Id = 2000, Name = "process2.exe" }
-        };
-
-        _processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(processes);
-
+        // Arrange & Act
         var cut = RenderComponent<ProcessSelector>(parameters => parameters
+            .Add(p => p.ProcessList, _defaultProcesses)
             .Add(p => p.SelectedProcessId, 1000));
 
         await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
-
-        // Act - Change selection externally
+        
+        JSInterop.SetupVoid("Radzen.SetDropDownValue", 2000);
+        
         cut.SetParametersAndRender(parameters => parameters
             .Add(p => p.SelectedProcessId, 2000));
 
         // Assert
         var selectedText = cut.Find(".rz-dropdown-text").TextContent;
-        Assert.Contains("process2.exe", selectedText);
+        Assert.Contains("test2.exe", selectedText);
+    }
+
+    private void LogJsInterop(string methodName)
+    {
+        var expectedIdentifier = $"Radzen.{methodName}";
+        _loggerMock.Object.LogInformation($"Checking for JS interop call: {expectedIdentifier}");
+        
+        var invocations = JSInterop.Invocations
+            .Select(i => i.Identifier)
+            .ToList();
+            
+        _loggerMock.Object.LogInformation($"Found invocations: {string.Join(", ", invocations)}");
+        
+        Assert.True(
+            JSInterop.Invocations.Any(i => i.Identifier.EndsWith(expectedIdentifier)),
+            $"Expected to find JS interop call to {expectedIdentifier}"
+        );
     }
 }

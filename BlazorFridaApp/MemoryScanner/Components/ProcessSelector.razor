@@ -1,10 +1,45 @@
-@using Radzen
-@using Radzen.Blazor
+@using Blazorise
 @using BlazorFridaApp.MemoryScanner.Models
 @using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @inject ILogger<ProcessSelector> Logger
 @inject IProcessService ProcessService
 @implements IAsyncDisposable
+
+<div>
+    <Row>
+        <Column ColumnSize="ColumnSize.Is9">
+            <Select TValue="int?" 
+                   @bind-SelectedValue="@SelectedProcessId"
+                   Disabled="@IsLoading"
+                   SearchChanged="@((string value) => { _searchTerm = value; StateHasChanged(); })">
+                <ChildContent>
+                    <SelectItem TValue="int?" Value="null">@(IsLoading ? "Loading processes..." : "Select a process")</SelectItem>
+                    @foreach (var process in FilteredProcesses)
+                    {
+                        <SelectItem TValue="int?" Value="@process.Id">@($"{process.Name} ({process.Id})")</SelectItem>
+                    }
+                </ChildContent>
+            </Select>
+        </Column>
+        @if (ShowRefreshButton)
+        {
+            <Column ColumnSize="ColumnSize.Is3">
+                <Button Color="Color.Primary" 
+                        Disabled="@IsLoading"
+                        Clicked="@HandleRefreshClick">
+                    <Icon Name="@(IsLoading ? "fas fa-hourglass-half" : "fas fa-sync")" />
+                    @(IsLoading ? "Loading..." : "Process Scan")
+                </Button>
+            </Column>
+        }
+    </Row>
+    @if (IsLoading)
+    {
+        <Progress Striped Animated>
+            <ProgressBar Value="100" />
+        </Progress>
+    }
+</div>
 
 @code {
     [Parameter] public List<ProcessInfo> ProcessList { get; set; } = new();
@@ -18,6 +53,7 @@
     private readonly Stopwatch _lifecycleTimer = new();
     private readonly Stopwatch _operationTimer = new();
     private int _renderCount = 0;
+    private string _searchTerm = string.Empty;
 
     public async Task InitializeAsync()
     {
@@ -99,6 +135,7 @@
         }
         
         base.OnParametersSet();
+        StateHasChanged();
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -225,6 +262,13 @@
         }
     }
 
+    public async Task HandleFilter(ChangeEventArgs args)
+    {
+        _searchTerm = args?.Value?.ToString() ?? string.Empty;
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
     public async ValueTask DisposeAsync()
     {
         Logger.LogInformation(
@@ -237,49 +281,22 @@
         await ValueTask.CompletedTask;
     }
 
-    private RenderFragment ProcessTemplate(ProcessInfo process) => builder =>
-    {
-        try
-        {
-            Logger.LogTrace("Rendering process template for {Name} ({Id})", process.Name, process.Id);
-            builder.AddContent(0, $"{process.Name} ({process.Id})");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error rendering process template for process ID: {Id}", process.Id);
-            throw;
-        }
-    };
-}
+    private IEnumerable<ProcessInfo> FilteredProcesses => ProcessList?
+        .Where(p => string.IsNullOrEmpty(_searchTerm) || 
+                    p.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase))
+        .ToList() ?? new List<ProcessInfo>();
 
-<div>
-    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
-        <RadzenDropDown TValue="int?"
-                       @bind-Value="@SelectedProcessId"
-                       Data="@ProcessList"
-                       ValueProperty="Id"
-                       TextProperty="Name"
-                       Template="@((dynamic item) => ProcessTemplate((ProcessInfo)item))"
-                       Placeholder="@(IsLoading ? "Loading processes..." : "Click Scan to load processes")"
-                       Change="@(args => HandleProcessSelected())"
-                       LoadData="@(args => Task.CompletedTask)"
-                       AllowClear="true"
-                       AllowFiltering="true"
-                       FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                       Style="width: 80%"
-                       Disabled="@IsLoading" />
-        @if (ShowRefreshButton)
-        {
-            <RadzenButton Icon="@(IsLoading ? "hourglass_empty" : "refresh")"
-                         Click="@HandleRefreshClick"
-                         ButtonStyle="ButtonStyle.Primary"
-                         Title="@(IsLoading ? "Loading..." : "Scan for processes")"
-                         Text="@(IsLoading ? "Loading..." : "Process Scan")"
-                         Disabled="@IsLoading" />
-        }
-    </RadzenStack>
-    @if (IsLoading)
+    private bool FilterProcesses(object item)
     {
-        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="mt-2" />
+        if (string.IsNullOrEmpty(_searchTerm))
+            return true;
+
+        if (item is SelectItem<int?> selectItem && selectItem.Value.HasValue)
+        {
+            var process = ProcessList.FirstOrDefault(p => p.Id == selectItem.Value.Value);
+            return process != null && process.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
     }
-</div>
+}
