@@ -8,22 +8,21 @@
         <RadzenDataGridColumn TItem="IntPtr" Title="Value">
             <Template>
                 @{
-                    var currentValue = GetCurrentValue(context);
-                    if (ValueType == MemoryValueType.Float || ValueType == MemoryValueType.Double)
-                    {
-                        <RadzenNumeric TValue="double" Value="@currentValue" Format="0.00"
-                                     Change="@(async (double v) => await OnValueChanged.InvokeAsync((context, (int)v)))"/>
-                    }
-                    else
-                    {
-                        <div class="d-flex align-items-center">
-                            <RadzenNumeric TValue="int" Value="@currentValue"
-                                         Change="@(async (int v) => await OnValueChanged.InvokeAsync((context, v)))"/>
-                            <RadzenText TextStyle="TextStyle.Body2" class="ms-2">
-                                @FormatValue(currentValue)
-                            </RadzenText>
-                        </div>
-                    }
+                    var row = context;
+                }
+                @if (IsFrozen(row))
+                {
+                    <span>@FormatValue(row)</span>
+                }
+                else
+                {
+                    var currentValue = GetCurrentValue(row);
+                    <div class="d-flex align-items-center">
+                        <RadzenNumeric TValue="int" 
+                                     Value="@currentValue"
+                                     ValueChanged="@(async v => await HandleValueChange(row, v))" />
+                        <span class="ms-2">@FormatValue(row)</span>
+                    </div>
                 }
             </Template>
         </RadzenDataGridColumn>
@@ -45,17 +44,25 @@
     [Parameter] public EventCallback<(IntPtr address, int value)> OnValueChanged { get; set; }
     [Parameter] public EventCallback<IntPtr> OnFreezeToggle { get; set; }
 
-    private string FormatValue(int value)
+    private string FormatValue(IntPtr value)
     {
         return ValueType switch
         {
-            MemoryValueType.Float => ((float)value).ToString("F2"),
-            MemoryValueType.Double => ((double)value).ToString("F2"),
-            MemoryValueType.Byte => $"0x{value:X2}",
-            MemoryValueType.Int16 => value.ToString(),
-            MemoryValueType.Int32 => value.ToString(),
-            MemoryValueType.Int64 => value.ToString(),
-            _ => value.ToString()
+            MemoryValueType.Float => ((float)GetCurrentValue(value)).ToString("F2"),
+            MemoryValueType.Double => ((double)GetCurrentValue(value)).ToString("F2"),
+            MemoryValueType.Byte => $"0x{GetCurrentValue(value):X2}",
+            MemoryValueType.Int16 => GetCurrentValue(value).ToString(),
+            MemoryValueType.Int32 => GetCurrentValue(value).ToString(),
+            MemoryValueType.Int64 => GetCurrentValue(value).ToString(),
+            _ => GetCurrentValue(value).ToString()
         };
+    }
+    private async Task HandleValueChange(IntPtr address, object newValue)
+    {
+        // Add null check and proper event invocation
+        if (OnValueChanged.HasDelegate)
+        {
+            await OnValueChanged.InvokeAsync((address, (int)newValue));
+        }
     }
 }

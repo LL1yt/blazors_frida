@@ -94,7 +94,7 @@
 @code {
     private string? _errorMessage;
     private bool IsValid => string.IsNullOrEmpty(_errorMessage);
-    private string buttonText => IsFirstScan ? "First Memory Scan" : "Next Memory Scan";
+    public string buttonText => IsFirstScan ? "First Memory Scan" : "Next Memory Scan";
 
     [Parameter] public ScanType ScanType { get; set; }
     [Parameter] public MemoryValueType ValueType { get; set; }
