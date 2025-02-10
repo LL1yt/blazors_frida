@@ -1,25 +1,29 @@
-@using Radzen
-@using Radzen.Blazor
+@using Blazorise
 
 <div class="save-config-dialog">
-    <RadzenTextBox @bind-Value="@configName" 
-                  Placeholder="Enter configuration name"
-                  Style="width: 100%; margin-bottom: 1rem;" />
+    <TextEdit @bind-Text="@configName"
+             Placeholder="Enter configuration name"
+             Style="width: 100%; margin-bottom: 1rem;" />
     
     <div class="d-flex justify-content-end gap-2">
-        <RadzenButton Text="Cancel" 
-                     Click="@(() => DialogService.Close())" 
-                     ButtonStyle="ButtonStyle.Light" />
-        <RadzenButton Text="Save" 
-                     Click="@(() => DialogService.Close(configName))" 
-                     ButtonStyle="ButtonStyle.Primary" 
-                     Disabled="@string.IsNullOrWhiteSpace(configName)" />
+        <Button Color="Color.Light"
+                Clicked="@OnCancel">
+            Cancel
+        </Button>
+        <Button Color="Color.Primary"
+                Clicked="@OnSave"
+                Disabled="@string.IsNullOrWhiteSpace(configName)">
+            Save
+        </Button>
     </div>
 </div>
 
 @code {
     private string configName = "";
 
-    [Inject]
-    public required DialogService DialogService { get; set; }
+    [Parameter] public EventCallback<string> OnConfigSaved { get; set; }
+    [Parameter] public EventCallback OnCanceled { get; set; }
+
+    private Task OnCancel() => OnCanceled.InvokeAsync();
+    private Task OnSave() => OnConfigSaved.InvokeAsync(configName);
 }

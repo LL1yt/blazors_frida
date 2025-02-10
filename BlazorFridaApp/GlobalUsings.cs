@@ -26,8 +26,8 @@ global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 
 // UI Components
-global using Radzen;
-global using Radzen.Blazor;
+global using Blazorise;
+global using Blazorise.Bootstrap;
 
 // Common Collections
 global using System.Collections.Generic;

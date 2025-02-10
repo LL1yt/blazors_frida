@@ -1,49 +1,47 @@
-@using Radzen
-@using Radzen.Blazor
+@using Blazorise
+@using Blazorise.DataGrid
 @using BlazorFridaApp.Components.Pages
 @using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @using BlazorFridaApp.MemoryScanner.Models
 
 <div class="load-config-dialog">
-    <RadzenDataGrid Data="@Configs" 
-                   TItem="KeyValuePair<string, Models.ScannerConfig>"
-                   AllowFiltering="true"
-                   AllowSorting="true"
-                   RowSelect="@(args => selectedConfig = args)"
-                   Style="margin-bottom: 1rem;">
-        <Columns>
-            <RadzenDataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>" 
-                                Property="Key" 
-                                Title="Name" />
-            <RadzenDataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>" 
-                                Property="Value.ScanType" 
-                                Title="Scan Type" />
-            <RadzenDataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>" 
-                                Property="Value.ValueType" 
-                                Title="Value Type" />
-            <RadzenDataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>" 
-                                Context="config" 
-                                Filterable="false" 
-                                Sortable="false" 
-                                TextAlign="TextAlign.Center">
-                <Template Context="config">
-                    <RadzenButton Icon="delete" 
-                                ButtonStyle="ButtonStyle.Danger" 
-                                Size="ButtonSize.Small"
-                                Click="@(() => DeleteConfig(config.Key))" />
-                </Template>
-            </RadzenDataGridColumn>
-        </Columns>
-    </RadzenDataGrid>
+    <DataGrid TItem="KeyValuePair<string, Models.ScannerConfig>"
+              Data="@Configs"
+              Filterable
+              Sortable
+              RowClicked="@(args => selectedConfig = args)"
+              Margin="Margin.Is3.FromBottom">
+        <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
+                       Field="Key"
+                       Caption="Name" />
+        <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
+                       Field="Value.ScanType"
+                       Caption="Scan Type" />
+        <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
+                       Field="Value.ValueType"
+                       Caption="Value Type" />
+        <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
+                       Caption="Actions">
+            <DisplayTemplate>
+                <Button Color="Color.Danger"
+                        Size="Size.Small"
+                        Clicked="@(() => DeleteConfig(context.Key))">
+                    <Icon Name="FontAwesomeIcons.Trash" />
+                </Button>
+            </DisplayTemplate>
+        </DataGridColumn>
+    </DataGrid>
     
     <div class="d-flex justify-content-end gap-2">
-        <RadzenButton Text="Cancel" 
-                     Click="@(() => DialogService.Close())" 
-                     ButtonStyle="ButtonStyle.Light" />
-        <RadzenButton Text="Load" 
-                     Click="@(() => DialogService.Close(selectedConfig?.Value))" 
-                     ButtonStyle="ButtonStyle.Primary" 
-                     Disabled="@(selectedConfig == null)" />
+        <Button Color="Color.Light"
+                Clicked="@OnCancel">
+            Cancel
+        </Button>
+        <Button Color="Color.Primary"
+                Clicked="@(() => OnConfigSelected.InvokeAsync(selectedConfig?.Value))"
+                Disabled="@(selectedConfig == null)">
+            Load
+        </Button>
     </div>
 </div>
 
@@ -51,17 +49,19 @@
     [Parameter]
     public required Dictionary<string, Models.ScannerConfig> Configs { get; set; }
 
-    [Inject]
-    public required DialogService DialogService { get; set; }
-
-    [Inject]
-    public required IScanProfileService ProfileService { get; set; }
+    [Parameter] public EventCallback<Models.ScannerConfig> OnConfigSelected { get; set; }
+    [Parameter] public EventCallback OnCanceled { get; set; }
+    
+    [Inject] public required IScanProfileService ProfileService { get; set; }
+    [Inject] public required INotificationService NotificationService { get; set; }
 
     private KeyValuePair<string, Models.ScannerConfig>? selectedConfig;
 
+    private Task OnCancel() => OnCanceled.InvokeAsync();
+
     private async Task DeleteConfig(string name)
     {
-        if (await DialogService.Confirm($"Are you sure you want to delete '{name}'?") == true)
+        if (await NotificationService.Confirm($"Are you sure you want to delete '{name}'?", "Confirm Delete"))
         {
             await ProfileService.DeleteScannerConfig(name);
             Configs.Remove(name);

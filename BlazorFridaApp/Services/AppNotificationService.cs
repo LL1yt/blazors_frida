@@ -1,68 +1,42 @@
-using System;
-using Radzen;
+using Microsoft.AspNetCore.Components;
+using Blazorise;
 
-namespace BlazorFridaApp.Services
+namespace BlazorFridaApp.Services;
+
+public interface INotificationService
 {
-    public class AppNotificationService : INotificationService
+    Task ShowSuccess(string message, string? title = null);
+    Task ShowError(string message, string? title = null);
+    Task ShowWarning(string message, string? title = null);
+    Task ShowInfo(string message, string? title = null);
+}
+
+public class AppNotificationService : INotificationService
+{
+    private readonly INotificationService _notificationService;
+
+    public AppNotificationService(INotificationService notificationService)
     {
-        private readonly DialogService _dialogService;
+        _notificationService = notificationService;
+    }
 
-        public AppNotificationService(DialogService dialogService)
-        {
-            _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
-        }
+    public Task ShowSuccess(string message, string? title = null)
+    {
+        return _notificationService.Success(title ?? "Success", message);
+    }
 
-        public void ShowInfo(string title, string message)
-        {
-            if (string.IsNullOrEmpty(title))
-                throw new ArgumentException("Title cannot be null or empty", nameof(title));
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty", nameof(message));
+    public Task ShowError(string message, string? title = null)
+    {
+        return _notificationService.Error(title ?? "Error", message);
+    }
 
-            _dialogService.Alert(message, title, new AlertOptions
-            {
-                OkButtonText = "OK"
-            });
-        }
+    public Task ShowWarning(string message, string? title = null)
+    {
+        return _notificationService.Warning(title ?? "Warning", message);
+    }
 
-        public void ShowWarning(string title, string message)
-        {
-            if (string.IsNullOrEmpty(title))
-                throw new ArgumentException("Title cannot be null or empty", nameof(title));
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty", nameof(message));
-
-            _dialogService.Alert(message, title, new AlertOptions
-            {
-                OkButtonText = "OK"
-            });
-        }
-
-        public void ShowError(string title, string message, Exception? exception = null)
-        {
-            if (string.IsNullOrEmpty(title))
-                throw new ArgumentException("Title cannot be null or empty", nameof(title));
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty", nameof(message));
-
-            var detail = exception != null ? $"{message}\n{exception.Message}" : message;
-            _dialogService.Alert(detail, title, new AlertOptions
-            {
-                OkButtonText = "OK"
-            });
-        }
-
-        public void ShowSuccess(string title, string message)
-        {
-            if (string.IsNullOrEmpty(title))
-                throw new ArgumentException("Title cannot be null or empty", nameof(title));
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty", nameof(message));
-
-            _dialogService.Alert(message, title, new AlertOptions
-            {
-                OkButtonText = "OK"
-            });
-        }
+    public Task ShowInfo(string message, string? title = null)
+    {
+        return _notificationService.Info(title ?? "Information", message);
     }
 }

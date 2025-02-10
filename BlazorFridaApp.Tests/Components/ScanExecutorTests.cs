@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using Radzen;
 using Microsoft.AspNetCore.Components;
 using BlazorFridaApp.MemoryScanner.Base;
+using Blazorise;
 
 namespace BlazorFridaApp.Tests.Components;
 
@@ -47,6 +48,11 @@ public class ScanExecutorTests : TestContextBase
         Services.AddScoped<ILogger<MemoryScannerComponentBase>>(_ => Mock.Of<ILogger<MemoryScannerComponentBase>>());
         Services.AddScoped<INotificationService>(_ => _notificationServiceMock.Object);
         Services.AddScoped<IProcessMemoryScanner>(_ => _processMemoryScannerMock.Object);
+
+        // Add Blazorise services
+        Services.AddBlazorise();
+        Services.AddBootstrapProviders();
+        Services.AddFontAwesomeIcons();
     }
 
     [Fact]
@@ -213,5 +219,28 @@ public class ScanExecutorTests : TestContextBase
 
         // Assert
         Assert.False(cut.Instance.CanExecuteScan);
+    }
+
+    [Fact]
+    public void ShouldShowProgressBarWhenLoading()
+    {
+        // Arrange & Act
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+            .Add(p => p.IsLoading, true));
+
+        // Assert
+        var progressBar = cut.FindComponent<Progress>();
+        Assert.NotNull(progressBar);
+    }
+
+    [Fact]
+    public void ShouldNotShowProgressBarWhenNotLoading()
+    {
+        // Arrange & Act
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+            .Add(p => p.IsLoading, false));
+
+        // Assert
+        Assert.Throws<ComponentNotFoundException>(() => cut.FindComponent<Progress>());
     }
 }

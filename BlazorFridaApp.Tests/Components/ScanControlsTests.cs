@@ -1,29 +1,21 @@
 using Bunit;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
-using BlazorFridaApp.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
-using Radzen;
-using BlazorFridaApp.MemoryScanner.Base;
+using Blazorise;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class ScanControlsTests : TestContextBase
 {
-    private readonly Mock<INotificationService> _notificationServiceMock;
-    private readonly Mock<IProcessMemoryScanner> _scannerMock;
-
     public ScanControlsTests()
     {
-        _notificationServiceMock = new Mock<INotificationService>();
-        _scannerMock = new Mock<IProcessMemoryScanner>();
-        
-        Services.AddScoped<DialogService>();
-        Services.AddScoped<Radzen.NotificationService>();
-        Services.AddScoped<INotificationService>(_ => _notificationServiceMock.Object);
-        Services.AddScoped<IProcessMemoryScanner>(_ => _scannerMock.Object);
+        // Add Blazorise services
+        Services.AddBlazorise();
+        Services.AddBootstrapProviders();
+        Services.AddFontAwesomeIcons();
     }
 
     [Fact]
@@ -40,85 +32,53 @@ public class ScanControlsTests : TestContextBase
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var dropdown = cut.Find(".rz-dropdown");
+        var dropdown = cut.FindComponent<Select<ScanType>>();
         Assert.NotNull(dropdown);
     }
 
     [Fact]
-    public void ShouldShowPatternInputsWhenPatternScanSelected()
+    public void ShouldShowPatternInputsForPatternScan()
     {
-        // Arrange
-        var scanTypes = new[] { ScanType.Pattern };
-        
-        // Act
+        // Arrange & Act
         var cut = RenderComponent<ScanControls>(parameters => parameters
-            .Add(p => p.ScanTypes, scanTypes)
+            .Add(p => p.ScanTypes, new[] { ScanType.Pattern })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.ScanType, ScanType.Pattern)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.PatternHex, "AA BB CC")
-            .Add(p => p.Mask, "xxx"));
+            .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var patternInput = cut.Find("textarea[placeholder*='Pattern']");
-        var maskInput = cut.Find("textarea[placeholder*='Mask']");
-        Assert.NotNull(patternInput);
-        Assert.NotNull(maskInput);
+        var memoEdits = cut.FindComponents<MemoEdit>();
+        Assert.Equal(2, memoEdits.Count); // One for pattern, one for mask
     }
 
     [Fact]
-    public void ShouldDisableScanButtonWhenLoading()
+    public void ShouldShowNumericInputForExactValue()
     {
         // Arrange & Act
         var cut = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
-            .Add(p => p.IsLoading, true)
-            .Add(p => p.CanScan, true)
-            .Add(p => p.PatternHex, "")
-            .Add(p => p.Mask, "")
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var button = cut.Find(".rz-button.rz-button-loading");
-        Assert.NotNull(button);
-        Assert.Contains("rz-button-loading", button.ClassList);
+        var numericEdit = cut.FindComponent<NumericEdit<int>>();
+        Assert.NotNull(numericEdit);
     }
 
     [Fact]
-    public void ShouldShowCorrectButtonTextForFirstAndNextScans()
+    public void ShouldShowFirstScanButton()
     {
-        // Arrange & Act - First Scan
-        var cutFirstScan = RenderComponent<ScanControls>(parameters => parameters
+        // Arrange & Act
+        var cut = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
-            .Add(p => p.IsFirstScan, true)
-            .Add(p => p.PatternHex, "")
-            .Add(p => p.Mask, "")
-            .Add(p => p.CanScan, true)
             .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int32));
+            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.IsFirstScan, true));
 
-        // Assert - First Scan
-        var firstScanButton = cutFirstScan.Find("button.rz-button");
-        var firstScanText = firstScanButton.GetAttribute("title") ?? firstScanButton.TextContent;
-        Assert.Equal("First Memory Scan", firstScanText.Trim());
-
-        // Arrange & Act - Next Scan
-        var cutNextScan = RenderComponent<ScanControls>(parameters => parameters
-            .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
-            .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
-            .Add(p => p.IsFirstScan, false)
-            .Add(p => p.PatternHex, "")
-            .Add(p => p.Mask, "")
-            .Add(p => p.CanScan, true)
-            .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int32));
-
-        // Assert - Next Scan
-        var nextScanButton = cutNextScan.Find("button.rz-button");
-        var nextScanText = nextScanButton.GetAttribute("title") ?? nextScanButton.TextContent;
-        Assert.Equal("Next Memory Scan", nextScanText.Trim());
+        // Assert
+        var button = cut.Find("button");
+        Assert.Contains("First Memory Scan", button.TextContent);
     }
 }

@@ -1,8 +1,7 @@
 @using System
 @using System.Collections.Generic
 @using System.Threading.Tasks
-@using Radzen
-@using Radzen.Blazor
+@using Blazorise
 @using Microsoft.AspNetCore.Components.Web
 
 @inherits MemoryScannerComponentBase
@@ -11,7 +10,9 @@
 <div>
     @if (IsLoading)
     {
-        <RadzenProgressBar Value="100" Mode="ProgressBarMode.Indeterminate" />
+        <Progress Striped Animated>
+            <ProgressBar Value="100" />
+        </Progress>
     }
 </div>
 

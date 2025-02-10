@@ -1,85 +1,129 @@
 @page "/memory-scanner"
 @using BlazorFridaApp.MemoryScanner.Components
+@using Blazorise
 @inherits MemoryScannerComponentBase
 
 @inject DialogService DialogService
 
 <div class="memory-scanner-container">
-    <RadzenCard class="header-card">
-        <div class="d-flex justify-content-between align-items-center">
-            <h2>Memory Scanner</h2>
-            <div class="d-flex gap-2">
-                <RadzenButton Icon="save" Text="Save Config" ButtonStyle="ButtonStyle.Secondary" Click="@SaveConfig" />
-                <RadzenButton Icon="folder_open" Text="Load Config" ButtonStyle="ButtonStyle.Secondary" Click="@LoadConfig" />
+    <Card Margin="Margin.Is3.FromBottom">
+        <CardBody>
+            <div class="d-flex justify-content-between align-items-center">
+                <Heading Size="HeadingSize.Is2">Memory Scanner</Heading>
+                <ButtonGroup>
+                    <Button Color="Color.Secondary" Clicked="@SaveConfig">
+                        <Icon Name="FontAwesomeIcons.Save" />
+                        Save Config
+                    </Button>
+                    <Button Color="Color.Secondary" Clicked="@LoadConfig">
+                        <Icon Name="FontAwesomeIcons.FolderOpen" />
+                        Load Config
+                    </Button>
+                </ButtonGroup>
             </div>
-        </div>
-    </RadzenCard>
+        </CardBody>
+    </Card>
 
     <div class="scanner-content">
         <div class="scanner-controls">
-            <RadzenCard class="process-card">
-                <ProcessSelector
-                    ProcessList="@_state.ProcessList"
-                    SelectedProcessId="@_state.SelectedProcessId"
-                    OnProcessSelected="@OnProcessSelected"
-                    OnRefreshClick="@RefreshProcessList"
-                    IsLoading="@_state.IsLoading" />
-            </RadzenCard>
+            <Card Margin="Margin.Is3.FromBottom">
+                <CardBody>
+                    <ProcessSelector
+                        ProcessList="@_state.ProcessList"
+                        SelectedProcessId="@_state.SelectedProcessId"
+                        OnProcessSelected="@OnProcessSelected"
+                        OnRefreshClick="@RefreshProcessList"
+                        IsLoading="@_state.IsLoading" />
+                </CardBody>
+            </Card>
 
-            <RadzenCard class="scan-options-card">
-                <ScanControls
-                    ScanType="@_state.SelectedScanType"
-                    ValueType="@_state.SelectedValueType"
-                    ScanTypes="@_state.ScanTypes"
-                    ValueTypes="@_state.ValueTypes"
-                    PatternHex="@_state.PatternHex"
-                    Mask="@_state.Mask"
-                    @bind-SearchValue="@_state.SearchValue"
-                    IsFirstScan="@_state.IsFirstScan"
-                    IsLoading="@_state.IsLoading"
-                    CanScan="@_state.CanScan"
-                    OnScanTypeChanged="@OnScanTypeChanged"
-                    OnValueTypeChanged="@OnValueTypeChanged"
-                    OnScanClick="@OnScan" />
+            <Card Margin="Margin.Is3.FromBottom" Style="flex-grow: 1;">
+                <CardBody>
+                    <ScanControls
+                        ScanType="@_state.SelectedScanType"
+                        ValueType="@_state.SelectedValueType"
+                        ScanTypes="@_state.ScanTypes"
+                        ValueTypes="@_state.ValueTypes"
+                        PatternHex="@_state.PatternHex"
+                        Mask="@_state.Mask"
+                        @bind-SearchValue="@_state.SearchValue"
+                        IsFirstScan="@_state.IsFirstScan"
+                        IsLoading="@_state.IsLoading"
+                        CanScan="@_state.CanScan"
+                        OnScanTypeChanged="@OnScanTypeChanged"
+                        OnValueTypeChanged="@OnValueTypeChanged"
+                        OnScanClick="@OnScan" />
 
-                <ScanExecutor @ref="scanExecutor"
-                    ProcessId="@_state.SelectedProcessId"
-                    ScanType="@_state.SelectedScanType"
-                    ValueType="@_state.SelectedValueType"
-                    PatternHex="@_state.PatternHex"
-                    Mask="@_state.Mask"
-                    SearchValue="@_state.SearchValue"
-                    IsFirstScan="@_state.IsFirstScan"
-                    IsLoading="@_state.IsLoading"
-                    OnScanComplete="@OnScanComplete"
-                    OnLoadingChanged="@OnLoadingChanged" />
-            </RadzenCard>
+                    <ScanExecutor @ref="scanExecutor"
+                        ProcessId="@_state.SelectedProcessId"
+                        ScanType="@_state.SelectedScanType"
+                        ValueType="@_state.SelectedValueType"
+                        PatternHex="@_state.PatternHex"
+                        Mask="@_state.Mask"
+                        SearchValue="@_state.SearchValue"
+                        IsFirstScan="@_state.IsFirstScan"
+                        IsLoading="@_state.IsLoading"
+                        OnScanComplete="@OnScanComplete"
+                        OnLoadingChanged="@OnLoadingChanged" />
+                </CardBody>
+            </Card>
 
-            <RadzenCard class="value-handlers-card">
-                <div class="d-flex gap-2">
-                    <div class="flex-grow-1">
-                        <MemoryValueHandler @ref="valueHandler"
-                            ValueType="@_state.SelectedValueType" />
-                    </div>
-                    <div class="flex-grow-1">
-                        <ValueFreezer @ref="valueFreezer"
-                            ValueType="@_state.SelectedValueType" />
-                    </div>
-                </div>
-            </RadzenCard>
+            <Card Margin="Margin.Is3.FromBottom">
+                <CardBody>
+                    <Row>
+                        <Column>
+                            <MemoryValueHandler @ref="valueHandler"
+                                ValueType="@_state.SelectedValueType" />
+                        </Column>
+                        <Column>
+                            <ValueFreezer @ref="valueFreezer"
+                                ValueType="@_state.SelectedValueType" />
+                        </Column>
+                    </Row>
+                </CardBody>
+            </Card>
         </div>
 
-        <RadzenCard class="results-card">
-            <ScanResultsGrid
-                Results="@_state.ScanResults"
-                ValueType="@_state.SelectedValueType"
-                GetCurrentValue="@(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0))"
-                IsFrozen="@IsFrozen"
-                OnValueChanged="@(args => OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
-                OnFreezeToggle="@(addr => ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
-        </RadzenCard>
+        <Card>
+            <CardBody>
+                <ScanResultsGrid
+                    Results="@_state.ScanResults"
+                    ValueType="@_state.SelectedValueType"
+                    GetCurrentValue="@(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0))"
+                    IsFrozen="@IsFrozen"
+                    OnValueChanged="@(args => OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
+                    OnFreezeToggle="@(addr => ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
+            </CardBody>
+        </Card>
     </div>
 </div>
+
+<Modal @ref="_saveConfigModal">
+    <ModalContent>
+        <ModalHeader>
+            <ModalTitle>Save Configuration</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            <SaveConfigDialog 
+                OnConfigSaved="@HandleConfigSaved"
+                OnCanceled="@(() => _saveConfigModal.Hide())" />
+        </ModalBody>
+    </ModalContent>
+</Modal>
+
+<Modal @ref="_loadConfigModal">
+    <ModalContent>
+        <ModalHeader>
+            <ModalTitle>Load Configuration</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+            <LoadConfigDialog 
+                Configs="@_state.SavedConfigs"
+                OnConfigSelected="@HandleConfigLoaded"
+                OnCanceled="@(() => _loadConfigModal.Hide())" />
+        </ModalBody>
+    </ModalContent>
+</Modal>
 
 <style>
     .memory-scanner-container {
@@ -126,3 +170,69 @@
         overflow: auto;
     }
 </style>
+
+@code {
+    private Modal _saveConfigModal;
+    private Modal _loadConfigModal;
+    
+    private async Task SaveConfig()
+    {
+        await _saveConfigModal.Show();
+    }
+
+    private async Task LoadConfig()
+    {
+        await _loadConfigModal.Show();
+    }
+
+    private async Task HandleConfigSaved(string configName)
+    {
+        if (string.IsNullOrWhiteSpace(configName))
+            return;
+
+        try 
+        {
+            var config = new ScannerConfig
+            {
+                ScanType = _state.SelectedScanType,
+                ValueType = _state.SelectedValueType,
+                PatternHex = _state.PatternHex,
+                Mask = _state.Mask,
+                SearchValue = _state.SearchValue
+            };
+
+            await ProfileService.SaveScannerConfig(configName, config);
+            await _saveConfigModal.Hide();
+            _state.SavedConfigs[configName] = config;
+            await NotificationService.Success($"Configuration '{configName}' saved successfully");
+        }
+        catch (Exception ex)
+        {
+            await NotificationService.Error($"Failed to save configuration: {ex.Message}");
+        }
+    }
+
+    private async Task HandleConfigLoaded(ScannerConfig config)
+    {
+        if (config == null)
+            return;
+
+        try
+        {
+            _state.SelectedScanType = config.ScanType;
+            _state.SelectedValueType = config.ValueType;
+            _state.PatternHex = config.PatternHex;
+            _state.Mask = config.Mask;
+            _state.SearchValue = config.SearchValue;
+            
+            await _loadConfigModal.Hide();
+            await NotificationService.Success("Configuration loaded successfully");
+        }
+        catch (Exception ex)
+        {
+            await NotificationService.Error($"Failed to load configuration: {ex.Message}");
+        }
+    }
+
+    // ...rest of existing code...
+}

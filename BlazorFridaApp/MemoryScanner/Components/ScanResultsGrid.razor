@@ -1,40 +1,46 @@
 @using BlazorFridaApp.MemoryScanner.Models
-@using Radzen
-@using Radzen.Blazor
+@using Blazorise
+@using Blazorise.DataGrid
 
-<RadzenDataGrid Data="@Results" TItem="IntPtr">
-    <Columns>
-        <RadzenDataGridColumn TItem="IntPtr" Title="Address" Property="@nameof(IntPtr)" FormatString="X8"/>
-        <RadzenDataGridColumn TItem="IntPtr" Title="Value">
-            <Template>
-                @{
-                    var row = context;
-                }
-                @if (IsFrozen(row))
-                {
-                    <span>@FormatValue(row)</span>
-                }
-                else
-                {
-                    var currentValue = GetCurrentValue(row);
-                    <div class="d-flex align-items-center">
-                        <RadzenNumeric TValue="int" 
-                                     Value="@currentValue"
-                                     ValueChanged="@(async v => await HandleValueChange(row, v))" />
-                        <span class="ms-2">@FormatValue(row)</span>
-                    </div>
-                }
-            </Template>
-        </RadzenDataGridColumn>
-        <RadzenDataGridColumn TItem="IntPtr" Title="Actions">
-            <Template>
-                <RadzenButton Icon="lock" 
-                            Click="@(() => OnFreezeToggle.InvokeAsync(context))" 
-                            Disabled="@(IsFrozen(context))"/>
-            </Template>
-        </RadzenDataGridColumn>
-    </Columns>
-</RadzenDataGrid>
+<DataGrid TItem="IntPtr"
+          Data="@Results"
+          Responsive>
+    <DataGridColumn TItem="IntPtr" Field="@nameof(IntPtr)" Caption="Address">
+        <DisplayTemplate>
+            @context.ToString("X8")
+        </DisplayTemplate>
+    </DataGridColumn>
+    <DataGridColumn TItem="IntPtr" Caption="Value">
+        <DisplayTemplate>
+            @{
+                var row = context;
+            }
+            @if (IsFrozen(row))
+            {
+                <span>@FormatValue(row)</span>
+            }
+            else
+            {
+                var currentValue = GetCurrentValue(row);
+                <div class="d-flex align-items-center">
+                    <NumericEdit TValue="int" 
+                               Value="@currentValue"
+                               ValueChanged="@(async v => await HandleValueChanged(row, v))" />
+                    <span class="ms-2">@FormatValue(row)</span>
+                </div>
+            }
+        </DisplayTemplate>
+    </DataGridColumn>
+    <DataGridColumn TItem="IntPtr" Caption="Actions">
+        <DisplayTemplate>
+            <Button Color="Color.Primary"
+                    Disabled="@(IsFrozen(context))"
+                    Clicked="@(() => OnFreezeToggle.InvokeAsync(context))">
+                <Icon Name="FontAwesomeIcons.Lock" />
+            </Button>
+        </DisplayTemplate>
+    </DataGridColumn>
+</DataGrid>
 
 @code {
     [Parameter] public required List<IntPtr> Results { get; set; }
@@ -57,7 +63,7 @@
             _ => GetCurrentValue(value).ToString()
         };
     }
-    private async Task HandleValueChange(IntPtr address, object newValue)
+    private async Task HandleValueChanged(IntPtr address, object newValue)
     {
         // Add null check and proper event invocation
         if (OnValueChanged.HasDelegate)

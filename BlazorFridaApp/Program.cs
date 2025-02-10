@@ -18,7 +18,6 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Logs;
-using Radzen;
 using Serilog;
 using Serilog.Events;
 using BlazorFridaApp.MemoryScanner.Base;
@@ -59,13 +58,9 @@ try
     // Add assets service
     builder.Services.AddScoped<AssetsService>();
 
-    // Add Radzen services
-    builder.Services.AddRadzenComponents();
-    builder.Services.AddScoped<DialogService>();
-    builder.Services.AddScoped<Radzen.NotificationService>();
-
-    // Add notification service
+    // Add notification and dialog services
     builder.Services.AddScoped<BlazorFridaApp.Services.INotificationService, BlazorFridaApp.Services.AppNotificationService>();
+    builder.Services.AddScoped<BlazorFridaApp.Services.DialogService>();
 
     // Configure OpenTelemetry
     builder.Services.AddOpenTelemetry()

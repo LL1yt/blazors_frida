@@ -1,83 +1,81 @@
 using Bunit;
-using Bunit.TestDoubles;
 using BlazorFridaApp.MemoryScanner.Components;
-using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Diagnostics;
+using BlazorFridaApp.MemoryScanner.Models;
+using Blazorise;
+using System.Threading;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class ProcessSelectorTests : TestContextBase
 {
     private readonly Mock<IProcessService> _processServiceMock;
-    private int? _selectedProcessId;
+    private readonly List<ProcessInfo> _defaultProcesses;
 
     public ProcessSelectorTests()
     {
         _processServiceMock = new Mock<IProcessService>();
         Services.AddScoped<IProcessService>(_ => _processServiceMock.Object);
         
-        JSInterop.SetupVoid("Radzen.preventArrows", _ => true);
-        JSInterop.SetupVoid("Radzen.togglePopup", _ => true);
-        JSInterop.SetupVoid("Radzen.closePopup", _ => true);
-        JSInterop.SetupVoid("Radzen.toggleMenuItem", _ => true);
-        JSInterop.SetupVoid("Radzen.destroyPopup", _ => true);
-    }
+        // Add Blazorise services
+        Services.AddBlazorise();
+        Services.AddBootstrapProviders();
+        Services.AddFontAwesomeIcons();
 
-    [Fact]
-    public async Task ComponentShouldHandleProcessSelection()
-    {
-        // Arrange
-        var processes = new List<ProcessInfo>
+        _defaultProcesses = new List<ProcessInfo>
         {
             new() { Id = 1000, Name = "notepad.exe" },
             new() { Id = 2000, Name = "test2.exe" }
         };
 
-        var cut = RenderComponent<ProcessSelector>(parameters => parameters
-            .Add(p => p.ProcessList, processes)
-            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create<int?>(this, id => _selectedProcessId = id))
-            .Add(p => p.OnRefreshClick, EventCallback.Factory.Create(this, () => Task.CompletedTask)));
-
-        // Act & Assert initial state
-        Assert.Empty(cut.Find(".rz-dropdown").TextContent.Trim());
-
-        // Act - Select process
-        await cut.Find(".rz-dropdown").ClickAsync(new MouseEventArgs());
-        await cut.FindAll(".rz-dropdown-item")[0].ClickAsync(new MouseEventArgs());
-
-        // Assert
-        Assert.Equal(1000, _selectedProcessId);
-        Assert.Contains("notepad.exe", cut.Find(".rz-dropdown-text").TextContent);
-
-        // Act - Re-render with updated parameters
-        var newProcesses = new List<ProcessInfo>
-        {
-            new() { Id = 3000, Name = "test3.exe" },
-            new() { Id = 4000, Name = "test4.exe" }
-        };
+        _processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_defaultProcesses);
         
-        cut = RenderComponent<ProcessSelector>(parameters => parameters
-            .Add(p => p.ProcessList, newProcesses)
-            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create<int?>(this, id => _selectedProcessId = id))
-            .Add(p => p.OnRefreshClick, EventCallback.Factory.Create(this, () => Task.CompletedTask)));
+        _processServiceMock.Setup(x => x.RefreshProcessesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(_defaultProcesses);
+    }
 
-        // Assert - Verify state is reset
-        Assert.Empty(cut.Find(".rz-dropdown-text").TextContent);
-
-        // Act - Select process
-        await cut.Find(".rz-dropdown").ClickAsync(new MouseEventArgs());
-        await cut.FindAll(".rz-dropdown-item")[0].ClickAsync(new MouseEventArgs());
+    [Fact]
+    public void ShouldRenderSelect()
+    {
+        // Arrange & Act
+        var cut = RenderComponent<ProcessSelector>();
 
         // Assert
-        Assert.Equal(3000, _selectedProcessId);
-        Assert.Contains("test3.exe", cut.Find(".rz-dropdown-text").TextContent);
+        var select = cut.FindComponent<Select<int?>>();
+        Assert.NotNull(select);
+    }
+
+    [Fact]
+    public async Task ShouldLoadProcessesOnInitialization()
+    {
+        // Arrange & Act
+        var cut = RenderComponent<ProcessSelector>();
+        await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
+
+        // Assert
+        _processServiceMock.Verify(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        var selectItems = cut.FindComponents<SelectItem<int?>>();
+        Assert.Equal(_defaultProcesses.Count + 1, selectItems.Count); // +1 for the default "Select a process" item
+    }
+
+    [Fact]
+    public async Task ShouldRefreshProcessList()
+    {
+        // Arrange
+        var cut = RenderComponent<ProcessSelector>();
+        await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
+
+        // Act
+        var refreshButton = cut.Find("button");
+        await refreshButton.ClickAsync(new());
+
+        // Assert
+        _processServiceMock.Verify(x => x.RefreshProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 }

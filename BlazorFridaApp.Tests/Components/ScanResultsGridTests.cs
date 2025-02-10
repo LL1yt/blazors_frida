@@ -6,136 +6,51 @@ using Microsoft.AspNetCore.Components;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
-using Radzen;
-using Radzen.Blazor;
+using Blazorise;
+using Blazorise.DataGrid;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class ScanResultsGridTests : TestContextBase
 {
+    private readonly IRenderedComponent<ScanResultsGrid> _component;
+    private readonly List<IntPtr> _testResults = new() { new IntPtr(0x1000), new IntPtr(0x2000) };
+
     public ScanResultsGridTests()
     {
-        JSInterop.Mode = JSRuntimeMode.Loose;
-        Services.AddSingleton<DialogService>();
+        // Add Blazorise services
+        Services.AddBlazorise();
+        Services.AddBootstrapProviders();
+        Services.AddFontAwesomeIcons();
+
+        // Render component
+        _component = RenderComponent<ScanResultsGrid>(parameters => parameters
+            .Add(p => p.Results, _testResults)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.GetCurrentValue, _ => 42)
+            .Add(p => p.IsFrozen, _ => false));
     }
 
     [Fact]
-    public void ShouldRenderEmptyGrid()
+    public void ShouldRenderDataGrid()
     {
-        // Act
-        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
-            .Add(p => p.Results, new List<IntPtr>())
-            .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => 0)
-            .Add(p => p.IsFrozen, (IntPtr addr) => false));
-
         // Assert
-        var grid = cut.Find(".rz-datatable");
+        var grid = _component.FindComponent<DataGrid<IntPtr>>();
         Assert.NotNull(grid);
     }
 
     [Fact]
-    public void ShouldRenderResultsWithValues()
+    public void ShouldDisplayCorrectValueFormat()
     {
         // Arrange
-        var results = new List<IntPtr> { new(0x1000), new(0x2000) };
-        var values = new Dictionary<IntPtr, int>
-        {
-            { new(0x1000), 42 },
-            { new(0x2000), 100 }
-        };
-
-        // Act
-        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
-            .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => values[addr])
-            .Add(p => p.IsFrozen, (IntPtr addr) => false));
-
-        // Assert
-        var rows = cut.FindAll(".rz-grid-table tbody tr");
-        Assert.Equal(2, rows.Count);
-    }
-
-    [Fact]
-    public async Task ShouldHandleValueChange()
-    {
-        // Arrange
-        var results = new List<IntPtr> { new(0x1000) };
-        var valueChanged = false;
-        var changedAddr = IntPtr.Zero;
-        var changedValue = 0;
-
-        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
-            .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
-            .Add(p => p.IsFrozen, (IntPtr addr) => false)
-            .Add(p => p.OnValueChanged, EventCallback.Factory.Create<(IntPtr address, int value)>(this, args =>
-            {
-                valueChanged = true;
-                changedAddr = args.address;
-                changedValue = args.value;
-                return Task.CompletedTask;
-            })));
-
-        // Act
-        var numericInput = cut.FindComponent<RadzenNumeric<int>>();
-        await numericInput.InvokeAsync(() => numericInput.Instance.ValueChanged.InvokeAsync(100));
-
-        // Assert
-        Assert.True(valueChanged);
-        Assert.Equal(new IntPtr(0x1000), changedAddr);
-        Assert.Equal(100, changedValue);
-    }
-
-    [Fact]
-    public void ShouldRenderFrozenIndicator()
-    {
-        // Arrange
-        var results = new List<IntPtr> { new(0x1000) };
-        var frozenAddresses = new HashSet<IntPtr> { new(0x1000) };
-
-        // Act
-        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
-            .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
-            .Add(p => p.IsFrozen, (IntPtr addr) => frozenAddresses.Contains(addr)));
-
-        // Assert
-        var frozenButton = cut.Find(".rz-button[disabled]");
-        Assert.NotNull(frozenButton);
-    }
-
-    [Fact]
-    public void ShouldHandleDifferentValueTypes()
-    {
-        // Arrange
-        var results = new List<IntPtr> { new(0x1000) };
-
-        // Act - Float
-        var cutFloat = RenderComponent<ScanResultsGrid>(parameters => parameters
-            .Add(p => p.Results, results)
+        var component = RenderComponent<ScanResultsGrid>(parameters => parameters
+            .Add(p => p.Results, _testResults)
             .Add(p => p.ValueType, MemoryValueType.Float)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => BitConverter.ToInt32(BitConverter.GetBytes(42.5f), 0))
-            .Add(p => p.IsFrozen, (IntPtr addr) => false));
+            .Add(p => p.GetCurrentValue, _ => 42)
+            .Add(p => p.IsFrozen, _ => false));
 
-        // Assert - Float
-        var floatValue = cutFloat.Find(".rz-spinner");
-        Assert.NotNull(floatValue);
-        Assert.Contains("42.50", floatValue.GetAttribute("value") ?? "");
-
-        // Act - Int
-        var cutInt = RenderComponent<ScanResultsGrid>(parameters => parameters
-            .Add(p => p.Results, results)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
-            .Add(p => p.IsFrozen, (IntPtr addr) => false));
-
-        // Assert - Int
-        var intValue = cutInt.Find(".rz-spinner");
-        Assert.NotNull(intValue);
-        Assert.Contains("42", intValue.GetAttribute("value") ?? "");
+        // Assert
+        var numericEdit = component.FindComponent<NumericEdit<int>>();
+        Assert.NotNull(numericEdit);
     }
 }

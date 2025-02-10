@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using Radzen;
+using Blazorise;
 using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.MemoryScanner.Components
@@ -64,13 +64,13 @@ namespace BlazorFridaApp.MemoryScanner.Components
 
         public static class CSS
         {
-            public const string DefaultButtonClass = "rz-button-md";
-            public const string PrimaryButtonClass = "rz-button-md rz-primary";
-            public const string SecondaryButtonClass = "rz-button-md rz-secondary";
-            public const string DangerButtonClass = "rz-button-md rz-danger";
-            public const string SuccessButtonClass = "rz-button-md rz-success";
-            public const string WarningButtonClass = "rz-button-md rz-warning";
-            public const string InfoButtonClass = "rz-button-md rz-info";
+            public const string DefaultButtonClass = "btn btn-secondary";
+            public const string PrimaryButtonClass = "btn btn-primary";
+            public const string SecondaryButtonClass = "btn btn-secondary";
+            public const string DangerButtonClass = "btn btn-danger";
+            public const string SuccessButtonClass = "btn btn-success";
+            public const string WarningButtonClass = "btn btn-warning";
+            public const string InfoButtonClass = "btn btn-info";
         }
 
         public static class Events

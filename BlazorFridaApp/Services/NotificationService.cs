@@ -1,80 +1,39 @@
 using System;
-using Radzen;
+using Blazorise;
 
-namespace BlazorFridaApp.Services
+namespace BlazorFridaApp.Services;
+
+public class NotificationService : INotificationService
 {
-    public class NotificationService : INotificationService
+    private readonly INotificationService _notificationService;
+
+    public NotificationService(INotificationService notificationService)
     {
-        private readonly Radzen.NotificationService _radzenNotificationService;
+        _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
+    }
 
-        public NotificationService(Radzen.NotificationService radzenNotificationService)
-        {
-            _radzenNotificationService = radzenNotificationService ?? throw new ArgumentNullException(nameof(radzenNotificationService));
-        }
+    public async Task<bool> Confirm(string message, string? title = null)
+    {
+        return await _notificationService.Confirm(message, title ?? "Confirm");
+    }
 
-        public void ShowInfo(string title, string message)
-        {
-            if (string.IsNullOrEmpty(title))
-                throw new ArgumentException("Title cannot be null or empty", nameof(title));
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty", nameof(message));
+    public Task ShowError(string message, string? title = null)
+    {
+        return _notificationService.Error(message, title ?? "Error");
+    }
 
-            _radzenNotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Info,
-                Summary = title,
-                Detail = message,
-                Duration = 4000
-            });
-        }
+    public Task ShowInfo(string message, string? title = null)
+    {
+        return _notificationService.Info(message, title ?? "Information");
+    }
 
-        public void ShowWarning(string title, string message)
-        {
-            if (string.IsNullOrEmpty(title))
-                throw new ArgumentException("Title cannot be null or empty", nameof(title));
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty", nameof(message));
+    public Task ShowSuccess(string message, string? title = null)
+    {
+        return _notificationService.Success(message, title ?? "Success");
+    }
 
-            _radzenNotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = title,
-                Detail = message,
-                Duration = 4000
-            });
-        }
-
-        public void ShowError(string title, string message, Exception? exception = null)
-        {
-            if (string.IsNullOrEmpty(title))
-                throw new ArgumentException("Title cannot be null or empty", nameof(title));
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty", nameof(message));
-
-            var detail = exception != null ? $"{message}\n{exception.Message}" : message;
-            _radzenNotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Error,
-                Summary = title,
-                Detail = detail,
-                Duration = 6000
-            });
-        }
-
-        public void ShowSuccess(string title, string message)
-        {
-            if (string.IsNullOrEmpty(title))
-                throw new ArgumentException("Title cannot be null or empty", nameof(title));
-            if (string.IsNullOrEmpty(message))
-                throw new ArgumentException("Message cannot be null or empty", nameof(message));
-
-            _radzenNotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Success,
-                Summary = title,
-                Detail = message,
-                Duration = 4000
-            });
-        }
+    public Task ShowWarning(string message, string? title = null)
+    {
+        return _notificationService.Warning(message, title ?? "Warning");
     }
 }
