@@ -14,6 +14,20 @@ using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.Tests.Components;
 
+public class TestLogger<T> : ILogger<T>
+{
+    public List<(LogLevel Level, string Message, Exception? Exception)> LogEntries { get; } = new();
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        LogEntries.Add((logLevel, formatter(state, exception), exception));
+    }
+}
+
 public class ScanExecutorTests : BunitContext
 {
     private readonly Mock<IMemoryScannerService> _scannerServiceMock;
@@ -60,11 +74,15 @@ public class ScanExecutorTests : BunitContext
     }
 
     [Fact]
-    public async Task ShouldHandleExceptionsDuringScanning()
+    public async Task ShouldLogErrorWhenScanningFails()
     {
         // Arrange
+        var testException = new Exception("Test error");
         _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
-            .ThrowsAsync(new Exception("Test error"));
+            .ThrowsAsync(testException);
+
+        var testLogger = new TestLogger<ScanExecutor>();
+        Services.AddScoped<ILogger<ScanExecutor>>(_ => testLogger);
 
         var cut = Render<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
@@ -77,17 +95,33 @@ public class ScanExecutorTests : BunitContext
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
 
         // Assert
-        _loggerMock.Verify(x => x.Log(
-            LogLevel.Error,
-            It.IsAny<EventId>(),
-            It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Error during memory scan")),
-            It.IsAny<Exception>(),
-            It.Is<Func<It.IsAnyType, Exception, string>>((v, t) => true)),
-        Times.Once());
+        var logEntry = Assert.Single(testLogger.LogEntries);
+        Assert.Equal(LogLevel.Error, logEntry.Level);
+        Assert.Contains("Error during memory scan", logEntry.Message);
+        Assert.Same(testException, logEntry.Exception);
+    }
 
+    [Fact]
+    public async Task ShouldShowNotificationWhenScanningFails()
+    {
+        // Arrange
+        var testException = new Exception("Test error");
+        _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
+            .ThrowsAsync(testException);
+
+        var cut = Render<ScanExecutor>(parameters => parameters
+            .Add(p => p.ProcessId, 1000)
+            .Add(p => p.ScanType, ScanType.ExactValue)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.SearchValue, 42)
+            .Add(p => p.IsFirstScan, true));
+
+        // Act
+        await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
+
+        // Assert
         _notificationServiceMock.Verify(x => 
-            x.ShowError(It.Is<string>(s => s.Contains("Scan failed")), 
-                       It.Is<string>(s => s.Contains("Test error"))),
+            x.ShowError("Scan failed", "Test error"),
             Times.Once);
     }
 
