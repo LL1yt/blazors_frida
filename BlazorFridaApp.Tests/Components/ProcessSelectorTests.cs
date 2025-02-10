@@ -21,11 +21,6 @@ public class ProcessSelectorTests : TestContextBase
     {
         _processServiceMock = new Mock<IProcessService>();
         Services.AddScoped<IProcessService>(_ => _processServiceMock.Object);
-        
-        // Add Blazorise services
-        Services.AddBlazorise();
-        Services.AddBootstrapProviders();
-        Services.AddFontAwesomeIcons();
 
         _defaultProcesses = new List<ProcessInfo>
         {
@@ -61,7 +56,7 @@ public class ProcessSelectorTests : TestContextBase
         // Assert
         _processServiceMock.Verify(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
         var selectItems = cut.FindComponents<SelectItem<int?>>();
-        Assert.Equal(_defaultProcesses.Count + 1, selectItems.Count); // +1 for the default "Select a process" item
+        Assert.Equal(2 + 1, selectItems.Count); // +1 for the default "Select a process" item
     }
 
     [Fact]

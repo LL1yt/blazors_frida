@@ -3,6 +3,11 @@
 @using System.Threading.Tasks
 @using Blazorise
 @using Microsoft.AspNetCore.Components.Web
+@using BlazorFridaApp.MemoryScanner.Models
+@using BlazorFridaApp.MemoryScanner.Services.Interfaces
+@inject ILogger<ProcessSelector> Logger
+@inject IProcessService ProcessService
+@implements IAsyncDisposable
 
 @inherits MemoryScannerComponentBase
 @inject IMemoryScannerService MemoryScanner
@@ -17,8 +22,8 @@
 </div>
 
 @code {
-    private Dictionary<IntPtr, int> previousValues = new();
     private List<IntPtr> scanResults = new();
+    private Dictionary<IntPtr, int> previousValues = new();
 
     [Parameter]
     public int? ProcessId { get; set; }
@@ -54,9 +59,20 @@
 
     public async Task ExecuteScan(Func<IntPtr, int> getCurrentValue)
     {
+        if (scanResults == null)
+        {
+            scanResults = new List<IntPtr>();
+        }
+        
         if (!ProcessId.HasValue)
         {
             Logger.LogWarning("Scan attempted without a selected process");
+            return;
+        }
+
+        if (getCurrentValue == null)
+        {
+            Logger.LogWarning("Scan attempted without a value getter function");
             return;
         }
 
@@ -213,7 +229,11 @@
                 try
                 {
                     var currentValue = getCurrentValue(address);
-                    var previousValue = previousValues[address];
+                    if (!previousValues.TryGetValue(address, out var previousValue))
+                    {
+                        Logger.LogWarning("No previous value found for address {Address}", address);
+                        continue;
+                    }
                     processedCount++;
 
                     bool keepResult = ScanType switch
@@ -276,5 +296,18 @@
     {
         scanResults.Clear();
         previousValues.Clear();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            Reset();
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during disposal of ScanExecutor");
+        }
     }
 }

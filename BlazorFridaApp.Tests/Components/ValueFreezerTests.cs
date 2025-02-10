@@ -1,21 +1,38 @@
 using Bunit;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
+using BlazorFridaApp.MemoryScanner.Base;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
 using Blazorise;
+using Blazorise.Bootstrap;
+using Blazorise.Icons.FontAwesome;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class ValueFreezerTests : TestContextBase
 {
+    private readonly Mock<IValueFreezerService> _freezerMock;
+    private readonly Mock<IProcessMemoryScanner> _scannerMock;
+
     public ValueFreezerTests()
     {
-        // Add Blazorise services
-        Services.AddBlazorise();
-        Services.AddBootstrapProviders();
-        Services.AddFontAwesomeIcons();
+        _freezerMock = new Mock<IValueFreezerService>();
+        _scannerMock = new Mock<IProcessMemoryScanner>();
+        
+        Services.AddSingleton(_freezerMock.Object);
+        Services.AddSingleton(_scannerMock.Object);
+        
+        Services
+            .AddBlazorise()
+            .AddBootstrapProviders()
+            .AddFontAwesomeIcons();
+            
+        // Add style provider
+        JSInterop.SetupModule("_content/Blazorise/blazorise.js");
+        JSInterop.SetupModule("_content/Blazorise.Bootstrap/blazorise.bootstrap.js");
     }
 
     [Fact]

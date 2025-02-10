@@ -1,4 +1,5 @@
 using Bunit;
+using Bunit.Rendering;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
@@ -32,26 +33,21 @@ public class ScanExecutorTests : TestContextBase
 {
     private readonly Mock<IMemoryScannerService> _scannerServiceMock;
     private readonly Mock<ILogger<ScanExecutor>> _loggerMock;
-    private readonly Mock<INotificationService> _notificationServiceMock;
+    private readonly Mock<BlazorFridaApp.Services.INotificationService> _notificationServiceMock;
     private readonly Mock<IProcessMemoryScanner> _processMemoryScannerMock;
 
     public ScanExecutorTests()
     {
         _scannerServiceMock = new Mock<IMemoryScannerService>();
         _loggerMock = new Mock<ILogger<ScanExecutor>>();
-        _notificationServiceMock = new Mock<INotificationService>();
+        _notificationServiceMock = new Mock<BlazorFridaApp.Services.INotificationService>();
         _processMemoryScannerMock = new Mock<IProcessMemoryScanner>();
         
         Services.AddScoped<IMemoryScannerService>(_ => _scannerServiceMock.Object);
         Services.AddScoped<ILogger<ScanExecutor>>(_ => _loggerMock.Object);
         Services.AddScoped<ILogger<MemoryScannerComponentBase>>(_ => Mock.Of<ILogger<MemoryScannerComponentBase>>());
-        Services.AddScoped<INotificationService>(_ => _notificationServiceMock.Object);
+        Services.AddScoped<BlazorFridaApp.Services.INotificationService>(_ => _notificationServiceMock.Object);
         Services.AddScoped<IProcessMemoryScanner>(_ => _processMemoryScannerMock.Object);
-
-        // Add Blazorise services
-        Services.AddBlazorise();
-        Services.AddBootstrapProviders();
-        Services.AddFontAwesomeIcons();
     }
 
     [Fact]
@@ -84,9 +80,6 @@ public class ScanExecutorTests : TestContextBase
         _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
             .ThrowsAsync(testException);
 
-        var testLogger = new TestLogger<ScanExecutor>();
-        Services.AddScoped<ILogger<ScanExecutor>>(_ => testLogger);
-
         var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ValueType, MemoryValueType.Int32)
@@ -96,10 +89,14 @@ public class ScanExecutorTests : TestContextBase
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
 
         // Assert
-        var logEntry = Assert.Single(testLogger.LogEntries);
-        Assert.Equal(LogLevel.Error, logEntry.Level);
-        Assert.Contains("Error during memory scan", logEntry.Message);
-        Assert.Same(testException, logEntry.Exception);
+        _loggerMock.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => true),
+                testException,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]

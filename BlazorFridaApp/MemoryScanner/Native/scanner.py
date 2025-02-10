@@ -9,6 +9,7 @@ import gc
 import weakref
 import psutil
 from threading import Lock
+from weakref import WeakValueDictionary
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
 
 SCAN_SCRIPT = """
 rpc.exports = {
-    scanMemory: function(valueType, value) {
+    scanMemory: function(valueType, value, startAddress, endAddress, comparisonType) {
         const matches = [];
         
         // Helper to check if memory range should be scanned
@@ -122,35 +123,47 @@ rpc.exports = {
             return true;
         }
         
-        // Scan memory ranges
-        Process.enumerateRanges('r--').forEach(range => {
-            if (!shouldScanRange(range)) return;
-            
-            try {
-                if (valueType === 'pattern') {
-                    const pattern = patternToBytes(value);
-                    const data = range.readByteArray(range.size);
-                    
-                    for (let offset = 0; offset < data.byteLength - pattern.length; offset++) {
-                        const slice = new Uint8Array(data, offset, pattern.length);
-                        if (matchPattern(slice, pattern)) {
-                            matches.push(range.base.add(offset));
-                        }
+        // Get memory range to scan
+        const range = {
+            base: ptr(startAddress),
+            size: endAddress - startAddress
+        };
+        
+        try {
+            if (valueType === 'pattern') {
+                const pattern = patternToBytes(value);
+                const data = range.readByteArray(range.size);
+                
+                for (let offset = 0; offset < data.byteLength - pattern.length; offset++) {
+                    const slice = new Uint8Array(data, offset, pattern.length);
+                    if (matchPattern(slice, pattern)) {
+                        matches.push(range.base.add(offset));
                     }
-                } else {
-                    // Standard value scanning
-                    const pattern = valueType === 'string' ? 
-                        Memory.scanSync(range.base, range.size, value) :
-                        Memory.scanSync(range.base, range.size, Array.from(new Uint8Array(new Float64Array([value]).buffer)));
-                    pattern.forEach(match => {
-                        matches.push(match.address.toString());
-                    });
                 }
-            } catch (e) {
-                // Ignore read errors and continue
-                console.log('Error scanning range:', e);
+            } else {
+                // Standard value scanning
+                let searchValue;
+                if (valueType === 'string') {
+                    searchValue = value;
+                } else if (valueType === 'int32') {
+                    searchValue = new Int32Array([value])[0];
+                } else if (valueType === 'int64') {
+                    searchValue = new BigInt64Array([value])[0];
+                } else if (valueType === 'float') {
+                    searchValue = new Float32Array([value])[0];
+                } else if (valueType === 'double') {
+                    searchValue = new Float64Array([value])[0];
+                }
+                
+                const pattern = Memory.scanSync(range.base, range.size, searchValue);
+                pattern.forEach(match => {
+                    matches.push(match.address);
+                });
             }
-        });
+        } catch (e) {
+            // Log error and continue
+            console.log('Error scanning range:', e);
+        }
         
         return matches.map(ptr => ptr.toString());
     }
@@ -158,17 +171,24 @@ rpc.exports = {
 """
 
 
+class ScanResults:
+    """Wrapper class for scan results that can be weakly referenced"""
+
+    def __init__(self, results):
+        self.results = results
+
+
 class MemoryScanner:
     def __init__(self, frida_scanner, session_id: str):
         self.frida_scanner = frida_scanner
-        self._session_id = session_id
+        self.session_id = session_id
+        self._scan_results = WeakValueDictionary()  # Store results with weak references
         self._logger = logging.getLogger(__name__)
-        self._scan_results = weakref.WeakValueDictionary()
+        self.state_manager = StateManager(session_id)
         self._memory_lock = Lock()
         self._max_chunk_size = 1024 * 1024  # 1MB chunks
         self._process = psutil.Process()
         self._mem_threshold = 0.8  # 80% memory threshold
-        self.state_manager = StateManager(session_id)
         logger.info(f"MemoryScanner initialized for session {session_id}")
 
     def _check_memory_usage(self):
@@ -187,29 +207,21 @@ class MemoryScanner:
         value_type: str,
         value: Any,
         comparison_type: str,
-        ranges: Optional[List[Tuple[int, int]]] = None
+        ranges: Optional[List[Tuple[int, int]]] = None,
     ) -> List[Dict[str, Any]]:
-        """Perform memory scan with memory usage monitoring"""
-        self._check_memory_usage()
-
-        # Use all memory if no ranges specified
+        """Scan memory for a specific value"""
         if not ranges:
-            ranges = [(0x00010000, 0x7FFFFFFF)]  # Default range from service
-
-        # Break large ranges into chunks
-        chunked_ranges = []
-        for start, end in ranges:
-            size = end - start
-            if size > self._max_chunk_size:
-                chunks = range(start, end, self._max_chunk_size)
-                chunked_ranges.extend(
-                    (chunk, min(chunk + self._max_chunk_size, end)) for chunk in chunks
-                )
-            else:
-                chunked_ranges.append((start, end))
+            # Get all readable memory ranges from the Frida session
+            session_ranges = (
+                await self.frida_scanner._attacher.session.enumerate_ranges("r--")
+            )
+            ranges = [
+                (int(r.base_address, 16), int(r.base_address, 16) + r.size)
+                for r in session_ranges
+            ]
 
         results = []
-        for chunk_start, chunk_end in chunked_ranges:
+        for chunk_start, chunk_end in ranges:
             try:
                 chunk_results = await self.frida_scanner.scan_memory_range(
                     value_type, value, comparison_type, [(chunk_start, chunk_end)]
@@ -217,12 +229,14 @@ class MemoryScanner:
                 results.extend(chunk_results)
                 self._check_memory_usage()
             except Exception as e:
-                self._logger.warning(f"Error scanning memory range {chunk_start:x}-{chunk_end:x}: {e}")
+                self._logger.warning(
+                    f"Error scanning memory range {chunk_start:x}-{chunk_end:x}: {e}"
+                )
                 continue
 
-        # Store results with weak reference
+        # Store results with weak reference using wrapper
         result_key = f"{value_type}_{hash(str(value))}_{comparison_type}"
-        self._scan_results[result_key] = results
+        self._scan_results[result_key] = ScanResults(results)
 
         return results
 
@@ -254,7 +268,7 @@ class MemoryScanner:
         self._check_memory_usage()
         try:
             current_state = await self.state_manager.load_state()
-            if (current_state):
+            if current_state:
                 metadata = current_state.metadata
                 metadata.update(state_updates)
                 await self.state_manager.save_state(

@@ -1,21 +1,29 @@
 using Bunit;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
+using BlazorFridaApp.MemoryScanner.Base;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
 using Blazorise;
+using Blazorise.Bootstrap;
+using Blazorise.Icons.FontAwesome;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class ScanControlsTests : TestContextBase
 {
+    private readonly Mock<IProcessMemoryScanner> _scannerMock;
+
     public ScanControlsTests()
     {
-        // Add Blazorise services
-        Services.AddBlazorise();
-        Services.AddBootstrapProviders();
-        Services.AddFontAwesomeIcons();
+        _scannerMock = new Mock<IProcessMemoryScanner>();
+        Services.AddSingleton(_scannerMock.Object);
+        
+        Services
+            .AddBlazorise()
+            .AddBootstrapProviders()
+            .AddFontAwesomeIcons();
     }
 
     [Fact]

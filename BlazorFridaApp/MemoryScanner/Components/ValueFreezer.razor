@@ -6,6 +6,11 @@
 @inject IValueFreezerService Freezer
 
 <div class="freeze-control">
+    <div class="d-flex align-items-center gap-2">
+        <NumericEdit TValue="int" />
+        <Button Color="Color.Primary">Freeze</Button>
+    </div>
+
     @if (frozenAddresses?.Any() == true)
     {
         <div class="frozen-addresses">

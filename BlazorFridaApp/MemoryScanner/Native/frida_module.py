@@ -4,7 +4,7 @@ from writer import write_memory
 from scanner import scan_memory, MemoryScanner
 from process_list import get_process_list
 import logging
-from typing import List
+from typing import List, Tuple, Dict, Any
 
 
 class FridaMemoryScanner:
@@ -118,3 +118,45 @@ class FridaMemoryScanner:
         if not self.scanner:
             raise RuntimeError("Scanner not initialized. Call attach_to_process first.")
         return await self.scanner.scan_pattern(pattern, mask)
+
+    async def scan_memory_range(
+        self,
+        value_type: str,
+        value: Any,
+        comparison_type: str,
+        ranges: List[Tuple[int, int]],
+    ) -> List[Dict[str, Any]]:
+        """
+        Scan a specific memory range for a value
+        Args:
+            value_type: Type of value to scan for
+            value: The value to search for
+            comparison_type: Type of comparison to perform
+            ranges: List of (start, end) address tuples to scan
+        Returns:
+            List of results containing addresses and values
+        """
+        if not self._attacher.session:
+            raise RuntimeError("Not attached to any process")
+
+        try:
+            script = await self._attacher.session.create_script(SCAN_SCRIPT)
+            await script.load()
+
+            results = []
+            for start, end in ranges:
+                matches = await script.exports.scan_memory(
+                    value_type=value_type,
+                    value=value,
+                    start_address=start,
+                    end_address=end,
+                    comparison_type=comparison_type,
+                )
+                results.extend(
+                    [{"address": match, "value": value} for match in matches]
+                )
+
+            return results
+        except Exception as e:
+            self._logger.error(f"Error scanning memory range: {e}")
+            raise

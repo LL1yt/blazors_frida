@@ -2,29 +2,32 @@ using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.Services;
+using BlazorFridaApp.MemoryScanner.Models;
 using Blazorise;
+using Blazorise.DataGrid;
 using Moq;
 using Xunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class DialogTests : TestContextBase
 {
     [Fact]
-    public void SaveConfigDialog_Should_RaiseEventOnSave()
+    public async Task SaveConfigDialog_Should_RaiseEventOnSave()
     {
         // Arrange
-        string savedConfig = null;
+        string? savedConfig = null;
         var cut = RenderComponent<SaveConfigDialog>(parameters => parameters
-            .Add(p => p.OnConfigSaved, (name) => { savedConfig = name; return Task.CompletedTask; }));
+            .Add(p => p.OnConfigSaved, EventCallback.Factory.Create<string>(this, name => savedConfig = name)));
 
         // Act
         var textEdit = cut.FindComponent<TextEdit>();
-        textEdit.SetParametersAndRender(parameters => parameters.Add(p => p.Text, "TestConfig"));
+        await textEdit.InvokeAsync(() => textEdit.Instance.TextChanged.InvokeAsync("TestConfig"));
 
-        var saveButton = cut.Find("button[type='button']:nth-child(2)");
-        saveButton.Click();
+        var saveButton = cut.Find("button[color='Primary']");
+        await saveButton.ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.Equal("TestConfig", savedConfig);
@@ -34,22 +37,22 @@ public class DialogTests : TestContextBase
     public void LoadConfigDialog_Should_RaiseEventOnSelect()
     {
         // Arrange
-        var configs = new Dictionary<string, Models.ScannerConfig>
+        var configs = new Dictionary<string, ScannerConfig>
         {
-            { "Test", new Models.ScannerConfig() }
+            { "Test", new ScannerConfig() }
         };
 
-        Models.ScannerConfig selectedConfig = null;
+        ScannerConfig? selectedConfig = null;
         var cut = RenderComponent<LoadConfigDialog>(parameters => parameters
             .Add(p => p.Configs, configs)
-            .Add(p => p.OnConfigSelected, (config) => { selectedConfig = config; return Task.CompletedTask; }));
+            .Add(p => p.OnConfigSelected, EventCallback.Factory.Create<ScannerConfig>(this, config => selectedConfig = config)));
 
         // Act
-        var grid = cut.FindComponent<DataGrid<KeyValuePair<string, Models.ScannerConfig>>>();
+        var grid = cut.FindComponent<DataGrid<KeyValuePair<string, ScannerConfig>>>();
         var row = grid.Find("tbody tr");
         row.Click();
 
-        var loadButton = cut.Find("button[type='button']:nth-child(2)");
+        var loadButton = cut.Find("button[color='Primary']");
         loadButton.Click();
 
         // Assert

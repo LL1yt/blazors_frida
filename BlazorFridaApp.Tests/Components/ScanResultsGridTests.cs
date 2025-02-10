@@ -18,11 +18,6 @@ public class ScanResultsGridTests : TestContextBase
 
     public ScanResultsGridTests()
     {
-        // Add Blazorise services
-        Services.AddBlazorise();
-        Services.AddBootstrapProviders();
-        Services.AddFontAwesomeIcons();
-
         // Render component
         _component = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, _testResults)
