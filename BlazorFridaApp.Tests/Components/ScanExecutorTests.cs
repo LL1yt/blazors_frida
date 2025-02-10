@@ -56,6 +56,8 @@ public class ScanExecutorTests : TestContextBase
         _notificationServiceMock.Setup(x => x.ShowSuccess(It.IsAny<string>(), It.IsAny<string>()));
         _notificationServiceMock.Setup(x => x.ShowError(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Exception>()));
         _notificationServiceMock.Setup(x => x.ShowInfo(It.IsAny<string>(), It.IsAny<string>()));
+
+        _loggerMock.Setup(x => x.IsEnabled(It.IsAny<LogLevel>())).Returns(true);
     }
 
     [Fact]
@@ -67,15 +69,13 @@ public class ScanExecutorTests : TestContextBase
         _scannerServiceMock.Setup(x => x.ScanForValue(processId, value, MemoryValueType.Int32))
             .ReturnsAsync(new List<IntPtr>());
 
-        _processMemoryScannerMock.Setup(x => x.ScanForValue(processId, value, MemoryValueType.Int32))
-            .ReturnsAsync(new List<IntPtr>());
-
         // Act
         var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, processId)
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.IsFirstScan, true)
             .Add(p => p.ScanType, ScanType.ExactValue)
+            .Add(p => p.SearchValue, value)
             .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, _ => Task.CompletedTask))
             .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, _ => Task.CompletedTask)));
 
@@ -90,29 +90,33 @@ public class ScanExecutorTests : TestContextBase
     public async Task ShouldLogErrorWhenScanningFails()
     {
         // Arrange
+        var processId = 1000;
+        var value = 42;
         var testException = new Exception("Test error");
-        _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
+        
+        _scannerServiceMock.Setup(x => x.ScanForValue(processId, value, MemoryValueType.Int32))
             .ThrowsAsync(testException);
 
         var cut = RenderComponent<ScanExecutor>(parameters => parameters
-            .Add(p => p.ProcessId, 1000)
+            .Add(p => p.ProcessId, processId)
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.IsFirstScan, true)
             .Add(p => p.ScanType, ScanType.ExactValue)
+            .Add(p => p.SearchValue, value)
             .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, _ => Task.CompletedTask))
             .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, _ => Task.CompletedTask)));
 
         // Act
-        await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
+        await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => value));
 
         // Assert
         _loggerMock.Verify(
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => true),
+                It.Is<It.IsAnyType>((state, _) => true),
                 testException,
-                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()),
             Times.Once);
     }
 

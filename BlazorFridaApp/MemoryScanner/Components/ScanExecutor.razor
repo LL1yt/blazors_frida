@@ -19,8 +19,8 @@
 </div>
 
 @code {
-    private List<IntPtr> scanResults = new();
-    private Dictionary<IntPtr, int> previousValues = new();
+    private List<IntPtr> scanResults = new List<IntPtr>();
+    private Dictionary<IntPtr, int> previousValues = new Dictionary<IntPtr, int>();
 
     [Parameter]
     public int? ProcessId { get; set; }
@@ -56,20 +56,15 @@
 
     public async Task ExecuteScan(Func<IntPtr, int> getCurrentValue)
     {
-        if (scanResults == null)
-        {
-            scanResults = new List<IntPtr>();
-        }
-        
-        if (!ProcessId.HasValue)
-        {
-            Logger.LogWarning("Scan attempted without a selected process");
-            return;
-        }
-
         if (getCurrentValue == null)
         {
             Logger.LogWarning("Scan attempted without a value getter function");
+            return;
+        }
+
+        if (!ProcessId.HasValue)
+        {
+            Logger.LogWarning("Scan attempted without a selected process");
             return;
         }
 
@@ -79,7 +74,10 @@
             Logger.LogInformation("Starting {ScanType} scan for process {ProcessId}. IsFirstScan: {IsFirstScan}, ValueType: {ValueType}",
                 ScanType, processId, IsFirstScan, ValueType);
             
-            await OnLoadingChanged.InvokeAsync(true);
+            if (OnLoadingChanged.HasDelegate)
+            {
+                await OnLoadingChanged.InvokeAsync(true);
+            }
             
             if (ScanType == ScanType.Pattern)
             {
@@ -101,7 +99,10 @@
             }
 
             Logger.LogInformation("Scan completed. Found {ResultCount} results", resultCount);
-            await OnScanComplete.InvokeAsync(scanResults);
+            if (OnScanComplete.HasDelegate)
+            {
+                await OnScanComplete.InvokeAsync(scanResults);
+            }
         }
         catch (Exception ex)
         {
@@ -109,11 +110,17 @@
             ShowError("Scan failed", ex.GetBaseException().Message, ex);
             scanResults.Clear();
             previousValues.Clear();
-            await OnScanComplete.InvokeAsync(scanResults);
+            if (OnScanComplete.HasDelegate)
+            {
+                await OnScanComplete.InvokeAsync(scanResults);
+            }
         }
         finally
         {
-            await OnLoadingChanged.InvokeAsync(false);
+            if (OnLoadingChanged.HasDelegate)
+            {
+                await OnLoadingChanged.InvokeAsync(false);
+            }
         }
     }
 
