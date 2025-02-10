@@ -1,18 +1,21 @@
 @page "/memory-scanner"
-@using BlazorFridaApp.MemoryScanner.Components
 @using BlazorFridaApp.MemoryScanner.Models
+@using BlazorFridaApp.MemoryScanner.Components
 @using BlazorFridaApp.MemoryScanner.Services.Interfaces
+@using BlazorFridaApp.Services
 @using Blazorise
 @using Blazorise.Components
 @using Blazorise.Icons.FontAwesome
 @using Blazorise.Icons
 @using Blazorise.Modules
 @using static Blazorise.ModalSize
-@using static Blazorise.LayoutOptions
+@using System.ComponentModel
 @inherits MemoryScannerComponentBase
 
 [Inject]
 protected new IScanProfileService ProfileService { get; set; } = default!;
+[Inject]
+protected new INotificationService NotificationService { get; set; } = default!;
 @inject DialogService DialogService
 
 <div class="memory-scanner-container">
@@ -55,26 +58,17 @@ protected new IScanProfileService ProfileService { get; set; } = default!;
                         ScanTypes="@_state.ScanTypes"
                         ValueTypes="@_state.ValueTypes"
                         PatternHex="@_state.PatternHex"
+                        PatternHexChanged="@((string pattern) => _state.PatternHex = pattern)"
                         Mask="@_state.Mask"
-                        @bind-SearchValue="@_state.SearchValue"
+                        MaskChanged="@((string mask) => _state.Mask = mask)"
+                        SearchValue="@_state.SearchValue"
+                        SearchValueChanged="@((int value) => _state.SearchValue = value)"
                         IsFirstScan="@_state.IsFirstScan"
                         IsLoading="@_state.IsLoading"
                         CanScan="@_state.CanScan"
-                        OnScanTypeChanged="@OnScanTypeChanged"
-                        OnValueTypeChanged="@OnValueTypeChanged"
+                        OnScanTypeChanged="@((ScanType type) => _state.SelectedScanType = type)"
+                        OnValueTypeChanged="@((MemoryValueType type) => _state.SelectedValueType = type)"
                         OnScanClick="@OnScan" />
-
-                    <ScanExecutor @ref="scanExecutor"
-                        ProcessId="@_state.SelectedProcessId"
-                        ScanType="@_state.SelectedScanType"
-                        ValueType="@_state.SelectedValueType"
-                        PatternHex="@_state.PatternHex"
-                        Mask="@_state.Mask"
-                        SearchValue="@_state.SearchValue"
-                        IsFirstScan="@_state.IsFirstScan"
-                        IsLoading="@_state.IsLoading"
-                        OnScanComplete="@OnScanComplete"
-                        OnLoadingChanged="@OnLoadingChanged" />
                 </CardBody>
             </Card>
 
@@ -94,13 +88,11 @@ protected new IScanProfileService ProfileService { get; set; } = default!;
             </Card>
         </div>
 
-        <Card>
+        <Card Margin="Margin.Is3.FromBottom" Class="results-card">
             <CardBody>
                 <ScanResultsGrid
                     Results="@_state.ScanResults"
                     ValueType="@_state.SelectedValueType"
-                    GetCurrentValue="@(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0))"
-                    IsFrozen="@IsFrozen"
                     OnValueChanged="@(args => OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
                     OnFreezeToggle="@(addr => ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
             </CardBody>
@@ -116,7 +108,7 @@ protected new IScanProfileService ProfileService { get; set; } = default!;
         <ModalBody>
             <SaveConfigDialog 
                 OnConfigSaved="@HandleConfigSaved"
-                OnCanceled="@(() => _saveConfigModal.Hide())" />
+                OnCanceled="@(() => _saveConfigModal?.Hide())" />
         </ModalBody>
     </ModalContent>
 </Modal>
@@ -128,9 +120,9 @@ protected new IScanProfileService ProfileService { get; set; } = default!;
         </ModalHeader>
         <ModalBody>
             <LoadConfigDialog 
-                Configs="@_state.SavedConfigs"
-                OnConfigSelected="@HandleConfigLoaded"
-                OnCanceled="@(() => _loadConfigModal.Hide())" />
+                Configs="@(_state.SavedConfigs)"
+                OnConfigSelected="@((ScannerConfig config) => HandleConfigLoaded(config))"
+                OnCanceled="@(() => _loadConfigModal?.Hide())" />
         </ModalBody>
     </ModalContent>
 </Modal>
@@ -204,51 +196,33 @@ protected new IScanProfileService ProfileService { get; set; } = default!;
 
         try 
         {
-            var config = new ScannerConfig 
-            {
-                Description = $"Configuration saved at {DateTime.Now}",
-                ValueType = _state.SelectedValueType,
-                ScanType = _state.SelectedScanType.ToString(),
-                ComparisonType = "exact" // default value
-            };
-            
+            var config = _state.ToConfig(configName);
             await ProfileService.SaveScannerConfig(configName, config);
-            if (_saveConfigModal is not null)
-                await _saveConfigModal.Hide();
-                
-            await NotificationService.ShowSuccess("Configuration saved", $"Configuration '{configName}' saved successfully");
+            _saveConfigModal?.Hide();
+            NotificationService.ShowSuccess("Configuration saved", $"Configuration '{configName}' saved successfully");
         }
         catch (Exception ex)
         {
-            await NotificationService.ShowError("Save failed", $"Failed to save configuration: {ex.Message}");
+            NotificationService.ShowError("Save failed", $"Failed to save configuration: {ex.Message}");
         }
     }
 
-    private async Task HandleConfigLoaded(ScannerConfig config)
+    private Task HandleConfigLoaded(ScannerConfig config)
     {
         if (config == null)
-            return;
+            return Task.CompletedTask;
 
         try
         {
-            _state.LoadConfig(new Components.Pages.ScannerConfig 
-            {
-                ScanType = Enum.Parse<ScanType>(config.ScanType),
-                ValueType = config.ValueType,
-                PatternHex = config.CustomSettings.GetValueOrDefault("PatternHex", ""),
-                Mask = config.CustomSettings.GetValueOrDefault("Mask", ""),
-                SearchValue = int.Parse(config.CustomSettings.GetValueOrDefault("SearchValue", "0"))
-            });
-            
-            if (_loadConfigModal is not null)
-                await _loadConfigModal.Hide();
-            await NotificationService.ShowSuccess("Configuration loaded", "Configuration loaded successfully");
+            _state.LoadConfig(config);
+            _loadConfigModal?.Hide();
+            NotificationService.ShowSuccess("Configuration loaded", "Configuration loaded successfully");
+            return Task.CompletedTask;
         }
         catch (Exception ex)
         {
-            await NotificationService.ShowError("Load failed", $"Failed to load configuration: {ex.Message}");
+            NotificationService.ShowError("Load failed", $"Failed to load configuration: {ex.Message}");
+            return Task.CompletedTask;
         }
     }
-
-    // ...rest of existing code...
 }

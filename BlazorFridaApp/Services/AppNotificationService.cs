@@ -1,5 +1,4 @@
-using Microsoft.AspNetCore.Components;
-using Blazorise;
+using Microsoft.Extensions.Logging;
 
 namespace BlazorFridaApp.Services;
 
@@ -13,30 +12,34 @@ public interface IAppNotificationService
 
 public class AppNotificationService : IAppNotificationService
 {
-    private readonly Blazorise.INotificationService _notificationService;
+    private readonly ILogger<AppNotificationService> _logger;
     
-    public AppNotificationService(Blazorise.INotificationService notificationService)
+    public AppNotificationService(ILogger<AppNotificationService> logger)
     {
-        _notificationService = notificationService;
+        _logger = logger;
     }
 
     public Task ShowSuccess(string message, string? title = null)
     {
-        return _notificationService.Success(title ?? "Success", message);
+        _logger.LogInformation("{Title}: {Message}", title ?? "Success", message);
+        return Task.CompletedTask;
     }
 
     public Task ShowError(string message, string? title = null)
     {
-        return _notificationService.Error(title ?? "Error", message);
+        _logger.LogError("{Title}: {Message}", title ?? "Error", message);
+        return Task.CompletedTask;
     }
 
     public Task ShowWarning(string message, string? title = null)
     {
-        return _notificationService.Warning(title ?? "Warning", message);
+        _logger.LogWarning("{Title}: {Message}", title ?? "Warning", message);
+        return Task.CompletedTask;
     }
 
     public Task ShowInfo(string message, string? title = null)
     {
-        return _notificationService.Info(title ?? "Information", message);
+        _logger.LogInformation("{Title}: {Message}", title ?? "Information", message);
+        return Task.CompletedTask;
     }
 }

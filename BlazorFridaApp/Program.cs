@@ -63,18 +63,15 @@ try
         })
         .AddBootstrapProviders()
         .AddFontAwesomeIcons()
-        .AddBlazoriseRichTextEdit()
-        .AddBlazoriseTreeView()
-        .AddBlazoriseSnackbar()
-        .AddBlazoriseDataGrid();
+        .AddBlazoriseRichTextEdit();
 
     // Add assets service
     builder.Services.AddScoped<AssetsService>();
 
     // Add notification and dialog services
-    builder.Services.AddScoped<NotificationService<string>>();
     builder.Services.AddScoped<BlazorFridaApp.Services.INotificationService, BlazorFridaApp.Services.NotificationService>();
-    builder.Services.AddScoped<BlazorFridaApp.Services.DialogService>();
+    builder.Services.AddScoped<BlazorFridaApp.Services.IAppNotificationService, BlazorFridaApp.Services.AppNotificationService>();
+    builder.Services.AddScoped<DialogService>();
 
     // Configure OpenTelemetry
     builder.Services.AddOpenTelemetry()
