@@ -10,14 +10,13 @@ using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ScanControlsTests : BunitContext
+public class ScanControlsTests : TestContextBase
 {
     private readonly Mock<INotificationService> _notificationServiceMock;
     private readonly Mock<IProcessMemoryScanner> _scannerMock;
 
     public ScanControlsTests()
     {
-        JSInterop.Mode = JSRuntimeMode.Loose;
         _notificationServiceMock = new Mock<INotificationService>();
         _scannerMock = new Mock<IProcessMemoryScanner>();
         

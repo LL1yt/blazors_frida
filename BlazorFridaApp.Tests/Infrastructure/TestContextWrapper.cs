@@ -1,28 +1,18 @@
 using Bunit;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 
 namespace BlazorFridaApp.Tests;
 
-public class TestContextBase : BunitContext, IAsyncDisposable, IDisposable
+public class TestContextBase : TestContext
 {
-    private bool _disposed;
+    public TestContextBase()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+    }
 
     public new void Dispose()
     {
-        if (!_disposed)
-        {
-            DisposeAsync().AsTask().GetAwaiter().GetResult();
-            _disposed = true;
-            base.Dispose();
-        }
-    }
-
-    public new async ValueTask DisposeAsync()
-    {
-        if (!_disposed)
-        {
-            await base.DisposeAsync();
-            _disposed = true;
-        }
+        base.Dispose();
     }
 }

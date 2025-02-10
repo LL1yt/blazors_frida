@@ -28,7 +28,7 @@ public class TestLogger<T> : ILogger<T>
     }
 }
 
-public class ScanExecutorTests : BunitContext
+public class ScanExecutorTests : TestContextBase
 {
     private readonly Mock<IMemoryScannerService> _scannerServiceMock;
     private readonly Mock<ILogger<ScanExecutor>> _loggerMock;

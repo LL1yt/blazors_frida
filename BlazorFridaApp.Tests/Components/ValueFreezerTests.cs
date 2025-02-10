@@ -61,7 +61,7 @@ public class ValueFreezerTests : TestContextBase, IAsyncLifetime
         _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int32"))
             .Returns(Task.CompletedTask);
 
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
@@ -80,7 +80,7 @@ public class ValueFreezerTests : TestContextBase, IAsyncLifetime
         _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int32"))
             .ThrowsAsync(new Exception("Test error"));
 
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
@@ -102,7 +102,7 @@ public class ValueFreezerTests : TestContextBase, IAsyncLifetime
         _freezerServiceMock.Setup(x => x.GetFrozenAddresses())
             .ReturnsAsync(new HashSet<IntPtr> { address });
 
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act

@@ -23,7 +23,7 @@ public class ScanResultsGridTests : TestContextBase
     public void ShouldRenderEmptyGrid()
     {
         // Act
-        var cut = Render<ScanResultsGrid>(parameters => parameters
+        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, new List<IntPtr>())
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 0)
@@ -46,7 +46,7 @@ public class ScanResultsGridTests : TestContextBase
         };
 
         // Act
-        var cut = Render<ScanResultsGrid>(parameters => parameters
+        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => values[addr])
@@ -66,7 +66,7 @@ public class ScanResultsGridTests : TestContextBase
         var changedAddr = IntPtr.Zero;
         var changedValue = 0;
 
-        var cut = Render<ScanResultsGrid>(parameters => parameters
+        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
@@ -97,7 +97,7 @@ public class ScanResultsGridTests : TestContextBase
         var frozenAddresses = new HashSet<IntPtr> { new(0x1000) };
 
         // Act
-        var cut = Render<ScanResultsGrid>(parameters => parameters
+        var cut = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
@@ -115,26 +115,26 @@ public class ScanResultsGridTests : TestContextBase
         var results = new List<IntPtr> { new(0x1000) };
 
         // Act - Float
-        var cutFloat = Render<ScanResultsGrid>(parameters => parameters
+        var cutFloat = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Float)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => BitConverter.ToInt32(BitConverter.GetBytes(42.5f), 0))
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert - Float
-        var floatValue = cutFloat.Find(".rz-spinner");  // Updated selector
+        var floatValue = cutFloat.Find(".rz-spinner");
         Assert.NotNull(floatValue);
         Assert.Contains("42.50", floatValue.GetAttribute("value") ?? "");
 
         // Act - Int
-        var cutInt = Render<ScanResultsGrid>(parameters => parameters
+        var cutInt = RenderComponent<ScanResultsGrid>(parameters => parameters
             .Add(p => p.Results, results)
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.GetCurrentValue, (IntPtr addr) => 42)
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert - Int
-        var intValue = cutInt.Find(".rz-spinner");  // Updated selector
+        var intValue = cutInt.Find(".rz-spinner");
         Assert.NotNull(intValue);
         Assert.Contains("42", intValue.GetAttribute("value") ?? "");
     }

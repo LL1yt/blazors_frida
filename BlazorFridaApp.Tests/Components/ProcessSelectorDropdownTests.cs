@@ -22,12 +22,11 @@ public class ProcessSelectorDropdownTests : TestContextBase
         _processServiceMock = new Mock<IProcessService>();
         Services.AddScoped<IProcessService>(_ => _processServiceMock.Object);
         
-        JSInterop.SetupModule("_content/Radzen.Blazor/Radzen.Blazor.js");
-        JSInterop.Setup<object>("Radzen.preventArrows", _ => true);
-        JSInterop.Setup<object>("Radzen.togglePopup", _ => true);
-        JSInterop.Setup<object>("Radzen.closePopup", _ => true);
-        JSInterop.Setup<object>("Radzen.toggleMenuItem", _ => true);
-        JSInterop.Setup<object>("Radzen.destroyPopup", _ => true);
+        JSInterop.SetupVoid("Radzen.preventArrows", _ => true);
+        JSInterop.SetupVoid("Radzen.togglePopup", _ => true);
+        JSInterop.SetupVoid("Radzen.closePopup", _ => true);
+        JSInterop.SetupVoid("Radzen.toggleMenuItem", _ => true);
+        JSInterop.SetupVoid("Radzen.destroyPopup", _ => true);
     }
 
     [Fact(DisplayName = "Dropdown should maintain selected process after closing")]
