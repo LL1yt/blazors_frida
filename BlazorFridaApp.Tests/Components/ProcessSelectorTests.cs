@@ -52,11 +52,16 @@ public class ProcessSelectorTests : TestContextBase
         // Arrange & Act
         var cut = RenderComponent<ProcessSelector>();
         await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
+        
+        // Wait for re-render
+        cut.WaitForState(() => !cut.Instance.IsLoading);
+        cut.WaitForState(() => cut.Instance.ProcessList.Count == _defaultProcesses.Count);
 
         // Assert
         _processServiceMock.Verify(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
         var selectItems = cut.FindComponents<SelectItem<int?>>();
-        Assert.Equal(2 + 1, selectItems.Count); // +1 for the default "Select a process" item
+        Assert.Equal(3, selectItems.Count); // 2 processes + 1 default item
+        Assert.Equal(_defaultProcesses.Count + 1, selectItems.Count); // +1 for the default "Select a process" item
     }
 
     [Fact]

@@ -48,6 +48,14 @@ public class ScanExecutorTests : TestContextBase
         Services.AddScoped<ILogger<MemoryScannerComponentBase>>(_ => Mock.Of<ILogger<MemoryScannerComponentBase>>());
         Services.AddScoped<BlazorFridaApp.Services.INotificationService>(_ => _notificationServiceMock.Object);
         Services.AddScoped<IProcessMemoryScanner>(_ => _processMemoryScannerMock.Object);
+        
+        JSInterop.SetupVoid("ShowSuccess", _ => true);
+        JSInterop.SetupVoid("ShowError", _ => true);
+        JSInterop.SetupVoid("ShowInfo", _ => true);
+        
+        _notificationServiceMock.Setup(x => x.ShowSuccess(It.IsAny<string>(), It.IsAny<string>()));
+        _notificationServiceMock.Setup(x => x.ShowError(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Exception>()));
+        _notificationServiceMock.Setup(x => x.ShowInfo(It.IsAny<string>(), It.IsAny<string>()));
     }
 
     [Fact]
@@ -56,7 +64,6 @@ public class ScanExecutorTests : TestContextBase
         // Arrange
         var processId = 1234;
         var value = 42;
-
         _scannerServiceMock.Setup(x => x.ScanForValue(processId, value, MemoryValueType.Int32))
             .ReturnsAsync(new List<IntPtr>());
 
@@ -64,12 +71,16 @@ public class ScanExecutorTests : TestContextBase
         var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, processId)
             .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.IsFirstScan, true));
+            .Add(p => p.IsFirstScan, true)
+            .Add(p => p.ScanType, ScanType.ExactValue)
+            .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, _ => Task.CompletedTask))
+            .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, _ => Task.CompletedTask)));
 
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => value));
 
         // Assert
         _scannerServiceMock.Verify(x => x.ScanForValue(processId, value, MemoryValueType.Int32), Times.Once);
+        _notificationServiceMock.Verify(x => x.ShowInfo("Scan Results", "No results found"), Times.Once);
     }
 
     [Fact]
@@ -83,7 +94,10 @@ public class ScanExecutorTests : TestContextBase
         var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.IsFirstScan, true));
+            .Add(p => p.IsFirstScan, true)
+            .Add(p => p.ScanType, ScanType.ExactValue)
+            .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, _ => Task.CompletedTask))
+            .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, _ => Task.CompletedTask)));
 
         // Act
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
@@ -110,7 +124,10 @@ public class ScanExecutorTests : TestContextBase
         var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.IsFirstScan, true));
+            .Add(p => p.IsFirstScan, true)
+            .Add(p => p.ScanType, ScanType.ExactValue)
+            .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, _ => Task.CompletedTask))
+            .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, _ => Task.CompletedTask)));
 
         // Act
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));

@@ -108,7 +108,7 @@ protected new INotificationService NotificationService { get; set; } = default!;
         <ModalBody>
             <SaveConfigDialog 
                 OnConfigSaved="@HandleConfigSaved"
-                OnCanceled="@(() => _saveConfigModal?.Hide())" />
+                OnCanceled="@HandleSaveConfigCancel" />
         </ModalBody>
     </ModalContent>
 </Modal>
@@ -120,9 +120,9 @@ protected new INotificationService NotificationService { get; set; } = default!;
         </ModalHeader>
         <ModalBody>
             <LoadConfigDialog 
-                Configs="@(_state.SavedConfigs)"
+                Configs="@(_state.SavedConfigs ?? new Dictionary<string, ScannerConfig>())"
                 OnConfigSelected="@((ScannerConfig config) => HandleConfigLoaded(config))"
-                OnCanceled="@(() => _loadConfigModal?.Hide())" />
+                OnCanceled="@HandleLoadConfigCancel" />
         </ModalBody>
     </ModalContent>
 </Modal>
@@ -223,6 +223,22 @@ protected new INotificationService NotificationService { get; set; } = default!;
         {
             NotificationService.ShowError("Load failed", $"Failed to load configuration: {ex.Message}");
             return Task.CompletedTask;
+        }
+    }
+
+    private void HandleSaveConfigCancel()
+    {
+        if (_saveConfigModal is not null)
+        {
+            _saveConfigModal.Hide();
+        }
+    }
+
+    private void HandleLoadConfigCancel()
+    {
+        if (_loadConfigModal is not null)
+        {
+            _loadConfigModal.Hide();
         }
     }
 }
