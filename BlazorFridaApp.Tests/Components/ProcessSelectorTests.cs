@@ -14,7 +14,7 @@ using System.Diagnostics;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ProcessSelectorTests : BunitTestContext
+public class ProcessSelectorTests : TestContextBase
 {
     private readonly Mock<IProcessService> _processServiceMock;
 
@@ -40,16 +40,12 @@ public class ProcessSelectorTests : BunitTestContext
             new() { Id = 1000, Name = "notepad.exe" },
             new() { Id = 2000, Name = "test2.exe" }
         };
-        int? selectedProcessId = null;
+        ProcessInfo? selectedProcess = null;
 
-        var cut = RenderComponent<ProcessSelector>(parameters => parameters
+        var cut = Render<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, processes)
-            .Add(p => p.SelectedProcessId, selectedProcessId)
-            .Add(p => p.OnProcessSelected, (EventCallback<int?>) EventCallback.Factory.Create<int?>(this, id =>
-            {
-                selectedProcessId = id;
-                return Task.CompletedTask;
-            })));
+            .Add(p => p.OnProcessSelected, (ProcessInfo p) => HandleSelection(p))
+            .Add(p => p.OnRefreshClick, EventCallback.Factory.Create(this, () => Task.CompletedTask)));
 
         // Act & Assert initial state
         Assert.Empty(cut.Find(".rz-dropdown").TextContent.Trim());
@@ -59,15 +55,33 @@ public class ProcessSelectorTests : BunitTestContext
         await cut.FindAll(".rz-dropdown-item")[0].ClickAsync(new MouseEventArgs());
 
         // Assert
-        Assert.Equal(1000, selectedProcessId);
+        Assert.Equal(1000, selectedProcess?.Id);
         Assert.Contains("notepad.exe", cut.Find(".rz-dropdown-text").TextContent);
 
         // Act - Re-render with updated parameters
-        await cut.InvokeAsync(() => cut.SetParametersAndRender(parameters => parameters
-            .Add(p => p.ProcessList, processes)
-            .Add(p => p.SelectedProcessId, selectedProcessId)));
+        var newProcesses = new List<ProcessInfo>
+        {
+            new() { Id = 3000, Name = "test3.exe" },
+            new() { Id = 4000, Name = "test4.exe" }
+        };
+        await cut.SetParametersAsync(parameters => parameters
+            .Add(p => p.ProcessList, newProcesses));
+        cut.Render();
 
         // Assert - Verify state persists
-        Assert.contains("notepad.exe", cut.Find(".rz-dropdown-text").TextContent);
+        Assert.Empty(cut.Find(".rz-dropdown-text").TextContent);
+
+        // Act - Select process
+        await cut.Find(".rz-dropdown").ClickAsync(new MouseEventArgs());
+        await cut.FindAll(".rz-dropdown-item")[0].ClickAsync(new MouseEventArgs());
+
+        // Assert
+        Assert.Equal(3000, selectedProcess?.Id);
+        Assert.Contains("test3.exe", cut.Find(".rz-dropdown-text").TextContent);
+    }
+
+    private void HandleSelection(ProcessInfo process)
+    {
+        selectedProcess = process;
     }
 }

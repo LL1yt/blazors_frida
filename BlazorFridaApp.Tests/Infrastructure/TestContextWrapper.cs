@@ -3,7 +3,7 @@ using System;
 
 namespace BlazorFridaApp.Tests;
 
-public class TestContextWrapper : BunitContext, IAsyncDisposable, IDisposable
+public class TestContextBase : BunitContext, IAsyncDisposable, IDisposable
 {
     private bool _disposed;
 

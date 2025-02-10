@@ -13,7 +13,7 @@ using BlazorFridaApp.MemoryScanner.Base;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ValueFreezerTests : TestContextWrapper, IAsyncLifetime
+public class ValueFreezerTests : TestContextBase, IAsyncLifetime
 {
     private readonly Mock<IValueFreezerService> _freezerServiceMock;
     private readonly Mock<INotificationService> _notificationServiceMock;

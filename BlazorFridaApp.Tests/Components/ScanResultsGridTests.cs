@@ -11,7 +11,7 @@ using Radzen.Blazor;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ScanResultsGridTests : TestContextWrapper
+public class ScanResultsGridTests : TestContextBase
 {
     public ScanResultsGridTests()
     {
