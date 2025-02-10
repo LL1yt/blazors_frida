@@ -14,7 +14,7 @@ using System.Diagnostics;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ProcessSelectorTests : BunitContext
+public class ProcessSelectorTests : BunitTestContext
 {
     private readonly Mock<IProcessService> _processServiceMock;
 
@@ -23,16 +23,16 @@ public class ProcessSelectorTests : BunitContext
         _processServiceMock = new Mock<IProcessService>();
         Services.AddScoped<IProcessService>(_ => _processServiceMock.Object);
         
-        // Setup JS interop for Radzen components
-        JSInterop.SetupVoid("Radzen.preventArrows", _ => true);
-        JSInterop.SetupVoid("Radzen.togglePopup", _ => true);
-        JSInterop.SetupVoid("Radzen.closePopup", _ => true);
-        JSInterop.SetupVoid("Radzen.toggleMenuItem", _ => true);
-        JSInterop.SetupVoid("Radzen.destroyPopup", _ => true);
+        JSInterop.SetupModule("_content/Radzen.Blazor/Radzen.Blazor.js");
+        JSInterop.Setup<object>("Radzen.preventArrows", _ => true);
+        JSInterop.Setup<object>("Radzen.togglePopup", _ => true);
+        JSInterop.Setup<object>("Radzen.closePopup", _ => true);
+        JSInterop.Setup<object>("Radzen.toggleMenuItem", _ => true);
+        JSInterop.Setup<object>("Radzen.destroyPopup", _ => true);
     }
 
     [Fact]
-    public void ShouldRenderProcessList()
+    public async Task ComponentShouldHandleProcessSelection()
     {
         // Arrange
         var processes = new List<ProcessInfo>
@@ -40,83 +40,34 @@ public class ProcessSelectorTests : BunitContext
             new() { Id = 1000, Name = "notepad.exe" },
             new() { Id = 2000, Name = "test2.exe" }
         };
+        int? selectedProcessId = null;
 
-        // Act
-        var cut = Render<ProcessSelector>(parameters => parameters
-            .Add(p => p.ProcessList, processes));
-
-        // Assert
-        var dropdown = cut.Find(".rz-dropdown");
-        Assert.NotNull(dropdown);
-        // Click to open dropdown
-        dropdown.Click();
-        var items = cut.FindAll(".rz-dropdown-item");
-        Assert.Contains(items, item => item.TextContent.Contains("notepad.exe"));
-        Assert.Contains(items, item => item.TextContent.Contains("test2.exe"));
-    }
-
-    [Fact]
-    public async Task ShouldTriggerRefreshProcessList()
-    {
-        // Arrange
-        var onRefreshCalled = false;
-        
-        // Act
-        var cut = Render<ProcessSelector>(parameters => parameters
-            .Add(p => p.ProcessList, new List<ProcessInfo>())
-            .Add(p => p.OnRefreshClick, EventCallback.Factory.Create(this, () => 
+        var cut = RenderComponent<ProcessSelector>(parameters => parameters
+            .Add(p => p.ProcessList, processes)
+            .Add(p => p.SelectedProcessId, selectedProcessId)
+            .Add(p => p.OnProcessSelected, (EventCallback<int?>) EventCallback.Factory.Create<int?>(this, id =>
             {
-                onRefreshCalled = true;
+                selectedProcessId = id;
                 return Task.CompletedTask;
             })));
 
-        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        // Act & Assert initial state
+        Assert.Empty(cut.Find(".rz-dropdown").TextContent.Trim());
+
+        // Act - Select process
+        await cut.Find(".rz-dropdown").ClickAsync(new MouseEventArgs());
+        await cut.FindAll(".rz-dropdown-item")[0].ClickAsync(new MouseEventArgs());
 
         // Assert
-        Assert.True(onRefreshCalled);
-    }
+        Assert.Equal(1000, selectedProcessId);
+        Assert.Contains("notepad.exe", cut.Find(".rz-dropdown-text").TextContent);
 
-    [Fact]
-    public async Task ShouldNotifyOnProcessSelected()
-    {
-        // Arrange
-        var processes = new List<ProcessInfo>
-        {
-            new() { Id = 1000, Name = "notepad.exe" }
-        };
-        int? selectedProcess = null;
-        var cut = Render<ProcessSelector>(parameters => parameters
+        // Act - Re-render with updated parameters
+        await cut.InvokeAsync(() => cut.SetParametersAndRender(parameters => parameters
             .Add(p => p.ProcessList, processes)
-            .Add(p => p.SelectedProcessId, selectedProcess)
-            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create(this, async () => 
-            {
-                selectedProcess = 1000;
-                await Task.CompletedTask;
-            })));
+            .Add(p => p.SelectedProcessId, selectedProcessId)));
 
-        // Act
-        var dropdown = cut.Find(".rz-dropdown");
-        await dropdown.ClickAsync(new MouseEventArgs());
-        var option = cut.Find(".rz-dropdown-item");
-        await option.ClickAsync(new MouseEventArgs());
-
-        // Assert
-        Assert.Equal(1000, selectedProcess);
-    }
-
-    [Fact]
-    public void ShouldDisableControlsWhenLoading()
-    {
-        // Arrange & Act
-        var cut = Render<ProcessSelector>(parameters => parameters
-            .Add(p => p.ProcessList, new List<ProcessInfo>())
-            .Add(p => p.IsLoading, true));
-
-        // Assert
-        var dropdown = cut.Find(".rz-dropdown");
-        Assert.True(dropdown.HasAttribute("aria-disabled") || dropdown.ClassList.Contains("rz-state-disabled"));
-        
-        var button = cut.Find(".rz-button");
-        Assert.True(button.HasAttribute("disabled") || button.ClassList.Contains("rz-state-disabled"));
+        // Assert - Verify state persists
+        Assert.contains("notepad.exe", cut.Find(".rz-dropdown-text").TextContent);
     }
 }

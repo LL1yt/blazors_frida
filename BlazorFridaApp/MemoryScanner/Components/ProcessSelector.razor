@@ -65,6 +65,17 @@
             SelectedProcessId,
             IsLoading,
             _renderCount);
+
+        // Ensure selection stays valid
+        if (SelectedProcessId.HasValue && ProcessList != null)
+        {
+            var processExists = ProcessList.Any(p => p.Id == SelectedProcessId.Value);
+            if (!processExists)
+            {
+                Logger.LogWarning("Selected process {ProcessId} no longer exists in the list", SelectedProcessId.Value);
+            }
+        }
+        
         base.OnParametersSet();
     }
 
@@ -108,9 +119,11 @@
                 Logger.LogWarning(
                     "Process selection attempted while component is loading. Previous: {PreviousId}, New: {NewId}",
                     previousId, SelectedProcessId);
+                return;
             }
 
             await OnProcessSelected.InvokeAsync();
+            StateHasChanged();
             
             _operationTimer.Stop();
             Logger.LogDebug(
@@ -158,7 +171,7 @@
             }
 
             await OnRefreshClick.InvokeAsync();
-            
+
             var newProcessCount = ProcessList?.Count ?? 0;
             _operationTimer.Stop();
             Logger.LogDebug(
@@ -218,6 +231,7 @@
                        Template="@((dynamic item) => ProcessTemplate((ProcessInfo)item))"
                        Placeholder="@(IsLoading ? "Loading processes..." : "Click Scan to load processes")"
                        Change="@(args => HandleProcessSelected())"
+                       LoadData="@(args => Task.CompletedTask)"
                        AllowClear="true"
                        AllowFiltering="true"
                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"

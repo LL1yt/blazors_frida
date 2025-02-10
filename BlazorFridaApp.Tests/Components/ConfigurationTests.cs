@@ -103,19 +103,21 @@ public class ConfigurationTests : BunitContext, IDisposable
     public void ShouldHandleDuplicateConfigurationNames()
     {
         // Arrange
-        var context = _dbContextFactory.CreateContext();
-        
         var config1 = new ScannerConfig { Name = "TestConfig" };
         var config2 = new ScannerConfig { Name = "TestConfig" };
 
         // Act & Assert
-        context.ScannerConfigs.Add(config1);
-        context.SaveChanges();
+        _dbContext.ScannerConfigs.Add(config1);
+        _dbContext.SaveChanges();
 
-        context.ScannerConfigs.Add(config2);
-        var exception = Assert.Throws<DbUpdateException>(() => context.SaveChanges());
+        _dbContext.ScannerConfigs.Add(config2);
+        var exception = Assert.Throws<DbUpdateException>(() => 
+        {
+            _dbContext.SaveChanges();
+        });
         
-        Assert.Contains("SQLite Error 19: UNIQUE constraint failed", exception.InnerException?.Message);
+        Assert.Contains("UNIQUE constraint failed: ScannerConfigs.Name", 
+            exception.InnerException?.Message);
     }
 
     [Fact]
