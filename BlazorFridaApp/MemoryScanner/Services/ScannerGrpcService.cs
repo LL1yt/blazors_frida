@@ -14,6 +14,7 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
 {
     private readonly ArrayPool<byte> _arrayPool;
     private readonly Dictionary<string, WeakReference<byte[]>> _resultCache;
+    private readonly Dictionary<int, string> _sessionIds;  // Track process ID to session ID mapping
     private readonly object _cacheLock = new();
     private const int MaxCacheSize = 100;
     private const ulong DefaultMemoryStart = 0x00010000;  // Start of typical process memory
@@ -26,6 +27,7 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
     {
         _arrayPool = ArrayPool<byte>.Shared;
         _resultCache = new Dictionary<string, WeakReference<byte[]>>();
+        _sessionIds = new Dictionary<int, string>();
     }
 
     public async Task<(bool success, string sessionId)> AttachToProcessAsync(ProcessInfo process)
@@ -40,6 +42,10 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
             };
 
             var response = await client.AttachToProcessAsync(request, CreateMetadata());
+            if (response.Success)
+            {
+                _sessionIds[process.Id] = response.SessionId;
+            }
             return (response.Success, response.SessionId);
         }
         catch (Exception ex)
@@ -49,15 +55,25 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
         }
     }
 
+    private string GetSessionId(int processId)
+    {
+        if (!_sessionIds.TryGetValue(processId, out var sessionId))
+        {
+            throw new InvalidOperationException($"Process {processId} is not attached. Call AttachToProcessAsync first.");
+        }
+        return sessionId;
+    }
+
     public async Task<IEnumerable<string>> ScanAsync(ProcessInfo process, string searchPattern, int scanType, ScanProfile profile)
     {
         try
         {
+            var sessionId = GetSessionId(process.Id);
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
             var request = new Proto.ScanRequest
             {
-                SessionId = process.Id.ToString(),
+                SessionId = sessionId,
                 Value = ByteString.CopyFromUtf8(searchPattern),
                 ScanType = scanType.ToString(),
                 ValueType = profile.ValueType.ToString(),
@@ -83,12 +99,13 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
                 throw new ArgumentException("Pattern and mask must have the same length");
             }
 
+            var sessionId = GetSessionId(processId);
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
             var patternWithMask = string.Join(" ", pattern.Select((b, i) => mask[i] == 'x' ? b.ToString("X2") : "??"));
             var request = new Proto.PatternScanRequest
             {
-                SessionId = processId.ToString(),
+                SessionId = sessionId,
                 Pattern = patternWithMask
             };
 
@@ -106,11 +123,12 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
     {
         try
         {
+            var sessionId = GetSessionId(processId);
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
             var request = new Proto.ScanRequest
             {
-                SessionId = processId.ToString(),
+                SessionId = sessionId,
                 Value = ByteString.CopyFrom(BitConverter.GetBytes(value)),
                 ValueType = valueType.ToString(),
                 ComparisonType = "exact",
@@ -138,11 +156,12 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
     {
         try
         {
+            var sessionId = GetSessionId(processId);
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
             var request = new Proto.ScanRequest
             {
-                SessionId = processId.ToString(),
+                SessionId = sessionId,
                 ValueType = valueType.ToString(),
                 ComparisonType = "all",
                 ScanType = "all"
