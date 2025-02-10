@@ -5,6 +5,16 @@
 @implements IDisposable
 
 @code {
+    [Parameter] public required List<ProcessInfo> ProcessList { get; set; }
+    [Parameter] public int? SelectedProcessId { get; set; }
+    [Parameter] public EventCallback OnProcessSelected { get; set; }
+    [Parameter] public EventCallback OnRefreshClick { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+
+    private readonly Stopwatch _lifecycleTimer = new();
+    private readonly Stopwatch _operationTimer = new();
+    private int _renderCount = 0;
+
     private void ValidateComponentState(string operation)
     {
         try
@@ -33,19 +43,9 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error validating component state during {Operation}", operation);
+            throw;
         }
     }
-}
-
-@*
-    IMPORTANT: Process scanning is only initiated by clicking the Scan button.
-    This component is designed to display processes after manual scan initiation,
-    not to automatically scan on page load or component initialization.
-*@
-<div>
-@code {
-    private readonly Stopwatch _lifecycleTimer = new();
-    private int _renderCount = 0;
 
     protected override void OnInitialized()
     {
@@ -90,52 +90,6 @@
         }
         base.OnAfterRender(firstRender);
     }
-
-    public void Dispose()
-    {
-        Logger.LogInformation(
-            "Disposing ProcessSelector component after {ElapsedMs}ms. Component ID: {ComponentId}, Final render count: {RenderCount}",
-            _lifecycleTimer.ElapsedMilliseconds,
-            GetHashCode(),
-            _renderCount);
-        _lifecycleTimer.Stop();
-    }
-}
-
-    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
-        <RadzenDropDown TValue="int?"
-                       @bind-Value="@SelectedProcessId"
-                       Data="@ProcessList"
-                       ValueProperty="Id"
-                       TextProperty="DisplayName"
-                       Placeholder="@(IsLoading ? "Loading processes..." : "Click Scan to load processes")"
-                       Change="@(args => HandleProcessSelected())"
-                       AllowClear="true"
-                       AllowFiltering="true"
-                       FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                       Style="width: 80%"
-                       Disabled="@IsLoading"/>
-        <RadzenButton Icon="@(IsLoading ? "hourglass_empty" : "refresh")"
-                     Click="@HandleRefreshClick"
-                     ButtonStyle="ButtonStyle.Primary"
-                     Title="@(IsLoading ? "Loading..." : "Scan for processes")"
-                     Text="@(IsLoading ? "Loading..." : "Process Scan")"
-                     Disabled="@IsLoading"/>
-    </RadzenStack>
-    @if (IsLoading)
-    {
-        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="mt-2"/>
-    }
-</div>
-
-@code {
-    [Parameter] public required List<ProcessInfo> ProcessList { get; set; }
-    [Parameter] public int? SelectedProcessId { get; set; }
-    [Parameter] public EventCallback OnProcessSelected { get; set; }
-    [Parameter] public EventCallback OnRefreshClick { get; set; }
-    [Parameter] public bool IsLoading { get; set; }
-
-    private readonly Stopwatch _operationTimer = new();
 
     private async Task HandleProcessSelected()
     {
@@ -229,7 +183,17 @@
         }
     }
 
-    private RenderFragment<ProcessInfo> ProcessTemplate => (process) => builder =>
+    public void Dispose()
+    {
+        Logger.LogInformation(
+            "Disposing ProcessSelector component after {ElapsedMs}ms. Component ID: {ComponentId}, Final render count: {RenderCount}",
+            _lifecycleTimer.ElapsedMilliseconds,
+            GetHashCode(),
+            _renderCount);
+        _lifecycleTimer.Stop();
+    }
+
+    private RenderFragment ProcessTemplate(ProcessInfo process) => builder =>
     {
         try
         {
@@ -243,3 +207,31 @@
         }
     };
 }
+
+<div>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween">
+        <RadzenDropDown TValue="int?"
+                       @bind-Value="@SelectedProcessId"
+                       Data="@ProcessList"
+                       ValueProperty="Id"
+                       TextProperty="Name"
+                       Template="@((dynamic item) => ProcessTemplate((ProcessInfo)item))"
+                       Placeholder="@(IsLoading ? "Loading processes..." : "Click Scan to load processes")"
+                       Change="@(args => HandleProcessSelected())"
+                       AllowClear="true"
+                       AllowFiltering="true"
+                       FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                       Style="width: 80%"
+                       Disabled="@IsLoading" />
+        <RadzenButton Icon="@(IsLoading ? "hourglass_empty" : "refresh")"
+                     Click="@HandleRefreshClick"
+                     ButtonStyle="ButtonStyle.Primary"
+                     Title="@(IsLoading ? "Loading..." : "Scan for processes")"
+                     Text="@(IsLoading ? "Loading..." : "Process Scan")"
+                     Disabled="@IsLoading" />
+    </RadzenStack>
+    @if (IsLoading)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" class="mt-2" />
+    }
+</div>

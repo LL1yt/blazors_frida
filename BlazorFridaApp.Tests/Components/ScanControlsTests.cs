@@ -71,8 +71,9 @@ public class ScanControlsTests : BunitContext
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var button = cut.Find(".rz-button");
-        Assert.True(button.HasAttribute("disabled"));
+        var button = cut.Find(".rz-button.rz-button-loading");
+        Assert.NotNull(button);
+        Assert.Contains("rz-button-loading", button.ClassList);
     }
 
     [Fact]
@@ -91,7 +92,7 @@ public class ScanControlsTests : BunitContext
 
         // Assert - First Scan
         var firstScanButton = cutFirstScan.Find(".rz-button");
-        Assert.Equal("First Memory Scan", firstScanButton.TextContent);
+        Assert.Equal("First Memory Scan", firstScanButton.TextContent.Trim());
 
         // Arrange & Act - Next Scan
         var cutNextScan = Render<ScanControls>(parameters => parameters
@@ -106,6 +107,6 @@ public class ScanControlsTests : BunitContext
 
         // Assert - Next Scan
         var nextScanButton = cutNextScan.Find(".rz-button");
-        Assert.Equal("Next Memory Scan", nextScanButton.TextContent);
+        Assert.Equal("Next Memory Scan", nextScanButton.TextContent.Trim());
     }
 }

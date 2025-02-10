@@ -7,6 +7,7 @@ using Moq;
 using Xunit;
 using System.Collections.Generic;
 using Radzen;
+using Radzen.Blazor;
 
 namespace BlazorFridaApp.Tests.Components;
 
@@ -52,7 +53,7 @@ public class ScanResultsGridTests : TestContextWrapper
             .Add(p => p.IsFrozen, (IntPtr addr) => false));
 
         // Assert
-        var rows = cut.FindAll(".rz-grid-table tr");
+        var rows = cut.FindAll(".rz-grid-table tbody tr");
         Assert.Equal(2, rows.Count);
     }
 
@@ -79,8 +80,9 @@ public class ScanResultsGridTests : TestContextWrapper
             })));
 
         // Act
-        var numericInput = cut.FindComponent<RadzenNumeric<int>>();
-        await numericInput.InvokeAsync(() => numericInput.Instance.Change.InvokeAsync(100));
+        var numericInput = cut.Find(".rz-numeric");
+        var changeEvent = new ChangeEventArgs { Value = "100" };
+        await cut.InvokeAsync(() => numericInput.Change(changeEvent));
 
         // Assert
         Assert.True(valueChanged);
