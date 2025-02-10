@@ -33,7 +33,7 @@ namespace BlazorFridaApp.Components.Pages
             try
             {
                 _logger.LogInformation("Refreshing process list");
-                var processes = await _processService.GetAccessibleProcessesAsync();
+                var processes = await _processService.GetProcessesAsync();
                 state.ProcessList = processes;
                 _logger.LogInformation("Process list refreshed successfully");
             }

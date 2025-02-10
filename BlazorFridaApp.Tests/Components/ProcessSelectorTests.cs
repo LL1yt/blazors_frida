@@ -17,6 +17,7 @@ namespace BlazorFridaApp.Tests.Components;
 public class ProcessSelectorTests : TestContextBase
 {
     private readonly Mock<IProcessService> _processServiceMock;
+    private int? _selectedProcessId;
 
     public ProcessSelectorTests()
     {
@@ -39,11 +40,10 @@ public class ProcessSelectorTests : TestContextBase
             new() { Id = 1000, Name = "notepad.exe" },
             new() { Id = 2000, Name = "test2.exe" }
         };
-        ProcessInfo? selectedProcess = null;
 
-        var cut = Render<ProcessSelector>(parameters => parameters
+        var cut = RenderComponent<ProcessSelector>(parameters => parameters
             .Add(p => p.ProcessList, processes)
-            .Add(p => p.OnProcessSelected, (ProcessInfo p) => HandleSelection(p))
+            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create<int?>(this, id => _selectedProcessId = id))
             .Add(p => p.OnRefreshClick, EventCallback.Factory.Create(this, () => Task.CompletedTask)));
 
         // Act & Assert initial state
@@ -54,7 +54,7 @@ public class ProcessSelectorTests : TestContextBase
         await cut.FindAll(".rz-dropdown-item")[0].ClickAsync(new MouseEventArgs());
 
         // Assert
-        Assert.Equal(1000, selectedProcess?.Id);
+        Assert.Equal(1000, _selectedProcessId);
         Assert.Contains("notepad.exe", cut.Find(".rz-dropdown-text").TextContent);
 
         // Act - Re-render with updated parameters
@@ -63,11 +63,13 @@ public class ProcessSelectorTests : TestContextBase
             new() { Id = 3000, Name = "test3.exe" },
             new() { Id = 4000, Name = "test4.exe" }
         };
-        await cut.SetParametersAsync(parameters => parameters
-            .Add(p => p.ProcessList, newProcesses));
-        cut.Render();
+        
+        cut = RenderComponent<ProcessSelector>(parameters => parameters
+            .Add(p => p.ProcessList, newProcesses)
+            .Add(p => p.OnProcessSelected, EventCallback.Factory.Create<int?>(this, id => _selectedProcessId = id))
+            .Add(p => p.OnRefreshClick, EventCallback.Factory.Create(this, () => Task.CompletedTask)));
 
-        // Assert - Verify state persists
+        // Assert - Verify state is reset
         Assert.Empty(cut.Find(".rz-dropdown-text").TextContent);
 
         // Act - Select process
@@ -75,12 +77,7 @@ public class ProcessSelectorTests : TestContextBase
         await cut.FindAll(".rz-dropdown-item")[0].ClickAsync(new MouseEventArgs());
 
         // Assert
-        Assert.Equal(3000, selectedProcess?.Id);
+        Assert.Equal(3000, _selectedProcessId);
         Assert.Contains("test3.exe", cut.Find(".rz-dropdown-text").TextContent);
-    }
-
-    private void HandleSelection(ProcessInfo process)
-    {
-        selectedProcess = process;
     }
 }

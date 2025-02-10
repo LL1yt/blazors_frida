@@ -3,6 +3,10 @@ using BlazorFridaApp.MemoryScanner.Services.Base;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Grpc.Core;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System;
 
 namespace BlazorFridaApp.MemoryScanner.Services;
 
@@ -19,14 +23,26 @@ public class ProcessGrpcService : BaseGrpcService, IProcessGrpcService, IProcess
     {
     }
 
-    public async Task<List<ProcessInfo>> GetAccessibleProcessesAsync()
+    // IProcessGrpcService implementation
+    async Task<List<ProcessInfo>> IProcessGrpcService.GetAccessibleProcessesAsync()
+    {
+        return await GetProcessesAsync(CancellationToken.None);
+    }
+
+    async Task<ProcessInfo> IProcessGrpcService.GetTargetProcessAsync()
+    {
+        return await GetTargetProcessAsync(CancellationToken.None);
+    }
+
+    // IProcessService implementation
+    public async Task<List<ProcessInfo>> GetProcessesAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
             var request = new Proto.Empty();
-            var response = await client.ListProcessesAsync(request, CreateMetadata());
+            var response = await client.ListProcessesAsync(request, CreateMetadata(), cancellationToken: cancellationToken);
             
             return response.Processes.Select(p => new ProcessInfo
             {
@@ -54,7 +70,7 @@ public class ProcessGrpcService : BaseGrpcService, IProcessGrpcService, IProcess
                     var channel = await GetChannelAsync();
                     var client = CreateClient(channel);
                     var request = new Proto.Empty();
-                    var response = await client.ListProcessesAsync(request, CreateMetadata());
+                    var response = await client.ListProcessesAsync(request, CreateMetadata(), cancellationToken: cancellationToken);
                     
                     return response.Processes.Select(p => new ProcessInfo
                     {
@@ -79,9 +95,14 @@ public class ProcessGrpcService : BaseGrpcService, IProcessGrpcService, IProcess
         }
     }
 
-    public async Task<ProcessInfo> GetTargetProcessAsync()
+    public async Task<List<ProcessInfo>> RefreshProcessesAsync(CancellationToken cancellationToken = default)
     {
-        var processes = await GetAccessibleProcessesAsync();
+        return await GetProcessesAsync(cancellationToken);
+    }
+
+    public async Task<ProcessInfo> GetTargetProcessAsync(CancellationToken cancellationToken = default)
+    {
+        var processes = await GetProcessesAsync(cancellationToken);
         return processes.FirstOrDefault() ?? throw new InvalidOperationException("No accessible processes found");
     }
 
@@ -132,4 +153,6 @@ public class ProcessGrpcService : BaseGrpcService, IProcessGrpcService, IProcess
             throw;
         }
     }
+
+    // ... rest of the existing methods ...
 }

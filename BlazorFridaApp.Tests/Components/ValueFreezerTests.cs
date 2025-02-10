@@ -36,16 +36,21 @@ public class ValueFreezerTests : TestContextBase, IAsyncLifetime
 
     public Task InitializeAsync() => Task.CompletedTask;
 
-    public new async Task DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
+    }
+
+    async Task IAsyncLifetime.DisposeAsync()
+    {
+        await DisposeAsync();
     }
 
     [Fact]
     public void ShouldRenderWithoutErrors()
     {
         // Act
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
@@ -120,7 +125,7 @@ public class ValueFreezerTests : TestContextBase, IAsyncLifetime
         _freezerServiceMock.Setup(x => x.UnfreezeValue(address))
             .Returns(Task.CompletedTask);
 
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
@@ -138,7 +143,7 @@ public class ValueFreezerTests : TestContextBase, IAsyncLifetime
         _freezerServiceMock.Setup(x => x.UnfreezeValue(address))
             .ThrowsAsync(new Exception("Test error"));
 
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Act
@@ -163,7 +168,7 @@ public class ValueFreezerTests : TestContextBase, IAsyncLifetime
         _freezerServiceMock.Setup(x => x.FreezeValue(address, bytes, "Int32"))
             .Returns(Task.CompletedTask);
 
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.OnFreezeStateChanged, EventCallback.Factory.Create<(IntPtr, bool)>(this, state =>
             {
@@ -184,7 +189,7 @@ public class ValueFreezerTests : TestContextBase, IAsyncLifetime
     public void ShouldRenderFreezeControls()
     {
         // Arrange & Act
-        var cut = Render<ValueFreezer>(parameters => parameters
+        var cut = RenderComponent<ValueFreezer>(parameters => parameters
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert

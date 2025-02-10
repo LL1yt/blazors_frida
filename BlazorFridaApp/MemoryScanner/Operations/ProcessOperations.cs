@@ -21,7 +21,7 @@ namespace BlazorFridaApp.MemoryScanner.Operations
 
         public async Task<List<ProcessInfo>> GetProcessListAsync()
         {
-            return await _processService.GetAccessibleProcessesAsync();
+            return await _processService.GetProcessesAsync();
         }
 
         public async Task SaveLastProcess(int processId)

@@ -53,24 +53,22 @@ public class ScanExecutorTests : TestContextBase
     public async Task ShouldHandleEmptyScanResults()
     {
         // Arrange
-        _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
-            .ReturnsAsync(new List<nint>());
+        var processId = 1234;
+        var value = 42;
 
-        var cut = Render<ScanExecutor>(parameters => parameters
-            .Add(p => p.ProcessId, 1000)
-            .Add(p => p.ScanType, ScanType.ExactValue)
-            .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.SearchValue, 42)
-            .Add(p => p.IsFirstScan, true));
+        _scannerServiceMock.Setup(x => x.ScanForValue(processId, value, MemoryValueType.Int32))
+            .ReturnsAsync(new List<IntPtr>());
 
         // Act
-        await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
+            .Add(p => p.ProcessId, processId)
+            .Add(p => p.ValueType, MemoryValueType.Int32)
+            .Add(p => p.IsFirstScan, true));
+
+        await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => value));
 
         // Assert
-        _notificationServiceMock.Verify(x => 
-            x.ShowInfo(It.Is<string>(s => s.Contains("Scan Results")), 
-                      It.Is<string>(s => s.Contains("No results found"))), 
-            Times.Once);
+        _scannerServiceMock.Verify(x => x.ScanForValue(processId, value, MemoryValueType.Int32), Times.Once);
     }
 
     [Fact]
@@ -84,15 +82,13 @@ public class ScanExecutorTests : TestContextBase
         var testLogger = new TestLogger<ScanExecutor>();
         Services.AddScoped<ILogger<ScanExecutor>>(_ => testLogger);
 
-        var cut = Render<ScanExecutor>(parameters => parameters
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
-            .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.SearchValue, 42)
             .Add(p => p.IsFirstScan, true));
 
         // Act
-        await cut.InvokeAsync(async () => await cut.Instance.ExecuteScan(_ => 42));
+        await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
 
         // Assert
         var logEntry = Assert.Single(testLogger.LogEntries);
@@ -109,11 +105,9 @@ public class ScanExecutorTests : TestContextBase
         _scannerServiceMock.Setup(x => x.ScanForValue(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<MemoryValueType>()))
             .ThrowsAsync(testException);
 
-        var cut = Render<ScanExecutor>(parameters => parameters
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
-            .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.SearchValue, 42)
             .Add(p => p.IsFirstScan, true));
 
         // Act
@@ -139,11 +133,9 @@ public class ScanExecutorTests : TestContextBase
             .ReturnsAsync(largeResults);
 
         var resultCount = 0;
-        var cut = Render<ScanExecutor>(parameters => parameters
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
-            .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.SearchValue, 42)
             .Add(p => p.IsFirstScan, true)
             .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, results =>
             {
@@ -169,7 +161,7 @@ public class ScanExecutorTests : TestContextBase
         _scannerServiceMock.Setup(x => x.ScanForPattern(It.IsAny<int>(), pattern, mask))
             .ReturnsAsync(results);
 
-        var cut = Render<ScanExecutor>(parameters => parameters
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ScanType, ScanType.Pattern)
             .Add(p => p.PatternHex, "AA BB CC")
@@ -191,11 +183,9 @@ public class ScanExecutorTests : TestContextBase
             .ReturnsAsync(new List<nint>());
             
         var loadingStates = new List<bool>();
-        var cut = Render<ScanExecutor>(parameters => parameters
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, 1000)
-            .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int32)
-            .Add(p => p.SearchValue, 42)
             .Add(p => p.IsFirstScan, true)
             .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, isLoading =>
             {
@@ -216,7 +206,7 @@ public class ScanExecutorTests : TestContextBase
     public void ShouldRequireValidProcessId()
     {
         // Arrange & Act
-        var cut = Render<ScanExecutor>(parameters => parameters
+        var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, null)
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int32));

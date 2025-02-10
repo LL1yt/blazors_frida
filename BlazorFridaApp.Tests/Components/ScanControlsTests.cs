@@ -33,7 +33,7 @@ public class ScanControlsTests : TestContextBase
         var scanTypes = new[] { ScanType.ExactValue, ScanType.Pattern };
 
         // Act
-        var cut = Render<ScanControls>(parameters => parameters
+        var cut = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, scanTypes)
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.ScanType, ScanType.ExactValue)
@@ -51,7 +51,7 @@ public class ScanControlsTests : TestContextBase
         var scanTypes = new[] { ScanType.Pattern };
         
         // Act
-        var cut = Render<ScanControls>(parameters => parameters
+        var cut = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, scanTypes)
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.ScanType, ScanType.Pattern)
@@ -70,7 +70,7 @@ public class ScanControlsTests : TestContextBase
     public void ShouldDisableScanButtonWhenLoading()
     {
         // Arrange & Act
-        var cut = Render<ScanControls>(parameters => parameters
+        var cut = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.IsLoading, true)
@@ -90,7 +90,7 @@ public class ScanControlsTests : TestContextBase
     public void ShouldShowCorrectButtonTextForFirstAndNextScans()
     {
         // Arrange & Act - First Scan
-        var cutFirstScan = Render<ScanControls>(parameters => parameters
+        var cutFirstScan = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.IsFirstScan, true)
@@ -106,7 +106,7 @@ public class ScanControlsTests : TestContextBase
         Assert.Equal("First Memory Scan", firstScanText.Trim());
 
         // Arrange & Act - Next Scan
-        var cutNextScan = Render<ScanControls>(parameters => parameters
+        var cutNextScan = RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanTypes, new[] { ScanType.ExactValue })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.IsFirstScan, false)

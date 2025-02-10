@@ -1,19 +1,41 @@
 @using Radzen
 @using Radzen.Blazor
 @using BlazorFridaApp.MemoryScanner.Models
+@using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @inject ILogger<ProcessSelector> Logger
-@implements IDisposable
+@inject IProcessService ProcessService
+@implements IAsyncDisposable
 
 @code {
-    [Parameter] public required List<ProcessInfo> ProcessList { get; set; }
+    [Parameter] public List<ProcessInfo> ProcessList { get; set; } = new();
     [Parameter] public int? SelectedProcessId { get; set; }
-    [Parameter] public EventCallback OnProcessSelected { get; set; }
+    [Parameter] public EventCallback<int?> OnProcessSelected { get; set; }
     [Parameter] public EventCallback OnRefreshClick { get; set; }
+    [Parameter] public bool ShowRefreshButton { get; set; } = true;
     [Parameter] public bool IsLoading { get; set; }
 
+    private readonly CancellationTokenSource _cts = new();
     private readonly Stopwatch _lifecycleTimer = new();
     private readonly Stopwatch _operationTimer = new();
     private int _renderCount = 0;
+
+    public async Task InitializeAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            ProcessList = await ProcessService.GetProcessesAsync(_cts.Token);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to initialize process list");
+            throw;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
 
     private void ValidateComponentState(string operation)
     {
@@ -122,7 +144,7 @@
                 return;
             }
 
-            await OnProcessSelected.InvokeAsync();
+            await OnProcessSelected.InvokeAsync(SelectedProcessId);
             StateHasChanged();
             
             _operationTimer.Stop();
@@ -170,6 +192,8 @@
                 return;
             }
 
+            IsLoading = true;
+            ProcessList = await ProcessService.RefreshProcessesAsync(_cts.Token);
             await OnRefreshClick.InvokeAsync();
 
             var newProcessCount = ProcessList?.Count ?? 0;
@@ -194,9 +218,14 @@
                 IsLoading);
             throw;
         }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Logger.LogInformation(
             "Disposing ProcessSelector component after {ElapsedMs}ms. Component ID: {ComponentId}, Final render count: {RenderCount}",
@@ -204,6 +233,8 @@
             GetHashCode(),
             _renderCount);
         _lifecycleTimer.Stop();
+        _cts.Cancel();
+        await ValueTask.CompletedTask;
     }
 
     private RenderFragment ProcessTemplate(ProcessInfo process) => builder =>
@@ -237,12 +268,15 @@
                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                        Style="width: 80%"
                        Disabled="@IsLoading" />
-        <RadzenButton Icon="@(IsLoading ? "hourglass_empty" : "refresh")"
-                     Click="@HandleRefreshClick"
-                     ButtonStyle="ButtonStyle.Primary"
-                     Title="@(IsLoading ? "Loading..." : "Scan for processes")"
-                     Text="@(IsLoading ? "Loading..." : "Process Scan")"
-                     Disabled="@IsLoading" />
+        @if (ShowRefreshButton)
+        {
+            <RadzenButton Icon="@(IsLoading ? "hourglass_empty" : "refresh")"
+                         Click="@HandleRefreshClick"
+                         ButtonStyle="ButtonStyle.Primary"
+                         Title="@(IsLoading ? "Loading..." : "Scan for processes")"
+                         Text="@(IsLoading ? "Loading..." : "Process Scan")"
+                         Disabled="@IsLoading" />
+        }
     </RadzenStack>
     @if (IsLoading)
     {
