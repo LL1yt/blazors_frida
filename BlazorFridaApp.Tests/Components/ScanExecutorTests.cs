@@ -67,6 +67,9 @@ public class ScanExecutorTests : TestContextBase
         _scannerServiceMock.Setup(x => x.ScanForValue(processId, value, MemoryValueType.Int32))
             .ReturnsAsync(new List<IntPtr>());
 
+        _processMemoryScannerMock.Setup(x => x.ScanForValue(processId, value, MemoryValueType.Int32))
+            .ReturnsAsync(new List<IntPtr>());
+
         // Act
         var cut = RenderComponent<ScanExecutor>(parameters => parameters
             .Add(p => p.ProcessId, processId)
@@ -156,11 +159,13 @@ public class ScanExecutorTests : TestContextBase
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.IsFirstScan, true)
+            .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, results =>
             {
                 resultCount = results.Count;
                 return Task.CompletedTask;
-            })));
+            }))
+            .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, _ => Task.CompletedTask)));
 
         // Act
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
@@ -185,7 +190,9 @@ public class ScanExecutorTests : TestContextBase
             .Add(p => p.ScanType, ScanType.Pattern)
             .Add(p => p.PatternHex, "AA BB CC")
             .Add(p => p.Mask, mask)
-            .Add(p => p.IsFirstScan, true));
+            .Add(p => p.IsFirstScan, true)
+            .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, _ => Task.CompletedTask))
+            .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, _ => Task.CompletedTask)));
 
         // Act
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 0));
@@ -206,11 +213,13 @@ public class ScanExecutorTests : TestContextBase
             .Add(p => p.ProcessId, 1000)
             .Add(p => p.ValueType, MemoryValueType.Int32)
             .Add(p => p.IsFirstScan, true)
+            .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.OnLoadingChanged, EventCallback.Factory.Create<bool>(this, isLoading =>
             {
                 loadingStates.Add(isLoading);
                 return Task.CompletedTask;
-            })));
+            }))
+            .Add(p => p.OnScanComplete, EventCallback.Factory.Create<List<IntPtr>>(this, _ => Task.CompletedTask)));
 
         // Act
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));

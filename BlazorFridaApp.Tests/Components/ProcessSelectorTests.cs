@@ -57,6 +57,9 @@ public class ProcessSelectorTests : TestContextBase
         cut.WaitForState(() => !cut.Instance.IsLoading);
         cut.WaitForState(() => cut.Instance.ProcessList.Count == _defaultProcesses.Count);
 
+        // Ensure component has re-rendered with the updated process list
+        await cut.InvokeAsync(() => Task.Delay(100)); // Give time for the UI to update
+        
         // Assert
         _processServiceMock.Verify(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
         var selectItems = cut.FindComponents<SelectItem<int?>>();
