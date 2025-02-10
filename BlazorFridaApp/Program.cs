@@ -67,7 +67,8 @@ try
         .AddBlazoriseLoadingIndicator()
         .AddBlazoriseTreeView()
         .AddBlazoriseSnackbar()
-        .AddBlazoriseDataGrid();
+        .AddBlazoriseDataGrid()
+        .AddBlazoriseButtons();
 
     // Add assets service
     builder.Services.AddScoped<AssetsService>();

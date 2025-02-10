@@ -82,7 +82,7 @@
         <Button Color="Color.Primary"
                 Disabled="@(!CanScan || IsLoading || !IsValid)"
                 Clicked="@OnScanClick">
-            <Icon Name="@(IsLoading ? FontAwesomeIcons.Refresh : FontAwesomeIcons.Search)" />
+            <Blazorise.Icon Name="@(IsLoading ? FontAwesomeIcons.Refresh : FontAwesomeIcons.Search)" />
             First Memory Scan
         </Button>
     }
@@ -91,7 +91,7 @@
         <Button Color="Color.Secondary"
                 Disabled="@(!CanScan || IsLoading || !IsValid)"
                 Clicked="@OnScanClick">
-            <Icon Name="@(IsLoading ? FontAwesomeIcons.Refresh : FontAwesomeIcons.Search)" />
+            <Blazorise.Icon Name="@(IsLoading ? FontAwesomeIcons.Refresh : FontAwesomeIcons.Search)" />
             Next Scan
         </Button>
     }

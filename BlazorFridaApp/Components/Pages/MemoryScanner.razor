@@ -1,8 +1,12 @@
 @page "/memory-scanner"
 @using BlazorFridaApp.MemoryScanner.Components
+@using BlazorFridaApp.MemoryScanner.Models
+@using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @using Blazorise
+@using Blazorise.Components.Buttons
 @inherits MemoryScannerComponentBase
 
+@inject IScanProfileService ProfileService
 @inject DialogService DialogService
 
 <div class="memory-scanner-container">
@@ -10,16 +14,16 @@
         <CardBody>
             <div class="d-flex justify-content-between align-items-center">
                 <Heading Size="HeadingSize.Is2">Memory Scanner</Heading>
-                <ButtonGroup>
+                <Addons>
                     <Button Color="Color.Secondary" Clicked="@HandleSaveConfigClick">
-                        <Icon Name="FontAwesomeIcons.Save" />
+                        <Blazorise.Icon Name="@FontAwesomeIcons.Save" />
                         Save Config
                     </Button>
                     <Button Color="Color.Secondary" Clicked="@HandleLoadConfigClick">
-                        <Icon Name="FontAwesomeIcons.FolderOpen" />
+                        <Blazorise.Icon Name="@FontAwesomeIcons.FolderOpen" />
                         Load Config
                     </Button>
-                </ButtonGroup>
+                </Addons>
             </div>
         </CardBody>
     </Card>
@@ -172,17 +176,19 @@
 </style>
 
 @code {
-    private Modal _saveConfigModal;
-    private Modal _loadConfigModal;
+    private Modal? _saveConfigModal;
+    private Modal? _loadConfigModal;
     
     private async Task HandleSaveConfigClick()
     {
-        await _saveConfigModal.Show();
+        if (_saveConfigModal is not null)
+            await _saveConfigModal.Show();
     }
 
     private async Task HandleLoadConfigClick()
     {
-        await _loadConfigModal.Show();
+        if (_loadConfigModal is not null)
+            await _loadConfigModal.Show();
     }
 
     private async Task HandleConfigSaved(string configName)
@@ -192,10 +198,17 @@
 
         try 
         {
-            var config = _state.ToConfig();
+            var config = new ScannerConfig 
+            {
+                Name = configName,
+                ValueType = _state.SelectedValueType,
+                ScanType = _state.SelectedScanType.ToString()
+            };
+            
             await ProfileService.SaveScannerConfig(configName, config);
-            await _saveConfigModal.Hide();
-            _state.SavedConfigs[configName] = config;
+            if (_saveConfigModal is not null)
+                await _saveConfigModal.Hide();
+                
             await NotificationService.ShowSuccess("Configuration saved", $"Configuration '{configName}' saved successfully");
         }
         catch (Exception ex)
@@ -212,7 +225,8 @@
         try
         {
             _state.LoadConfig(config);
-            await _loadConfigModal.Hide();
+            if (_loadConfigModal is not null)
+                await _loadConfigModal.Hide();
             await NotificationService.ShowSuccess("Configuration loaded", "Configuration loaded successfully");
         }
         catch (Exception ex)

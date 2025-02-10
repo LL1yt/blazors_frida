@@ -36,7 +36,7 @@
             <Button Color="Color.Primary"
                     Disabled="@(IsFrozen(context))"
                     Clicked="@(() => OnFreezeToggle.InvokeAsync(context))">
-                <Icon Name="FontAwesomeIcons.Lock" />
+                <Blazorise.Icon Name="@FontAwesomeIcons.Lock" />
             </Button>
         </DisplayTemplate>
     </DataGridColumn>

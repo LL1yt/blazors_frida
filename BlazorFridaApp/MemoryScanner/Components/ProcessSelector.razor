@@ -27,7 +27,7 @@
                 <Button Color="Color.Primary" 
                         Disabled="@IsLoading"
                         Clicked="@HandleRefreshClick">
-                    <Icon Name="@(IsLoading ? "fas fa-hourglass-half" : "fas fa-sync")" />
+                    <Blazorise.Icon Name="@(IsLoading ? "fas fa-hourglass-half" : "fas fa-sync")" />
                     @(IsLoading ? "Loading..." : "Process Scan")
                 </Button>
             </Column>
