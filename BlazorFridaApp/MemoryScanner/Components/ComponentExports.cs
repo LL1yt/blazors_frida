@@ -1,13 +1,14 @@
 using Microsoft.AspNetCore.Components;
 using Blazorise;
 using BlazorFridaApp.MemoryScanner.Base;
+using BlazorFridaApp.Services;
 
 namespace BlazorFridaApp.MemoryScanner.Components
 {
     public abstract class MemoryScannerComponentBase : ComponentBase
     {
         [Inject] protected ILogger<MemoryScannerComponentBase> Logger { get; set; } = null!;
-        [Inject] protected INotificationService NotificationService { get; set; } = null!;
+        [Inject] protected BlazorFridaApp.Services.INotificationService NotificationService { get; set; } = null!;
         [Inject] protected IProcessMemoryScanner Scanner { get; set; } = null!;
 
         protected virtual void OnInitializedBase()

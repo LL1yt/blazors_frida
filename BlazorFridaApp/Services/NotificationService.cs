@@ -5,35 +5,35 @@ namespace BlazorFridaApp.Services;
 
 public class NotificationService : INotificationService
 {
-    private readonly INotificationService _notificationService;
+    private readonly NotificationService<string> _notificationService;
 
-    public NotificationService(INotificationService notificationService)
+    public NotificationService(NotificationService<string> notificationService)
     {
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
     }
 
-    public async Task<bool> Confirm(string message, string? title = null)
+    public void ShowInfo(string title, string message)
     {
-        return await _notificationService.Confirm(message, title ?? "Confirm");
+        _notificationService.Info(title, message);
     }
 
-    public Task ShowError(string message, string? title = null)
+    public void ShowWarning(string title, string message)
     {
-        return _notificationService.Error(message, title ?? "Error");
+        _notificationService.Warning(title, message);
     }
 
-    public Task ShowInfo(string message, string? title = null)
+    public void ShowError(string title, string message, Exception? exception = null)
     {
-        return _notificationService.Info(message, title ?? "Information");
+        _notificationService.Error(title, message);
     }
 
-    public Task ShowSuccess(string message, string? title = null)
+    public void ShowSuccess(string title, string message)
     {
-        return _notificationService.Success(message, title ?? "Success");
+        _notificationService.Success(title, message);
     }
 
-    public Task ShowWarning(string message, string? title = null)
+    public Task<bool> Confirm(string message, string title)
     {
-        return _notificationService.Warning(message, title ?? "Warning");
+        return Task.FromResult(true); // Temporary implementation until we add proper dialog service
     }
 }

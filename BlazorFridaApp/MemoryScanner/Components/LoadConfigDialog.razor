@@ -1,5 +1,7 @@
 @using Blazorise
 @using Blazorise.DataGrid
+@using Blazorise.Components
+@using Blazorise.Icons.FontAwesome
 @using BlazorFridaApp.Components.Pages
 @using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @using BlazorFridaApp.MemoryScanner.Models
@@ -9,7 +11,7 @@
               Data="@Configs"
               Filterable
               Sortable
-              RowClicked="@(args => selectedConfig = args)"
+              RowClicked="@(args => selectedConfig = args.Item)"
               Margin="Margin.Is3.FromBottom">
         <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
                        Field="Key"
@@ -53,7 +55,7 @@
     [Parameter] public EventCallback OnCanceled { get; set; }
     
     [Inject] public required IScanProfileService ProfileService { get; set; }
-    [Inject] public required INotificationService NotificationService { get; set; }
+    [Inject] public required BlazorFridaApp.Services.INotificationService NotificationService { get; set; }
 
     private KeyValuePair<string, Models.ScannerConfig>? selectedConfig;
 

@@ -14,7 +14,7 @@ namespace BlazorFridaApp.Components.Pages
     public partial class MemoryScanner : MemoryScannerComponentBase
     {
         [Inject] protected new MemoryScannerService ScannerService { get; set; } = default!;
-        [Inject] protected new INotificationService NotificationService { get; set; } = default!;
+        [Inject] protected new BlazorFridaApp.Services.INotificationService NotificationService { get; set; } = default!;
         [Inject] protected IMemoryCleanupService CleanupService { get; set; } = default!;
 
         private readonly Stopwatch _componentLifetimeStopwatch = new();
@@ -128,13 +128,13 @@ namespace BlazorFridaApp.Components.Pages
             }
         }
 
-        public override void OnValueTypeChanged(MemoryValueType newType)
+        public override async void OnValueTypeChanged(MemoryValueType newType)
         {
             try
             {
                 Logger.LogInformation("Value type changing from {OldType} to {NewType}",
                     _state.SelectedValueType, newType);
-                ScannerService.OnValueTypeChanged(_state, newType);
+                await ScannerService.OnValueTypeChanged(_state, newType);
                 Logger.LogDebug("Value type changed successfully");
                 StateHasChanged();
             }
