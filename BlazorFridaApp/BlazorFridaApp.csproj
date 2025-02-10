@@ -91,4 +91,10 @@
       <_Parameter1>BlazorFridaApp.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
+  <!-- Razor Components -->
+  <ItemGroup>
+    <Content Include="**\*.razor" Exclude="obj\**\*.razor" />
+    <None Remove="**\_Imports.razor" />
+    <Content Include="**\_Imports.razor" />
+  </ItemGroup>
 </Project>

@@ -1,96 +1,100 @@
+@inherits MemoryScannerComponentBase
 @using BlazorFridaApp.MemoryScanner.Models
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Forms
+@using System.ComponentModel
 @using Radzen
 @using Radzen.Blazor
-@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.RenderTree
 
-<RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-    <ErrorBoundary>
-        <ChildContent>
-            <RadzenDropDown TValue="ScanType"
-                          @bind-Value="@ScanType"
-                          Data="@ScanTypes"
-                          AllowClear="true"
-                          Style="width: 200px"
-                          Change="@(args => OnScanTypeChanged.InvokeAsync((ScanType)args))"
-                          Placeholder="Scan type"/>
-        </ChildContent>
-        <ErrorContent>
-            @{
-                var error = context as Exception;
-                <div class="alert alert-danger">@error?.Message</div>
-            }
-        </ErrorContent>
-    </ErrorBoundary>
-    
-    <ErrorBoundary>
-        <ChildContent>
-            <RadzenDropDown TValue="MemoryValueType"
-                          @bind-Value="@ValueType"
-                          Data="@ValueTypes"
-                          Style="width: 200px"
-                          AllowClear="true"
-                          Change="@(args => OnValueTypeChanged.InvokeAsync((MemoryValueType)args))"
-                          Placeholder="Value type"/>
-        </ChildContent>
-        <ErrorContent>
-            @{
-                var error = context as Exception;
-                <div class="alert alert-danger">@error?.Message</div>
-            }
-        </ErrorContent>
-    </ErrorBoundary>
-</RadzenStack>
+<div>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+        <ErrorBoundary>
+            <ChildContent>
+                <RadzenDropDown TValue="ScanType"
+                              @bind-Value="@ScanType"
+                              Data="@ScanTypes"
+                              AllowClear="true"
+                              Style="width: 200px"
+                              Change="@(args => HandleScanTypeChanged(args))"
+                              Placeholder="Scan type"/>
+            </ChildContent>
+            <ErrorContent Context="errorContext">
+                <div class="alert alert-danger">@(errorContext?.Message ?? "An error occurred")</div>
+            </ErrorContent>
+        </ErrorBoundary>
+        
+        <ErrorBoundary>
+            <ChildContent>
+                <RadzenDropDown TValue="MemoryValueType"
+                              @bind-Value="@ValueType"
+                              Data="@ValueTypes"
+                              Style="width: 200px"
+                              AllowClear="true"
+                              Change="@(args => HandleValueTypeChanged(args))"
+                              Placeholder="Value type"/>
+            </ChildContent>
+            <ErrorContent Context="errorContext">
+                <div class="alert alert-danger">@(errorContext?.Message ?? "An error occurred")</div>
+            </ErrorContent>
+        </ErrorBoundary>
+    </RadzenStack>
 
-@if (ScanType == ScanType.Pattern)
-{
-    <div class="pattern-inputs">
-        <RadzenTextArea @bind-Value="@PatternHex"
-                       Placeholder="Pattern (hex, space-separated)"
-                       Change="@ValidatePattern"
-                       Rows="2"/>
-                   
-        <RadzenTextArea @bind-Value="@Mask"
-                       Placeholder="Mask (x - match, ? - wildcard)"
-                       Change="@ValidateMask"
-                       Rows="2"/>
-
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <div class="alert alert-danger mt-2">@_errorMessage</div>
-        }
-    </div>
-}
-else
-{
-    <RadzenNumeric Value="@SearchValue"
-                   ValueChanged="@(async (int val) => await SearchValueChanged.InvokeAsync(val))"
-                   Placeholder="Search value"
-                   Style="width: 100%"/>
-                  
-    @if (ScanType == ScanType.UnknownInitialValue)
+    @if (ScanType == ScanType.Pattern)
     {
-        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0">
-            Perform first scan to initialize, then change value in game and perform next scan
-        </RadzenText>
+        <div class="pattern-inputs">
+            <RadzenTextArea @bind-Value="@PatternHex"
+                           Placeholder="Pattern (hex, space-separated)"
+                           Change="@((string value) => ValidatePattern(value))"
+                           Rows="2"/>
+                       
+            <RadzenTextArea @bind-Value="@Mask"
+                           Placeholder="Mask (x - match, ? - wildcard)"
+                           Change="@((string value) => ValidateMask(value))"
+                           Rows="2"/>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger mt-2">@_errorMessage</div>
+            }
+        </div>
     }
-}
+    else
+    {
+        <RadzenNumeric TValue="int" 
+                      Value="@SearchValue"
+                      ValueChanged="@(async (int val) => await SearchValueChanged.InvokeAsync(val))"
+                      Placeholder="Search value"
+                      Style="width: 100%"/>
+                      
+        @if (ScanType == ScanType.UnknownInitialValue)
+        {
+            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0">
+                Perform first scan to initialize, then change value in game and perform next scan
+            </RadzenText>
+        }
+    }
 
-<RadzenButton Text="@(IsFirstScan ? "First Memory Scan" : "Next Memory Scan")"
-             Click="@OnScanClick"
-             Disabled="@(!CanScan || IsLoading || !IsValid)"
-             ButtonStyle="ButtonStyle.Primary"
-             Icon="@(IsLoading ? "refresh" : "search")"
-             class="@(IsLoading ? "rz-button-loading" : "")"
-             Style="min-width: 150px"/>
+    <RadzenButton Text="@buttonText"
+                 Title="@buttonText"
+                 Click="@OnScanClick"
+                 Disabled="@(!CanScan || IsLoading || !IsValid)"
+                 ButtonStyle="ButtonStyle.Primary"
+                 Icon="@(IsLoading ? "refresh" : "search")"
+                 class="@(IsLoading ? "rz-button-loading" : "")"
+                 Style="min-width: 150px"/>
 
-@if (IsLoading)
-{
-    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
-}
+    @if (IsLoading)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+</div>
 
 @code {
     private string? _errorMessage;
     private bool IsValid => string.IsNullOrEmpty(_errorMessage);
+    private string buttonText => IsFirstScan ? "First Memory Scan" : "Next Memory Scan";
 
     [Parameter] public ScanType ScanType { get; set; }
     [Parameter] public MemoryValueType ValueType { get; set; }
@@ -106,6 +110,22 @@ else
     [Parameter] public EventCallback<ScanType> OnScanTypeChanged { get; set; }
     [Parameter] public EventCallback<MemoryValueType> OnValueTypeChanged { get; set; }
     [Parameter] public EventCallback OnScanClick { get; set; }
+
+    private async Task HandleScanTypeChanged(object value)
+    {
+        if (value is ScanType scanType)
+        {
+            await OnScanTypeChanged.InvokeAsync(scanType);
+        }
+    }
+
+    private async Task HandleValueTypeChanged(object value)
+    {
+        if (value is MemoryValueType valueType)
+        {
+            await OnValueTypeChanged.InvokeAsync(valueType);
+        }
+    }
 
     private void ValidatePattern(string value)
     {

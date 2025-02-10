@@ -1,4 +1,7 @@
 @inherits MemoryScannerComponentBase
+@using Radzen
+@using Radzen.Blazor
+@using Microsoft.AspNetCore.Components.Web
 
 @inject IMemoryScannerService MemoryScanner
 
@@ -68,197 +71,31 @@
 
         try
         {
+            var processId = ProcessId.Value; // Cache the value to avoid multiple .Value calls
             Logger.LogInformation("Starting {ScanType} scan for process {ProcessId}. IsFirstScan: {IsFirstScan}, ValueType: {ValueType}",
-                ScanType, ProcessId.Value, IsFirstScan, ValueType);
+                ScanType, processId, IsFirstScan, ValueType);
             await OnLoadingChanged.InvokeAsync(true);
 
-            try
+            if (ScanType == ScanType.Pattern)
             {
-                if (ScanType == ScanType.Pattern)
-                {
-                    Logger.LogDebug("Preparing pattern scan with hex: {PatternHex}, mask: {Mask}", PatternHex, Mask);
-                    var pattern = PatternHex.Split(' ')
-                        .Select(b => Convert.ToByte(b, 16))
-                        .ToArray();
-                    Logger.LogTrace("Converted pattern to byte array, length: {Length}", pattern.Length);
-
-                    Logger.LogInformation("Executing pattern scan for process {ProcessId}", ProcessId.Value);
-                    scanResults = await MemoryScanner.ScanForPattern(
-                        ProcessId.Value,
-                        pattern,
-                        Mask);
-                    Logger.LogDebug("Pattern scan completed with {Count} results", scanResults.Count);
-                }
-                else
-                {
-                    if (IsFirstScan)
-                    {
-                        var startTime = DateTime.UtcNow;
-                        try
-                        {
-                            Logger.LogInformation("Starting first scan for process {ProcessId} with scan type {ScanType}",
-                                ProcessId.Value, ScanType);
-
-                            switch (ScanType)
-                            {
-                                case ScanType.ExactValue:
-                                    Logger.LogDebug("Scanning for exact value: {SearchValue} of type {ValueType}",
-                                        SearchValue, ValueType);
-                                    scanResults = await MemoryScanner.ScanForValue(
-                                        ProcessId.Value,
-                                        SearchValue,
-                                        ValueType);
-                                    Logger.LogDebug("Exact value scan completed with {Count} results", scanResults.Count);
-                                    break;
-
-                                case ScanType.UnknownInitialValue:
-                                    Logger.LogDebug("Getting all addresses for value type {ValueType}", ValueType);
-                                    scanResults = await MemoryScanner.GetAllAddresses(
-                                        ProcessId.Value,
-                                        ValueType);
-                                    Logger.LogDebug("Retrieved {Count} addresses", scanResults.Count);
-                                    break;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.LogError(ex, "Error during first scan for process {ProcessId}. ScanType: {ScanType}, ValueType: {ValueType}", 
-                                ProcessId.Value, ScanType, ValueType);
-                            throw;
-                        }
-
-                        if (scanResults.Count > 0)
-                        {
-                            Logger.LogInformation("Reading initial values for {Count} addresses", scanResults.Count);
-                            var processedCount = 0;
-                            var errorCount = 0;
-                            var batchStartTime = DateTime.UtcNow;
-
-                            foreach (var address in scanResults)
-                            {
-                                try
-                                {
-                                    previousValues[address] = getCurrentValue(address);
-                                    processedCount++;
-
-                                    if (processedCount % 1000 == 0)
-                                    {
-                                        var currentTime = DateTime.UtcNow;
-                                        var batchDuration = currentTime - batchStartTime;
-                                        Logger.LogDebug("Processed {Count}/{Total} addresses ({Rate:F2} addresses/sec)",
-                                            processedCount,
-                                            scanResults.Count,
-                                            1000 / batchDuration.TotalSeconds);
-                                        batchStartTime = currentTime;
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    errorCount++;
-                                    Logger.LogWarning(ex, "Failed to read value at address {Address}", address);
-                                    if (errorCount % 100 == 0)
-                                    {
-                                        Logger.LogWarning("Encountered {ErrorCount} read errors so far", errorCount);
-                                    }
-                                }
-                            }
-
-                            var duration = DateTime.UtcNow - startTime;
-                            Logger.LogInformation(
-                                "Completed reading initial values in {Duration:F2}s. Processed: {Processed}, Errors: {Errors}",
-                                duration.TotalSeconds, processedCount, errorCount);
-                        }
-                        else
-                        {
-                            Logger.LogWarning("First scan returned no results to process");
-                        }
-                    }
-                    else
-                    {
-                        Logger.LogInformation("Starting subsequent scan for {Count} addresses with type {ScanType}",
-                            scanResults.Count, ScanType);
-                        var startTime = DateTime.UtcNow;
-                        var newResults = new List<IntPtr>();
-                        var processedCount = 0;
-                        var errorCount = 0;
-                        var matchCount = 0;
-                        var batchStartTime = DateTime.UtcNow;
-
-                        foreach (var address in scanResults)
-                        {
-                            try
-                            {
-                                var currentValue = getCurrentValue(address);
-                                var previousValue = previousValues[address];
-                                processedCount++;
-
-                                bool keepResult = ScanType switch
-                                {
-                                    ScanType.ExactValue => currentValue == SearchValue,
-                                    ScanType.IncreasedValue => currentValue > previousValue,
-                                    ScanType.DecreasedValue => currentValue < previousValue,
-                                    ScanType.ChangedValue => currentValue != previousValue,
-                                    ScanType.UnchangedValue => currentValue == previousValue,
-                                    _ => false
-                                };
-
-                                if (keepResult)
-                                {
-                                    matchCount++;
-                                    newResults.Add(address);
-                                    previousValues[address] = currentValue;
-                                }
-
-                                if (processedCount % 1000 == 0)
-                                {
-                                    var currentTime = DateTime.UtcNow;
-                                    var batchDuration = currentTime - batchStartTime;
-                                    Logger.LogDebug(
-                                        "Processed {Count}/{Total} addresses ({Rate:F2} addresses/sec). Matches: {Matches}",
-                                        processedCount,
-                                        scanResults.Count,
-                                        1000 / batchDuration.TotalSeconds,
-                                        matchCount);
-                                    batchStartTime = currentTime;
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                errorCount++;
-                                Logger.LogWarning(ex, "Failed to process address {Address}", address);
-                                if (errorCount % 100 == 0)
-                                {
-                                    Logger.LogWarning("Encountered {ErrorCount} processing errors so far", errorCount);
-                                }
-                            }
-                        }
-
-                        var duration = DateTime.UtcNow - startTime;
-                        Logger.LogInformation(
-                            "Completed subsequent scan in {Duration:F2}s. Processed: {Processed}, Matches: {Matches}, Errors: {Errors}",
-                            duration.TotalSeconds, processedCount, matchCount, errorCount);
-
-                        scanResults = newResults;
-                    }
-                }
-
-                var resultCount = scanResults.Count;
-                if (resultCount == 0)
-                {
-                    ShowInfo("Scan Results", "No results found");
-                }
-                else
-                {
-                    ShowSuccess("Scan completed", $"Found {resultCount} {(resultCount == 1 ? "result" : "results")}");
-                }
-                Logger.LogInformation($"Scan completed. Found {resultCount} results");
-                await OnScanComplete.InvokeAsync(scanResults);
+                await HandlePatternScan(processId);
             }
-            catch (Exception ex)
+            else
             {
-                Logger.LogError(ex, "Error during memory scan operation. ProcessId: {ProcessId}, ScanType: {ScanType}", ProcessId, ScanType);
-                throw;
+                await HandleValueScan(getCurrentValue, processId);
             }
+
+            var resultCount = scanResults.Count;
+            if (resultCount == 0)
+            {
+                ShowInfo("Scan Results", "No results found");
+            }
+            else
+            {
+                ShowSuccess("Scan completed", $"Found {resultCount} {(resultCount == 1 ? "result" : "results")}");
+            }
+            Logger.LogInformation($"Scan completed. Found {resultCount} results");
+            await OnScanComplete.InvokeAsync(scanResults);
         }
         catch (Exception ex)
         {
@@ -267,12 +104,184 @@
             scanResults.Clear();
             previousValues.Clear();
             await OnScanComplete.InvokeAsync(scanResults);
-            throw; // Ensure the error is propagated for the test
         }
         finally
         {
             await OnLoadingChanged.InvokeAsync(false);
         }
+    }
+
+    private async Task HandlePatternScan(int processId)
+    {
+        Logger.LogDebug("Preparing pattern scan with hex: {PatternHex}, mask: {Mask}", PatternHex, Mask);
+        var pattern = PatternHex.Split(' ')
+            .Select(b => Convert.ToByte(b, 16))
+            .ToArray();
+        Logger.LogTrace("Converted pattern to byte array, length: {Length}", pattern.Length);
+
+        Logger.LogInformation("Executing pattern scan for process {ProcessId}", processId);
+        scanResults = await MemoryScanner.ScanForPattern(
+            processId,
+            pattern,
+            Mask);
+        Logger.LogDebug("Pattern scan completed with {Count} results", scanResults.Count);
+    }
+
+    private async Task HandleValueScan(Func<IntPtr, int> getCurrentValue, int processId)
+    {
+        if (IsFirstScan)
+        {
+            HandleFirstScan(processId);
+            if (scanResults.Count > 0)
+            {
+                ProcessInitialValues(getCurrentValue);
+            }
+            else
+            {
+                Logger.LogWarning("First scan returned no results to process");
+            }
+        }
+        else
+        {
+            await HandleSubsequentScan(getCurrentValue);
+        }
+    }
+
+    private void HandleFirstScan(int processId)
+    {
+        Logger.LogInformation("Starting first scan for process {ProcessId} with scan type {ScanType}",
+            processId, ScanType);
+
+        switch (ScanType)
+        {
+            case ScanType.ExactValue:
+                Logger.LogDebug("Scanning for exact value: {SearchValue} of type {ValueType}",
+                    SearchValue, ValueType);
+                scanResults = MemoryScanner.ScanForValue(
+                    processId,
+                    SearchValue,
+                    ValueType).Result;
+                Logger.LogDebug("Exact value scan completed with {Count} results", scanResults.Count);
+                break;
+
+            case ScanType.UnknownInitialValue:
+                Logger.LogDebug("Getting all addresses for value type {ValueType}", ValueType);
+                scanResults = MemoryScanner.GetAllAddresses(
+                    processId,
+                    ValueType).Result;
+                Logger.LogDebug("Retrieved {Count} addresses", scanResults.Count);
+                break;
+        }
+    }
+
+    private void ProcessInitialValues(Func<IntPtr, int> getCurrentValue)
+    {
+        Logger.LogInformation("Reading initial values for {Count} addresses", scanResults.Count);
+        var processedCount = 0;
+        var errorCount = 0;
+        var batchStartTime = DateTime.UtcNow;
+
+        foreach (var address in scanResults)
+        {
+            try
+            {
+                previousValues[address] = getCurrentValue(address);
+                processedCount++;
+
+                if (processedCount % 1000 == 0)
+                {
+                    var currentTime = DateTime.UtcNow;
+                    var batchDuration = currentTime - batchStartTime;
+                    Logger.LogDebug("Processed {Count}/{Total} addresses ({Rate:F2} addresses/sec)",
+                        processedCount,
+                        scanResults.Count,
+                        1000 / batchDuration.TotalSeconds);
+                    batchStartTime = currentTime;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorCount++;
+                Logger.LogWarning(ex, "Failed to read value at address {Address}", address);
+                if (errorCount % 100 == 0)
+                {
+                    Logger.LogWarning("Encountered {ErrorCount} read errors so far", errorCount);
+                }
+            }
+        }
+
+        var duration = DateTime.UtcNow - batchStartTime;
+        Logger.LogInformation(
+            "Completed reading initial values in {Duration:F2}s. Processed: {Processed}, Errors: {Errors}",
+            duration.TotalSeconds, processedCount, errorCount);
+    }
+
+    private async Task HandleSubsequentScan(Func<IntPtr, int> getCurrentValue)
+    {
+        Logger.LogInformation("Starting subsequent scan for {Count} addresses with type {ScanType}",
+            scanResults.Count, ScanType);
+        var startTime = DateTime.UtcNow;
+        var newResults = new List<IntPtr>();
+        var processedCount = 0;
+        var errorCount = 0;
+        var matchCount = 0;
+        var batchStartTime = DateTime.UtcNow;
+
+        foreach (var address in scanResults)
+        {
+            try
+            {
+                var currentValue = getCurrentValue(address);
+                var previousValue = previousValues[address];
+                processedCount++;
+
+                bool keepResult = ScanType switch
+                {
+                    ScanType.ExactValue => currentValue == SearchValue,
+                    ScanType.IncreasedValue => currentValue > previousValue,
+                    ScanType.DecreasedValue => currentValue < previousValue,
+                    ScanType.ChangedValue => currentValue != previousValue,
+                    ScanType.UnchangedValue => currentValue == previousValue,
+                    _ => false
+                };
+
+                if (keepResult)
+                {
+                    matchCount++;
+                    newResults.Add(address);
+                    previousValues[address] = currentValue;
+                }
+
+                if (processedCount % 1000 == 0)
+                {
+                    var currentTime = DateTime.UtcNow;
+                    var batchDuration = currentTime - batchStartTime;
+                    Logger.LogDebug(
+                        "Processed {Count}/{Total} addresses ({Rate:F2} addresses/sec). Matches: {Matches}",
+                        processedCount,
+                        scanResults.Count,
+                        1000 / batchDuration.TotalSeconds,
+                        matchCount);
+                    batchStartTime = currentTime;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorCount++;
+                Logger.LogWarning(ex, "Failed to process address {Address}", address);
+                if (errorCount % 100 == 0)
+                {
+                    Logger.LogWarning("Encountered {ErrorCount} processing errors so far", errorCount);
+                }
+            }
+        }
+
+        var duration = DateTime.UtcNow - startTime;
+        Logger.LogInformation(
+            "Completed subsequent scan in {Duration:F2}s. Processed: {Processed}, Matches: {Matches}, Errors: {Errors}",
+            duration.TotalSeconds, processedCount, matchCount, errorCount);
+
+        scanResults = newResults;
     }
 
     public void Reset()

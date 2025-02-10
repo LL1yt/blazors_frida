@@ -43,11 +43,8 @@
         try
         {
             await Freezer.FreezeValue(address, bytes, ValueType.ToString());
-            // Add to frozen addresses before invoking callback
-            if (frozenAddresses.Add(address))
-            {
-                await OnFreezeStateChanged.InvokeAsync((address, true));
-            }
+            frozenAddresses.Add(address);
+            await OnFreezeStateChanged.InvokeAsync((address, true));
         }
         catch (Exception ex)
         {
