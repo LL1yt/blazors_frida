@@ -183,13 +183,13 @@ public class MemoryScannerPageTests : IAsyncLifetime
         await nextScanButton.ClickAsync();
         
         // Wait for updated results with timeout
-        await _page.WaitForSelectorAsync(".results-grid .rz-row", new() 
+        await _page.WaitForSelectorAsync(".datagrid-row", new() 
         { 
             State = WaitForSelectorState.Visible
         });
         
         // Verify filtered results
-        var resultCount = (await _page.QuerySelectorAllAsync(".results-grid .rz-row")).Count;
+        var resultCount = (await _page.QuerySelectorAllAsync(".datagrid-row")).Count;
         Assert.True(resultCount >= 0);
     }
 }

@@ -8,10 +8,9 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
-using Radzen;
+using Blazorise;
 using Microsoft.AspNetCore.Components;
 using BlazorFridaApp.MemoryScanner.Base;
-using Blazorise;
 
 namespace BlazorFridaApp.Tests.Components;
 
