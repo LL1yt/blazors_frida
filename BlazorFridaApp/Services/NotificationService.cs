@@ -5,31 +5,36 @@ namespace BlazorFridaApp.Services;
 
 public class NotificationService : INotificationService
 {
-    private readonly NotificationService<string> _notificationService;
+    private readonly INotificationService _notificationService;
 
-    public NotificationService(NotificationService<string> notificationService)
+    public NotificationService(INotificationService(notificationService))
     {
         _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
     }
 
+    public async Task Show(NotificationMessage message)
+    {
+        await _notificationService.Show(message);
+    }
+
     public void ShowInfo(string title, string message)
     {
-        _notificationService.Info(title, message);
+        Show(new NotificationMessage { Title = title, Message = message, NotificationType = NotificationType.Info }).Wait();
     }
 
     public void ShowWarning(string title, string message)
     {
-        _notificationService.Warning(title, message);
+        Show(new NotificationMessage { Title = title, Message = message, NotificationType = NotificationType.Warning }).Wait();
     }
 
     public void ShowError(string title, string message, Exception? exception = null)
     {
-        _notificationService.Error(title, message);
+        Show(new NotificationMessage { Title = title, Message = message, NotificationType = NotificationType.Error }).Wait();
     }
 
     public void ShowSuccess(string title, string message)
     {
-        _notificationService.Success(title, message);
+        Show(new NotificationMessage { Title = title, Message = message, NotificationType = NotificationType.Success }).Wait();
     }
 
     public Task<bool> Confirm(string message, string title)

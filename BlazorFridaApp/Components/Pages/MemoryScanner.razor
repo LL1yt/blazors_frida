@@ -6,9 +6,13 @@
 @using Blazorise.Components
 @using Blazorise.Icons.FontAwesome
 @using Blazorise.Icons
+@using Blazorise.Modules
+@using static Blazorise.ModalSize
+@using static Blazorise.LayoutOptions
 @inherits MemoryScannerComponentBase
 
-@inject IScanProfileService ProfileService
+[Inject]
+protected new IScanProfileService ProfileService { get; set; } = default!;
 @inject DialogService DialogService
 
 <div class="memory-scanner-container">
@@ -202,9 +206,10 @@
         {
             var config = new ScannerConfig 
             {
-                Name = configName,
+                Description = $"Configuration saved at {DateTime.Now}",
                 ValueType = _state.SelectedValueType,
-                ScanType = _state.SelectedScanType.ToString()
+                ScanType = _state.SelectedScanType.ToString(),
+                ComparisonType = "exact" // default value
             };
             
             await ProfileService.SaveScannerConfig(configName, config);
@@ -226,7 +231,15 @@
 
         try
         {
-            _state.LoadConfig(config);
+            _state.LoadConfig(new Components.Pages.ScannerConfig 
+            {
+                ScanType = Enum.Parse<ScanType>(config.ScanType),
+                ValueType = config.ValueType,
+                PatternHex = config.CustomSettings.GetValueOrDefault("PatternHex", ""),
+                Mask = config.CustomSettings.GetValueOrDefault("Mask", ""),
+                SearchValue = int.Parse(config.CustomSettings.GetValueOrDefault("SearchValue", "0"))
+            });
+            
             if (_loadConfigModal is not null)
                 await _loadConfigModal.Hide();
             await NotificationService.ShowSuccess("Configuration loaded", "Configuration loaded successfully");
