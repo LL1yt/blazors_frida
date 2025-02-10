@@ -14,13 +14,13 @@ namespace BlazorFridaApp.Components.Pages
         private readonly IProcessService _processService;
         private readonly IScanProfileService _profileService;
         private readonly ILogger<MemoryScannerService> _logger;
-        private readonly INotificationService _notificationService;
+        private readonly IAppNotificationService _notificationService;
 
         public MemoryScannerService(
             IProcessService processService,
             IScanProfileService profileService,
             ILogger<MemoryScannerService> logger,
-            INotificationService notificationService)
+            IAppNotificationService notificationService)
         {
             _processService = processService;
             _profileService = profileService;
@@ -70,16 +70,16 @@ namespace BlazorFridaApp.Components.Pages
                 state.SelectedScanType = newType;
                 await Task.Run(() => state.Reset());
                 
-                await Task.Run(() => _notificationService.ShowInfo("Scan type changed", $"Selected scan type: {state.SelectedScanType}"));
+                await _notificationService.ShowInfo($"Selected scan type: {state.SelectedScanType}", "Scan type changed");
             }
             catch (Exception ex)
             {
-                await Task.Run(() => _notificationService.ShowError("Error changing scan type", ex.Message, ex));
+                await _notificationService.ShowError(ex.Message, "Error changing scan type");
                 throw;
             }
         }
 
-        public void OnValueTypeChanged(MemoryScannerState state, MemoryValueType newType)
+        public async Task OnValueTypeChanged(MemoryScannerState state, MemoryValueType newType)
         {
             try
             {
@@ -87,11 +87,11 @@ namespace BlazorFridaApp.Components.Pages
                 state.SelectedValueType = newType;
                 state.Reset();
                 
-                _notificationService.ShowInfo("Value type changed", $"Selected value type: {state.SelectedValueType}");
+                await _notificationService.ShowInfo($"Selected value type: {state.SelectedValueType}", "Value type changed");
             }
             catch (Exception ex)
             {
-                _notificationService.ShowError("Error changing value type", ex.Message, ex);
+                await _notificationService.ShowError(ex.Message, "Error changing value type");
                 throw;
             }
         }

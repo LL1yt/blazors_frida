@@ -47,15 +47,15 @@
     @if (ScanType == ScanType.Pattern)
     {
         <div class="pattern-inputs">
-            <MemoEdit @bind-Text="@PatternHex"
+            <MemoEdit Text="@PatternHex"
+                     TextChanged="@OnPatternHexChanged"
                      Placeholder="Pattern (hex, space-separated)"
-                     Rows="2"
-                     TextChanged="@(args => ValidatePattern(args))" />
+                     Rows="2" />
                      
-            <MemoEdit @bind-Text="@Mask"
+            <MemoEdit Text="@Mask"
+                     TextChanged="@OnMaskChanged"
                      Placeholder="Mask (x - match, ? - wildcard)"
-                     Rows="2"
-                     TextChanged="@(args => ValidateMask(args))" />
+                     Rows="2" />
 
             @if (!string.IsNullOrEmpty(_errorMessage))
             {
@@ -71,9 +71,9 @@
                     
         @if (ScanType == ScanType.UnknownInitialValue)
         {
-            <Text TextWeight="TextWeight.Light">
+            <div class="text-muted">
                 Perform first scan to initialize, then change value in game and perform next scan
-            </Text>
+            </div>
         }
     }
 
@@ -113,7 +113,9 @@
     [Parameter] public required Array ScanTypes { get; set; }
     [Parameter] public required Array ValueTypes { get; set; }
     [Parameter] public required string PatternHex { get; set; }
+    [Parameter] public EventCallback<string> PatternHexChanged { get; set; }
     [Parameter] public required string Mask { get; set; }
+    [Parameter] public EventCallback<string> MaskChanged { get; set; }
     [Parameter] public int SearchValue { get; set; }
     [Parameter] public EventCallback<int> SearchValueChanged { get; set; }
     [Parameter] public bool IsFirstScan { get; set; }
@@ -123,20 +125,16 @@
     [Parameter] public EventCallback<MemoryValueType> OnValueTypeChanged { get; set; }
     [Parameter] public EventCallback OnScanClick { get; set; }
 
-    private async Task HandleScanTypeChanged(object value)
+    private async Task OnPatternHexChanged(string value)
     {
-        if (value is ScanType scanType)
-        {
-            await OnScanTypeChanged.InvokeAsync(scanType);
-        }
+        ValidatePattern(value);
+        await PatternHexChanged.InvokeAsync(value);
     }
 
-    private async Task HandleValueTypeChanged(object value)
+    private async Task OnMaskChanged(string value)
     {
-        if (value is MemoryValueType valueType)
-        {
-            await OnValueTypeChanged.InvokeAsync(valueType);
-        }
+        ValidateMask(value);
+        await MaskChanged.InvokeAsync(value);
     }
 
     private void ValidatePattern(string value)

@@ -3,7 +3,7 @@ using Blazorise;
 
 namespace BlazorFridaApp.Services;
 
-public interface INotificationService
+public interface IAppNotificationService
 {
     Task ShowSuccess(string message, string? title = null);
     Task ShowError(string message, string? title = null);
@@ -11,11 +11,11 @@ public interface INotificationService
     Task ShowInfo(string message, string? title = null);
 }
 
-public class AppNotificationService : INotificationService
+public class AppNotificationService : IAppNotificationService
 {
-    private readonly INotificationService _notificationService;
-
-    public AppNotificationService(INotificationService notificationService)
+    private readonly Blazorise.INotificationService _notificationService;
+    
+    public AppNotificationService(Blazorise.INotificationService notificationService)
     {
         _notificationService = notificationService;
     }

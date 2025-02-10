@@ -11,11 +11,11 @@
             <div class="d-flex justify-content-between align-items-center">
                 <Heading Size="HeadingSize.Is2">Memory Scanner</Heading>
                 <ButtonGroup>
-                    <Button Color="Color.Secondary" Clicked="@SaveConfig">
+                    <Button Color="Color.Secondary" Clicked="@HandleSaveConfigClick">
                         <Icon Name="FontAwesomeIcons.Save" />
                         Save Config
                     </Button>
-                    <Button Color="Color.Secondary" Clicked="@LoadConfig">
+                    <Button Color="Color.Secondary" Clicked="@HandleLoadConfigClick">
                         <Icon Name="FontAwesomeIcons.FolderOpen" />
                         Load Config
                     </Button>
@@ -175,12 +175,12 @@
     private Modal _saveConfigModal;
     private Modal _loadConfigModal;
     
-    private async Task SaveConfig()
+    private async Task HandleSaveConfigClick()
     {
         await _saveConfigModal.Show();
     }
 
-    private async Task LoadConfig()
+    private async Task HandleLoadConfigClick()
     {
         await _loadConfigModal.Show();
     }
@@ -192,23 +192,15 @@
 
         try 
         {
-            var config = new ScannerConfig
-            {
-                ScanType = _state.SelectedScanType,
-                ValueType = _state.SelectedValueType,
-                PatternHex = _state.PatternHex,
-                Mask = _state.Mask,
-                SearchValue = _state.SearchValue
-            };
-
+            var config = _state.ToConfig();
             await ProfileService.SaveScannerConfig(configName, config);
             await _saveConfigModal.Hide();
             _state.SavedConfigs[configName] = config;
-            await NotificationService.Success($"Configuration '{configName}' saved successfully");
+            await NotificationService.ShowSuccess("Configuration saved", $"Configuration '{configName}' saved successfully");
         }
         catch (Exception ex)
         {
-            await NotificationService.Error($"Failed to save configuration: {ex.Message}");
+            await NotificationService.ShowError("Save failed", $"Failed to save configuration: {ex.Message}");
         }
     }
 
@@ -219,18 +211,13 @@
 
         try
         {
-            _state.SelectedScanType = config.ScanType;
-            _state.SelectedValueType = config.ValueType;
-            _state.PatternHex = config.PatternHex;
-            _state.Mask = config.Mask;
-            _state.SearchValue = config.SearchValue;
-            
+            _state.LoadConfig(config);
             await _loadConfigModal.Hide();
-            await NotificationService.Success("Configuration loaded successfully");
+            await NotificationService.ShowSuccess("Configuration loaded", "Configuration loaded successfully");
         }
         catch (Exception ex)
         {
-            await NotificationService.Error($"Failed to load configuration: {ex.Message}");
+            await NotificationService.ShowError("Load failed", $"Failed to load configuration: {ex.Message}");
         }
     }
 

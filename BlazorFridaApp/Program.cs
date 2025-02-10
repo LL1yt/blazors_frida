@@ -27,6 +27,11 @@ using Microsoft.Extensions.Options;
 using Blazorise;
 using Blazorise.Bootstrap;
 using Blazorise.Icons.FontAwesome;
+using Blazorise.RichTextEdit;
+using Blazorise.LoadingIndicator;
+using Blazorise.Sidebar;
+using Blazorise.Snackbar;
+using Blazorise.TreeView;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -51,9 +56,18 @@ try
         .AddInteractiveServerComponents();
 
     // Add Blazorise
-    builder.Services.AddBlazorise()
+    builder.Services
+        .AddBlazorise(options =>
+        {
+            options.Immediate = true;
+        })
         .AddBootstrapProviders()
-        .AddFontAwesomeIcons();
+        .AddFontAwesomeIcons()
+        .AddBlazoriseRichTextEdit()
+        .AddBlazoriseLoadingIndicator()
+        .AddBlazoriseTreeView()
+        .AddBlazoriseSnackbar()
+        .AddBlazoriseDataGrid();
 
     // Add assets service
     builder.Services.AddScoped<AssetsService>();

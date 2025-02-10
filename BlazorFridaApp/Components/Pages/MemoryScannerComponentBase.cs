@@ -16,7 +16,7 @@ namespace BlazorFridaApp.Components.Pages
         [Inject] protected ILogger<MemoryScannerComponentBase> Logger { get; set; } = default!;
         [Inject] protected IProcessService ProcessService { get; set; } = default!;
         [Inject] protected IScanProfileService ProfileService { get; set; } = default!;
-        [Inject] protected INotificationService NotificationService { get; set; } = default!;
+        [Inject] protected IAppNotificationService NotificationService { get; set; } = default!;
         [Inject] protected MemoryScannerService ScannerService { get; set; } = default!;
 
         protected MemoryScannerState _state = new();
