@@ -100,7 +100,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error during memory scan. ProcessId: {ProcessId}, ScanType: {ScanType}", ProcessId, ScanType);
-            ShowError("Scan failed", $"Error: {ex.Message}. Please try again or select different parameters.", ex);
+            ShowError("Scan failed", ex.GetBaseException().Message, ex);
             scanResults.Clear();
             previousValues.Clear();
             await OnScanComplete.InvokeAsync(scanResults);
