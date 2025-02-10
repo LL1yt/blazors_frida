@@ -93,29 +93,38 @@
                 {
                     if (IsFirstScan)
                     {
-                        Logger.LogInformation("Starting first scan for process {ProcessId} with scan type {ScanType}",
-                            ProcessId.Value, ScanType);
                         var startTime = DateTime.UtcNow;
-
-                        switch (ScanType)
+                        try
                         {
-                            case ScanType.ExactValue:
-                                Logger.LogDebug("Scanning for exact value: {SearchValue} of type {ValueType}",
-                                    SearchValue, ValueType);
-                                scanResults = await MemoryScanner.ScanForValue(
-                                    ProcessId.Value,
-                                    SearchValue,
-                                    ValueType);
-                                Logger.LogDebug("Exact value scan completed with {Count} results", scanResults.Count);
-                                break;
+                            Logger.LogInformation("Starting first scan for process {ProcessId} with scan type {ScanType}",
+                                ProcessId.Value, ScanType);
 
-                            case ScanType.UnknownInitialValue:
-                                Logger.LogDebug("Getting all addresses for value type {ValueType}", ValueType);
-                                scanResults = await MemoryScanner.GetAllAddresses(
-                                    ProcessId.Value,
-                                    ValueType);
-                                Logger.LogDebug("Retrieved {Count} addresses", scanResults.Count);
-                                break;
+                            switch (ScanType)
+                            {
+                                case ScanType.ExactValue:
+                                    Logger.LogDebug("Scanning for exact value: {SearchValue} of type {ValueType}",
+                                        SearchValue, ValueType);
+                                    scanResults = await MemoryScanner.ScanForValue(
+                                        ProcessId.Value,
+                                        SearchValue,
+                                        ValueType);
+                                    Logger.LogDebug("Exact value scan completed with {Count} results", scanResults.Count);
+                                    break;
+
+                                case ScanType.UnknownInitialValue:
+                                    Logger.LogDebug("Getting all addresses for value type {ValueType}", ValueType);
+                                    scanResults = await MemoryScanner.GetAllAddresses(
+                                        ProcessId.Value,
+                                        ValueType);
+                                    Logger.LogDebug("Retrieved {Count} addresses", scanResults.Count);
+                                    break;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogError(ex, "Error during first scan for process {ProcessId}. ScanType: {ScanType}, ValueType: {ValueType}", 
+                                ProcessId.Value, ScanType, ValueType);
+                            throw;
                         }
 
                         if (scanResults.Count > 0)
@@ -258,6 +267,7 @@
             scanResults.Clear();
             previousValues.Clear();
             await OnScanComplete.InvokeAsync(scanResults);
+            throw; // Ensure the error is propagated for the test
         }
         finally
         {

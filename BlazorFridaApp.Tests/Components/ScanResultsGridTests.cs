@@ -79,9 +79,8 @@ public class ScanResultsGridTests : TestContextWrapper
             })));
 
         // Act
-        var numericInput = cut.Find(".rz-numeric");
-        var changeEvent = new ChangeEventArgs { Value = "100" };
-        await cut.InvokeAsync(() => numericInput.Change(changeEvent));
+        var numericInput = cut.FindComponent<RadzenNumeric<int>>();
+        await numericInput.InvokeAsync(() => numericInput.Instance.Change.InvokeAsync(100));
 
         // Assert
         Assert.True(valueChanged);
