@@ -92,7 +92,7 @@ public class ScanExecutorTests : BunitContext
             .Add(p => p.IsFirstScan, true));
 
         // Act
-        await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => 42));
+        await cut.InvokeAsync(async () => await cut.Instance.ExecuteScan(_ => 42));
 
         // Assert
         var logEntry = Assert.Single(testLogger.LogEntries);
@@ -121,7 +121,7 @@ public class ScanExecutorTests : BunitContext
 
         // Assert
         _notificationServiceMock.Verify(x => 
-            x.ShowError("Scan failed", "Test error"),
+            x.ShowError("Scan failed", "Test error", It.IsAny<Exception?>()),
             Times.Once);
     }
 
