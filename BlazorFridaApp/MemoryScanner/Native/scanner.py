@@ -68,13 +68,22 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
     """
     try:
         scanner = get_or_create_scanner(session.session_id, session)
-        # Get all readable memory ranges
-        process = frida.Process(session.pid)
-        ranges = process.enumerate_ranges("r--")
+        # Get all readable memory ranges using the session's enumerate_ranges
+        script = await session.create_script(
+            """
+            rpc.exports = {
+                enumerateRanges: function() {
+                    return Process.enumerateRanges('r--');
+                }
+            };
+        """
+        )
+        await script.load()
+        ranges = await script.exports.enumerate_ranges()
 
         # Convert ranges to list of tuples
         range_tuples = [
-            (int(r.base_address, 16), int(r.base_address, 16) + r.size) for r in ranges
+            (int(r["base"], 16), int(r["base"], 16) + r["size"]) for r in ranges
         ]
 
         # Perform the scan
@@ -213,11 +222,20 @@ class MemoryScanner:
     ) -> List[Dict[str, Any]]:
         """Scan memory for a specific value"""
         if not ranges:
-            # Get all readable memory ranges from the Frida session
-            process = frida.Process(self.frida_scanner._attacher.session.pid)
-            session_ranges = process.enumerate_ranges("r--")
+            # Get all readable memory ranges using the session's enumerate_ranges
+            script = await self.frida_scanner._attacher.session.create_script(
+                """
+                rpc.exports = {
+                    enumerateRanges: function() {
+                        return Process.enumerateRanges('r--');
+                    }
+                };
+            """
+            )
+            await script.load()
+            session_ranges = await script.exports.enumerate_ranges()
             ranges = [
-                (int(r.base_address, 16), int(r.base_address, 16) + r.size)
+                (int(r["base"], 16), int(r["base"], 16) + r["size"])
                 for r in session_ranges
             ]
 
