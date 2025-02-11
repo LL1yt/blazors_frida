@@ -189,6 +189,19 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
     {
         try
         {
+            if (valueType.Equals("pattern", StringComparison.OrdinalIgnoreCase))
+            {
+                if (value == null || value.Length == 0)
+                {
+                    throw new ArgumentException("Pattern cannot be empty", nameof(value));
+                }
+
+                if (value.Length < 2) // Minimum pattern length check
+                {
+                    throw new ArgumentException("Pattern must be at least 2 bytes long", nameof(value));
+                }
+            }
+
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
             var request = new Proto.ScanRequest

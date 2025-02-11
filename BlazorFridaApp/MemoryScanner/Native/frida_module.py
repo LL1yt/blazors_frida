@@ -139,6 +139,12 @@ class FridaMemoryScanner:
         if not self._attacher.session:
             raise RuntimeError("Not attached to any process")
 
+        def ensure_serializable(v):
+            """Ensure value is JSON serializable at the lowest level"""
+            if isinstance(v, bytes):
+                return list(v)
+            return v
+
         def make_serializable(v):
             """Convert value to JSON serializable format"""
             try:
@@ -146,17 +152,15 @@ class FridaMemoryScanner:
                     f"make_serializable input: type={type(v)}, value={v}"
                 )
 
-                if isinstance(v, bytes):
-                    # Convert bytes to list of integers for better RPC handling
-                    result = [int(b) for b in v]
-                    self._logger.debug(f"Converted bytes to int list: {result}")
-                    return result
+                # First ensure the input value is serializable
+                v = ensure_serializable(v)
+
                 if isinstance(v, (list, tuple)):
-                    result = [make_serializable(x) for x in v]
+                    result = [ensure_serializable(x) for x in v]
                     self._logger.debug(f"Converted sequence: {result}")
                     return result
                 if isinstance(v, dict):
-                    result = {str(k): make_serializable(val) for k, val in v.items()}
+                    result = {str(k): ensure_serializable(val) for k, val in v.items()}
                     self._logger.debug(f"Converted dict: {result}")
                     return result
                 if isinstance(v, (int, float, str, bool, type(None))):
@@ -179,6 +183,11 @@ class FridaMemoryScanner:
             )
             self._logger.debug(f"Memory ranges to scan: {ranges}")
 
+            # Ensure value is serializable before proceeding
+            if isinstance(value, bytes):
+                self._logger.debug(f"Converting initial bytes value to list: {value}")
+                value = list(value)
+
             script = self._attacher.session.create_script(SCAN_SCRIPT)
             script.load()
 
@@ -193,6 +202,13 @@ class FridaMemoryScanner:
                     # Convert values to JSON serializable format
                     json_value = make_serializable(value)
 
+                    # Extra verification step
+                    if isinstance(json_value, bytes):
+                        self._logger.warning(
+                            "Found bytes after serialization, converting to list"
+                        )
+                        json_value = list(json_value)
+
                     # Verify JSON serialization works
                     try:
                         import json
@@ -203,8 +219,13 @@ class FridaMemoryScanner:
                         )
                     except Exception as je:
                         self._logger.error(
-                            f"JSON serialization verification failed: {str(je)}"
+                            f"JSON serialization verification failed: {str(je)}, value type: {type(json_value)}"
                         )
+                        if isinstance(json_value, (list, tuple)):
+                            self._logger.debug(
+                                "List contents types: "
+                                + str([type(x) for x in json_value])
+                            )
                         raise
 
                     matches = script.exports.scan_memory(
