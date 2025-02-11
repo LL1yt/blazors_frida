@@ -220,10 +220,6 @@ class FridaMemoryScanner:
                 "*",  # Allow raw wildcard type
             ]
 
-            # Map value type if needed
-            if value_type == "*":
-                value_type = "any"
-
             if value_type not in valid_types:
                 raise ValueError(
                     f"Invalid value type: {value_type}. Supported types: {valid_types}"
