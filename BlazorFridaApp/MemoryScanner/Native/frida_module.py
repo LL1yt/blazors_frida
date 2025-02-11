@@ -141,31 +141,88 @@ class FridaMemoryScanner:
 
         def make_serializable(v):
             """Convert value to JSON serializable format"""
-            if isinstance(v, bytes):
-                return v.hex()
-            if isinstance(v, (list, tuple)):
-                return [make_serializable(x) for x in v]
-            if isinstance(v, dict):
-                return {k: make_serializable(v) for k, v in v.items()}
-            return v
+            try:
+                self._logger.debug(
+                    f"make_serializable input: type={type(v)}, value={v}"
+                )
+
+                if isinstance(v, bytes):
+                    # Convert bytes to list of integers for better RPC handling
+                    result = [int(b) for b in v]
+                    self._logger.debug(f"Converted bytes to int list: {result}")
+                    return result
+                if isinstance(v, (list, tuple)):
+                    result = [make_serializable(x) for x in v]
+                    self._logger.debug(f"Converted sequence: {result}")
+                    return result
+                if isinstance(v, dict):
+                    result = {str(k): make_serializable(val) for k, val in v.items()}
+                    self._logger.debug(f"Converted dict: {result}")
+                    return result
+                if isinstance(v, (int, float, str, bool, type(None))):
+                    return v
+
+                # Handle any other types by converting to string
+                self._logger.warning(f"Converting unknown type {type(v)} to string")
+                return str(v)
+
+            except Exception as e:
+                self._logger.error(
+                    f"Serialization error for value type {type(v)}: {str(e)}"
+                )
+                self._logger.debug(f"Value content: {v}")
+                raise
 
         try:
+            self._logger.debug(
+                f"Starting memory scan with parameters: type={value_type}, value={value}, comparison={comparison_type}"
+            )
+            self._logger.debug(f"Memory ranges to scan: {ranges}")
+
             script = self._attacher.session.create_script(SCAN_SCRIPT)
             script.load()
 
             results = []
             for start, end in ranges:
-                # Convert values to JSON serializable format
-                json_value = make_serializable(value)
+                try:
+                    self._logger.debug(f"Processing range {hex(start)}-{hex(end)}")
+                    self._logger.debug(
+                        f"Raw value before serialization: {value} (type: {type(value)})"
+                    )
 
-                matches = script.exports.scan_memory(
-                    value_type, json_value, start, end, comparison_type
-                )
-                results.extend(
-                    [{"address": match, "value": json_value} for match in matches]
-                )
+                    # Convert values to JSON serializable format
+                    json_value = make_serializable(value)
+
+                    # Verify JSON serialization works
+                    try:
+                        import json
+
+                        json_str = json.dumps(json_value)
+                        self._logger.debug(
+                            f"Successfully serialized to JSON: {json_str[:100]}..."
+                        )
+                    except Exception as je:
+                        self._logger.error(
+                            f"JSON serialization verification failed: {str(je)}"
+                        )
+                        raise
+
+                    matches = script.exports.scan_memory(
+                        value_type, json_value, start, end, comparison_type
+                    )
+                    results.extend(
+                        [{"address": match, "value": json_value} for match in matches]
+                    )
+                except Exception as e:
+                    self._logger.error(
+                        f"Failed to scan range {hex(start)}-{hex(end)}: {str(e)}"
+                    )
+                    self._logger.debug(
+                        f"Failed value details - Type: {type(value)}, Content: {value}"
+                    )
+                    raise
 
             return results
         except Exception as e:
-            self._logger.error(f"Error scanning memory range: {e}")
+            self._logger.error(f"Error scanning memory range: {str(e)}", exc_info=True)
             raise
