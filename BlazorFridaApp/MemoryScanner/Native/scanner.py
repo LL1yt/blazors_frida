@@ -69,7 +69,7 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
     try:
         scanner = get_or_create_scanner(session.session_id, session)
         # Get all readable memory ranges using the session's enumerate_ranges
-        script = await session.create_script(
+        script = session.create_script(
             """
             rpc.exports = {
                 enumerateRanges: function() {
@@ -78,8 +78,8 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
             };
         """
         )
-        await script.load()
-        ranges = await script.exports.enumerate_ranges()
+        script.load()
+        ranges = script.exports.enumerate_ranges()
 
         # Convert ranges to list of tuples
         range_tuples = [
@@ -223,7 +223,7 @@ class MemoryScanner:
         """Scan memory for a specific value"""
         if not ranges:
             # Get all readable memory ranges using the session's enumerate_ranges
-            script = await self.frida_scanner._attacher.session.create_script(
+            script = self.frida_scanner._attacher.session.create_script(
                 """
                 rpc.exports = {
                     enumerateRanges: function() {
@@ -232,8 +232,8 @@ class MemoryScanner:
                 };
             """
             )
-            await script.load()
-            session_ranges = await script.exports.enumerate_ranges()
+            script.load()
+            session_ranges = script.exports.enumerate_ranges()
             ranges = [
                 (int(r["base"], 16), int(r["base"], 16) + r["size"])
                 for r in session_ranges

@@ -51,19 +51,20 @@ public class ProcessSelectorTests : TestContextBase
     {
         // Arrange & Act
         var cut = RenderComponent<ProcessSelector>();
+        
+        // Initialize and wait for first render
         await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
         
-        // Wait for re-render
+        // Wait for loading to complete and process list to be populated
         cut.WaitForState(() => !cut.Instance.IsLoading);
         cut.WaitForState(() => cut.Instance.ProcessList.Count == _defaultProcesses.Count);
-
-        // Ensure component has re-rendered with the updated process list
-        await cut.InvokeAsync(() => Task.Delay(100)); // Give time for the UI to update
+        
+        // Force a re-render to ensure UI is updated
+        cut.Render();
         
         // Assert
         _processServiceMock.Verify(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
         var selectItems = cut.FindComponents<SelectItem<int?>>();
-        Assert.Equal(3, selectItems.Count); // 2 processes + 1 default item
         Assert.Equal(_defaultProcesses.Count + 1, selectItems.Count); // +1 for the default "Select a process" item
     }
 

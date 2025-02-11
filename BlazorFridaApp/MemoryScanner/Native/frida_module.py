@@ -1,7 +1,7 @@
 from attacher import FridaAttacher
 from reader import read_memory
 from writer import write_memory
-from scanner import scan_memory, MemoryScanner
+from scanner import scan_memory, MemoryScanner, SCAN_SCRIPT
 from process_list import get_process_list
 import logging
 from typing import List, Tuple, Dict, Any
