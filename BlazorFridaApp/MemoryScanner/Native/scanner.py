@@ -121,7 +121,8 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
         'Float': 'float',
         'Double': 'double',
         'String': 'string',
-        'ByteArray': 'bytes'
+        'ByteArray': 'bytes',
+        '*': 'any' // Add support for wildcard type
     };
 
     // Normalize value type
@@ -203,12 +204,23 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
             case 'bytes':
                 searchValue = value;
                 break;
+
+            case 'any':
+                // For wildcard type, we'll match any value
+                const valueSize = typeof value === 'number' ? 4 : value.length;
+                const scanData = range.readByteArray(range.size);
+                
+                // Simply collect all addresses as matches when using wildcard
+                for (let offset = 0; offset < scanData.byteLength - valueSize + 1; offset++) {
+                    matches.push(range.base.add(offset));
+                }
+                break;
                 
             default:
                 throw new Error(`Unsupported normalized value type: ${normalizedType}`);
         }
         
-        if (normalizedType !== 'pattern' && searchValue !== undefined) {
+        if (normalizedType !== 'pattern' && normalizedType !== 'any' && searchValue !== undefined) {
             const scanResults = Memory.scanSync(range.base, range.size, searchValue);
             scanResults.forEach(match => {
                 matches.push(match.address);
