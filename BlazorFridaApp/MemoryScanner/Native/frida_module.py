@@ -139,17 +139,30 @@ class FridaMemoryScanner:
         if not self._attacher.session:
             raise RuntimeError("Not attached to any process")
 
+        def make_serializable(v):
+            """Convert value to JSON serializable format"""
+            if isinstance(v, bytes):
+                return v.hex()
+            if isinstance(v, (list, tuple)):
+                return [make_serializable(x) for x in v]
+            if isinstance(v, dict):
+                return {k: make_serializable(v) for k, v in v.items()}
+            return v
+
         try:
             script = self._attacher.session.create_script(SCAN_SCRIPT)
             script.load()
 
             results = []
             for start, end in ranges:
+                # Convert values to JSON serializable format
+                json_value = make_serializable(value)
+
                 matches = script.exports.scan_memory(
-                    value_type, value, start, end, comparison_type
+                    value_type, json_value, start, end, comparison_type
                 )
                 results.extend(
-                    [{"address": match, "value": value} for match in matches]
+                    [{"address": match, "value": json_value} for match in matches]
                 )
 
             return results

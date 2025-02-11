@@ -104,12 +104,23 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
-        // Stop the Python server to simulate connection error
-        // Note: In real test we would need to properly manage the server process
+        // First load the process list
+        var processListButton = _page.GetByRole(AriaRole.Button, new() { Name = "Process Scan" });
+        await processListButton.ClickAsync();
         
-        // Try to perform scan
-        var processCombobox = _page.GetByRole(AriaRole.Combobox).Nth(0);
-        await processCombobox.SelectOptionAsync(new[] { "notepad" });
+        // Wait for process list to be loaded and combobox to be enabled
+        var processCombobox = _page.GetByRole(AriaRole.Combobox).First;
+        await processCombobox.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
+        
+        // Wait a bit for the process list to be populated
+        await Task.Delay(2000);
+        
+        // Select notepad from the dropdown
+        await processCombobox.ClickAsync();
+        var notepadOption = _page.GetByText("notepad", new() { Exact = false });
+        await notepadOption.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await notepadOption.ClickAsync();
         
         var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" });
         await scanButton.ClickAsync();

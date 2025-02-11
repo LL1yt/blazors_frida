@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
+using System;
+using System.IO;
 
 namespace BlazorFridaApp.Tests.Components;
 
@@ -15,19 +17,22 @@ public class ConfigurationTests : TestContextBase, IDisposable
     private readonly Mock<IScanProfileService> _profileServiceMock;
     private readonly AppDbContext _dbContext;
     private readonly ServiceProvider _serviceProvider;
+    private readonly string _dbPath;
 
     public ConfigurationTests()
     {
         _profileServiceMock = new Mock<IScanProfileService>();
-
+        _dbPath = $"Data Source=TestMemoryScanner_{Guid.NewGuid()}.db";
+        
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options =>
-            options.UseInMemoryDatabase("TestMemoryScanner"));
+            options.UseSqlite(_dbPath));
             
         services.AddScoped<IScanProfileService>(_ => _profileServiceMock.Object);
         
         _serviceProvider = services.BuildServiceProvider();
         _dbContext = _serviceProvider.GetRequiredService<AppDbContext>();
+        _dbContext.Database.EnsureCreated();
         
         Services.AddScoped<IScanProfileService>(_ => _profileServiceMock.Object);
     }
@@ -36,10 +41,19 @@ public class ConfigurationTests : TestContextBase, IDisposable
     public async Task ShouldSaveAndLoadScanConfiguration()
     {
         // Arrange
+        var processSettings = new ProcessSettings 
+        { 
+            ProcessName = "notepad.exe",
+            Notes = "Test process"
+        };
+        await _dbContext.ProcessSettings.AddAsync(processSettings);
+        await _dbContext.SaveChangesAsync();
+
         var config = new ScanProfile
         {
             Name = "Test Config",
             ProcessName = "notepad.exe",
+            ProcessSettingsId = processSettings.Id,
             Pattern = new byte[] { 0xAA, 0xBB, 0xCC },
             Mask = "xxx",
             ComparisonType = "exact"
@@ -183,6 +197,17 @@ public class ConfigurationTests : TestContextBase, IDisposable
             _dbContext.Database.EnsureDeleted();
             _dbContext.Dispose();
             _serviceProvider.Dispose();
+            if (File.Exists(_dbPath))
+            {
+                try
+                {
+                    File.Delete(_dbPath);
+                }
+                catch
+                {
+                    // Best effort cleanup
+                }
+            }
         }
         base.Dispose(disposing);
     }
