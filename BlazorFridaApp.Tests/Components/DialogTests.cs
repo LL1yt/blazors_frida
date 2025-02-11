@@ -26,7 +26,7 @@ public class DialogTests : TestContextBase
         var textEdit = cut.FindComponent<TextEdit>();
         await textEdit.InvokeAsync(() => textEdit.Instance.TextChanged.InvokeAsync("TestConfig"));
 
-        var saveButton = cut.Find("button[color='Primary']");
+        var saveButton = cut.Find("button.btn-primary");
         await saveButton.ClickAsync(new MouseEventArgs());
 
         // Assert

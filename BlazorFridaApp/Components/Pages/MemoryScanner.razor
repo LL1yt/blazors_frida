@@ -58,17 +58,26 @@ protected new INotificationService NotificationService { get; set; } = default!;
                         ScanTypes="@_state.ScanTypes"
                         ValueTypes="@_state.ValueTypes"
                         PatternHex="@_state.PatternHex"
-                        PatternHexChanged="@((string pattern) => _state.PatternHex = pattern)"
                         Mask="@_state.Mask"
-                        MaskChanged="@((string mask) => _state.Mask = mask)"
-                        SearchValue="@_state.SearchValue"
-                        SearchValueChanged="@((int value) => _state.SearchValue = value)"
+                        @bind-SearchValue="@_state.SearchValue"
                         IsFirstScan="@_state.IsFirstScan"
                         IsLoading="@_state.IsLoading"
                         CanScan="@_state.CanScan"
-                        OnScanTypeChanged="@((ScanType type) => _state.SelectedScanType = type)"
-                        OnValueTypeChanged="@((MemoryValueType type) => _state.SelectedValueType = type)"
+                        OnScanTypeChanged="@OnScanTypeChanged"
+                        OnValueTypeChanged="@OnValueTypeChanged"
                         OnScanClick="@OnScan" />
+
+                    <ScanExecutor @ref="scanExecutor"
+                        ProcessId="@_state.SelectedProcessId"
+                        ScanType="@_state.SelectedScanType"
+                        ValueType="@_state.SelectedValueType"
+                        PatternHex="@_state.PatternHex"
+                        Mask="@_state.Mask"
+                        SearchValue="@_state.SearchValue"
+                        IsFirstScan="@_state.IsFirstScan"
+                        IsLoading="@_state.IsLoading"
+                        OnScanComplete="@OnScanComplete"
+                        OnLoadingChanged="@OnLoadingChanged" />
                 </CardBody>
             </Card>
 
@@ -88,11 +97,13 @@ protected new INotificationService NotificationService { get; set; } = default!;
             </Card>
         </div>
 
-        <Card Margin="Margin.Is3.FromBottom" Class="results-card">
+        <Card>
             <CardBody>
                 <ScanResultsGrid
                     Results="@_state.ScanResults"
                     ValueType="@_state.SelectedValueType"
+                    GetCurrentValue="@(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0))"
+                    IsFrozen="@IsFrozen"
                     OnValueChanged="@(args => OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
                     OnFreezeToggle="@(addr => ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
             </CardBody>
@@ -108,7 +119,7 @@ protected new INotificationService NotificationService { get; set; } = default!;
         <ModalBody>
             <SaveConfigDialog 
                 OnConfigSaved="@HandleConfigSaved"
-                OnCanceled="@HandleSaveConfigCancel" />
+                OnCanceled="@(() => _saveConfigModal?.Hide())" />
         </ModalBody>
     </ModalContent>
 </Modal>
@@ -120,9 +131,9 @@ protected new INotificationService NotificationService { get; set; } = default!;
         </ModalHeader>
         <ModalBody>
             <LoadConfigDialog 
-                Configs="@(_state.SavedConfigs ?? new Dictionary<string, ScannerConfig>())"
-                OnConfigSelected="@((ScannerConfig config) => HandleConfigLoaded(config))"
-                OnCanceled="@HandleLoadConfigCancel" />
+                Configs="@(_state.SavedConfigs ?? new())"
+                OnConfigSelected="@HandleConfigLoaded"
+                OnCanceled="@(() => _loadConfigModal?.Hide())" />
         </ModalBody>
     </ModalContent>
 </Modal>
@@ -196,7 +207,21 @@ protected new INotificationService NotificationService { get; set; } = default!;
 
         try 
         {
-            var config = _state.ToConfig(configName);
+            var config = new ScannerConfig 
+            {
+                Name = configName,
+                Description = $"Configuration saved at {DateTime.Now}",
+                ValueType = _state.SelectedValueType,
+                ScanType = _state.SelectedScanType.ToString(),
+                ComparisonType = "exact", // default value
+                CustomSettings = new Dictionary<string, string>
+                {
+                    ["PatternHex"] = _state.PatternHex,
+                    ["Mask"] = _state.Mask,
+                    ["SearchValue"] = _state.SearchValue.ToString()
+                }
+            };
+            
             await ProfileService.SaveScannerConfig(configName, config);
             _saveConfigModal?.Hide();
             NotificationService.ShowSuccess("Configuration saved", $"Configuration '{configName}' saved successfully");
@@ -214,7 +239,15 @@ protected new INotificationService NotificationService { get; set; } = default!;
 
         try
         {
-            _state.LoadConfig(config);
+            _state.LoadConfig(new Components.Pages.ScannerConfig 
+            {
+                ScanType = Enum.Parse<ScanType>(config.ScanType),
+                ValueType = config.ValueType,
+                PatternHex = config.CustomSettings?.GetValueOrDefault("PatternHex", "") ?? "",
+                Mask = config.CustomSettings?.GetValueOrDefault("Mask", "") ?? "",
+                SearchValue = int.Parse(config.CustomSettings?.GetValueOrDefault("SearchValue", "0") ?? "0")
+            });
+            
             _loadConfigModal?.Hide();
             NotificationService.ShowSuccess("Configuration loaded", "Configuration loaded successfully");
             return Task.CompletedTask;
@@ -223,22 +256,6 @@ protected new INotificationService NotificationService { get; set; } = default!;
         {
             NotificationService.ShowError("Load failed", $"Failed to load configuration: {ex.Message}");
             return Task.CompletedTask;
-        }
-    }
-
-    private void HandleSaveConfigCancel()
-    {
-        if (_saveConfigModal is not null)
-        {
-            _saveConfigModal.Hide();
-        }
-    }
-
-    private void HandleLoadConfigCancel()
-    {
-        if (_loadConfigModal is not null)
-        {
-            _loadConfigModal.Hide();
         }
     }
 }

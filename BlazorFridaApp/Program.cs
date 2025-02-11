@@ -70,7 +70,6 @@ try
 
     // Add notification and dialog services
     builder.Services.AddScoped<BlazorFridaApp.Services.INotificationService, BlazorFridaApp.Services.NotificationService>();
-    builder.Services.AddScoped<BlazorFridaApp.Services.IAppNotificationService, BlazorFridaApp.Services.AppNotificationService>();
     builder.Services.AddScoped<DialogService>();
 
     // Configure OpenTelemetry
