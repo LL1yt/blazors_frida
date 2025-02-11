@@ -96,52 +96,53 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
 
 
 SCAN_SCRIPT = """
-rpc.exports = {
-    scanMemory: function(valueType, value, startAddress, endAddress, comparisonType) {
-        const matches = [];
+console.log('[Frida Script] Initializing RPC exports');
+
+// Define the scan function once to avoid duplication
+function performScan(valueType, value, startAddress, endAddress, comparisonType) {
+    console.log('[Frida Script] Raw parameters received:', {
+        valueType, value, startAddress, endAddress, comparisonType
+    });
+
+    // Validate required parameters
+    if (valueType === undefined || value === undefined || 
+        startAddress === undefined || endAddress === undefined || 
+        comparisonType === undefined) {
+        throw new Error('All parameters are required: valueType, value, startAddress, endAddress, comparisonType');
+    }
+
+    // Normalize value type
+    valueType = String(valueType).toLowerCase();
+    
+    // Convert addresses to numbers if they're strings
+    startAddress = typeof startAddress === 'string' ? parseInt(startAddress) : startAddress;
+    endAddress = typeof endAddress === 'string' ? parseInt(endAddress) : endAddress;
+    
+    // Validate addresses
+    if (isNaN(startAddress) || isNaN(endAddress)) {
+        throw new Error('Invalid address values');
+    }
+
+    console.log(`[Frida Script] Normalized parameters:
+        valueType: ${valueType},
+        value: ${value},
+        startAddress: 0x${startAddress.toString(16)},
+        endAddress: 0x${endAddress.toString(16)},
+        comparisonType: ${comparisonType}`);
         
-        // Helper to check if memory range should be scanned
-        function shouldScanRange(range) {
-            // Skip if not readable
-            if (!(range.protection.indexOf('r') !== -1)) return false;
-            
-            // Skip certain module ranges
-            const skipModules = ['kernel32.dll', 'ntdll.dll'];
-            if (range.file && skipModules.some(m => range.file.name.includes(m))) {
-                return false;
-            }
-            
-            return true;
-        }
-        
-        // Convert pattern to byte array with wildcards
-        function patternToBytes(pattern) {
-            const bytes = [];
-            for (let i = 0; i < pattern.length; i += 2) {
-                const byte = pattern.substr(i, 2);
-                bytes.push(byte === '??' ? null : parseInt(byte, 16));
-            }
-            return bytes;
-        }
-        
-        // Pattern matching function
-        function matchPattern(data, pattern) {
-            for (let i = 0; i < pattern.length; i++) {
-                if (pattern[i] !== null && data[i] !== pattern[i]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        
-        // Get memory range to scan
-        const range = {
-            base: ptr(startAddress),
-            size: endAddress - startAddress
-        };
-        
-        try {
-            if (valueType === 'pattern') {
+    const matches = [];
+    
+    // Get memory range to scan
+    const range = {
+        base: ptr(startAddress),
+        size: endAddress - startAddress
+    };
+    
+    try {
+        // Handle different value types
+        let searchValue;
+        switch(valueType) {
+            case 'pattern':
                 const pattern = patternToBytes(value);
                 const data = range.readByteArray(range.size);
                 
@@ -151,34 +152,93 @@ rpc.exports = {
                         matches.push(range.base.add(offset));
                     }
                 }
-            } else {
-                // Standard value scanning
-                let searchValue;
-                if (valueType === 'string') {
-                    searchValue = value;
-                } else if (valueType === 'int32') {
-                    searchValue = new Int32Array([value])[0];
-                } else if (valueType === 'int64') {
-                    searchValue = new BigInt64Array([value])[0];
-                } else if (valueType === 'float') {
-                    searchValue = new Float32Array([value])[0];
-                } else if (valueType === 'double') {
-                    searchValue = new Float64Array([value])[0];
-                }
+                break;
                 
-                const pattern = Memory.scanSync(range.base, range.size, searchValue);
-                pattern.forEach(match => {
-                    matches.push(match.address);
-                });
-            }
-        } catch (e) {
-            // Log error and continue
-            console.log('Error scanning range:', e);
+            case 'string':
+                searchValue = value.toString();
+                break;
+                
+            case 'int32':
+            case 'int':
+                searchValue = new Int32Array([parseInt(value)])[0];
+                break;
+                
+            case 'int64':
+                searchValue = new Int64(value.toString());
+                break;
+                
+            case 'float':
+                searchValue = new Float32Array([parseFloat(value)])[0];
+                break;
+                
+            case 'double':
+                searchValue = new Float64Array([parseFloat(value)])[0];
+                break;
+                
+            default:
+                throw new Error(`Unsupported value type: ${valueType}`);
         }
         
-        return matches.map(ptr => ptr.toString());
+        if (valueType !== 'pattern' && searchValue !== undefined) {
+            const scanResults = Memory.scanSync(range.base, range.size, searchValue);
+            scanResults.forEach(match => {
+                matches.push(match.address);
+            });
+        }
+    } catch (e) {
+        console.log('[Frida Script] Error scanning range:', e.stack || e);
+        throw e;
     }
+    
+    console.log(`[Frida Script] scan found ${matches.length} matches`);
+    return matches.map(ptr => ptr.toString());
+}
+
+// Helper to check if memory range should be scanned
+function shouldScanRange(range) {
+    // Skip if not readable
+    if (!(range.protection.indexOf('r') !== -1)) return false;
+    
+    // Skip certain module ranges
+    const skipModules = ['kernel32.dll', 'ntdll.dll'];
+    if (range.file && skipModules.some(m => range.file.name.includes(m))) {
+        return false;
+    }
+    
+    return true;
+}
+
+// Convert pattern to byte array with wildcards
+function patternToBytes(pattern) {
+    if (typeof pattern !== 'string') {
+        throw new Error('Pattern must be a string');
+    }
+    
+    const bytes = [];
+    for (let i = 0; i < pattern.length; i += 2) {
+        const byte = pattern.substr(i, 2);
+        bytes.push(byte === '??' ? null : parseInt(byte, 16));
+    }
+    return bytes;
+}
+
+// Pattern matching function
+function matchPattern(data, pattern) {
+    for (let i = 0; i < pattern.length; i++) {
+        if (pattern[i] !== null && data[i] !== pattern[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Register both camelCase and lowercase versions
+rpc.exports = {
+    scanMemory: performScan,
+    scanmemory: performScan  // lowercase version
 };
+
+console.log('[Frida Script] RPC exports registered:', Object.keys(rpc.exports));
 """
 
 

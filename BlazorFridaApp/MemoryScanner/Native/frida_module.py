@@ -204,7 +204,21 @@ class FridaMemoryScanner:
             self._logger.debug(f"Memory ranges to scan: {ranges}")
 
             script = self._attacher.session.create_script(SCAN_SCRIPT)
+            self._logger.debug("Created Frida script")
+
+            script.on(
+                "message",
+                lambda message, data: self._logger.debug(
+                    f"Script message: {message}, data: {data}"
+                ),
+            )
+            self._logger.debug("Registered message handler")
+
             script.load()
+            self._logger.debug("Script loaded successfully")
+
+            # Log available exports
+            self._logger.debug(f"Available script exports: {dir(script.exports)}")
 
             results = []
             for start, end in ranges:
@@ -225,16 +239,22 @@ class FridaMemoryScanner:
                     )
 
                     # Call scan_memory with positional parameters in the order defined in the script
-                    self._logger.debug("Calling scanMemory with parameters:")
-                    self._logger.debug(f"  1. valueType: {value_type}")
-                    self._logger.debug(f"  2. value: {scan_value}")
-                    self._logger.debug(f"  3. startAddress: {hex(start)}")
-                    self._logger.debug(f"  4. endAddress: {hex(end)}")
-                    self._logger.debug(f"  5. comparisonType: {comparison_type}")
+                    if not hasattr(script.exports, "scanMemory"):
+                        available_methods = dir(script.exports)
+                        self._logger.error(
+                            f"scanMemory method not found. Available methods: {available_methods}"
+                        )
+                        raise RuntimeError(
+                            f"Frida script missing required method: scanMemory. Available methods: {available_methods}"
+                        )
 
-                    if not hasattr(script.exports, 'scanMemory'):
-                        raise RuntimeError("Frida script missing required method: scanMemory")
-                
+                    self._logger.debug("Calling scanMemory with parameters:")
+                    self._logger.debug(f"  valueType: {value_type}")
+                    self._logger.debug(f"  value: {scan_value}")
+                    self._logger.debug(f"  startAddress: 0x{start:x}")
+                    self._logger.debug(f"  endAddress: 0x{end:x}")
+                    self._logger.debug(f"  comparisonType: {comparison_type}")
+
                     matches = script.exports.scanMemory(
                         value_type, scan_value, start, end, comparison_type
                     )
