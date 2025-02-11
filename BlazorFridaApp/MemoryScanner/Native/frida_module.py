@@ -219,7 +219,7 @@ class FridaMemoryScanner:
 
                     if isinstance(json_value, bytes):
                         encoded_value = b64encode(json_value).decode('utf-8')
-                        logger.debug(f"Encoding bytes value to base64: {encoded_value[:50]}...")
+                        self._logger.debug(f"Encoding bytes value to base64: {encoded_value[:50]}...")
                     else:
                         encoded_value = json_value
 
@@ -230,17 +230,23 @@ class FridaMemoryScanner:
                         [{"address": match, "value": json_value} for match in matches]
                     )
                 except TypeError as e:
-                    error_details = {
+                    safe_details = {
                         "error_type": "SerializationError",
                         "value_type": type(json_value).__name__,
-                        "value_sample": str(json_value)[:100],
+                        "value_sample": repr(json_value)[:100],
                         "stack_trace": traceback.format_exc()
                     }
-                    logger.error("JSON serialization failed: %s", json.dumps(error_details))
+                    
+                    try:
+                        logged_details = json.dumps(safe_details, default=str)
+                    except Exception as inner_e:
+                        logged_details = f"Failed to serialize error: {str(inner_e)}"
+                    
+                    self._logger.error("JSON serialization failed: %s", logged_details)
                     
                     if isinstance(json_value, bytes):
                         hex_dump = ' '.join(f'{b:02x}' for b in json_value[:16])
-                        logger.debug("Partial hex dump: %s...", hex_dump)
+                        self._logger.debug("Partial hex dump: %s...", hex_dump)
                 except Exception as e:
                     self._logger.error(
                         f"Failed to scan range {hex(start)}-{hex(end)}: {str(e)}"
