@@ -70,6 +70,24 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IDisposable
         IEnumerable<(ulong start, ulong end)> ranges)
     {
         ThrowIfDisposed();
+        
+        // Add pattern validation
+        if (valueType.Equals("pattern", StringComparison.OrdinalIgnoreCase))
+        {
+            if (value == null || value.Length == 0)
+            {
+                throw new ArgumentException("Pattern cannot be empty", nameof(value));
+            }
+            if (value.Length < 4) // Minimum pattern length requirement
+            {
+                throw new ArgumentException("Pattern must be at least 4 bytes long", nameof(value));
+            }
+            if (value.Length > 256) // Maximum pattern length
+            {
+                throw new ArgumentException("Pattern cannot be longer than 256 bytes", nameof(value));
+            }
+        }
+        
         var results = await _scannerService.ScanAsync(sessionId, valueType, value, comparisonType, ranges);
         return results;
     }
@@ -167,4 +185,4 @@ public class MemoryScannerGrpcService : IMemoryScannerGrpcService, IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
-} 
+}
