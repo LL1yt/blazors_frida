@@ -203,6 +203,34 @@ class FridaMemoryScanner:
             )
             self._logger.debug(f"Memory ranges to scan: {ranges}")
 
+            # Validate value type before scanning
+            valid_types = [
+                "int8",
+                "uint8",
+                "int16",
+                "uint16",
+                "int32",
+                "uint32",
+                "int64",
+                "uint64",
+                "float",
+                "double",
+                "bytes",
+                "any",
+                "*",  # Allow raw wildcard type
+            ]
+
+            # Map value type if needed
+            if value_type == "*":
+                value_type = "any"
+
+            if value_type not in valid_types:
+                raise ValueError(
+                    f"Invalid value type: {value_type}. Supported types: {valid_types}"
+                )
+
+            scan_value = make_serializable(value)
+
             script = self._attacher.session.create_script(SCAN_SCRIPT)
             self._logger.debug("Created Frida script")
 
@@ -226,7 +254,6 @@ class FridaMemoryScanner:
                     self._logger.debug(f"Processing range {hex(start)}-{hex(end)}")
 
                     # Prepare scan value based on type
-                    scan_value = value
                     if isinstance(value, bytes):
                         scan_value = make_serializable(value)
                     elif isinstance(value, (int, float, str, bool)):

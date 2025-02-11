@@ -77,7 +77,7 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
                 SessionId = sessionId,
                 Value = ByteString.CopyFromUtf8(searchPattern),
                 ScanType = scanType.ToString(),
-                ValueType = profile.ValueType.ToString(),
+                ValueType = MapValueType(profile.ValueType.ToString()),
                 ComparisonType = profile.ComparisonType
             };
 
@@ -120,6 +120,23 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
         }
     }
 
+    public string MapValueType(string valueType)
+    {
+        return valueType.ToLowerInvariant() switch
+        {
+            "byte" => "uint8",
+            "int16" => "int16",
+            "int32" => "int32",
+            "int64" => "int64",
+            "float" => "float",
+            "double" => "double",
+            "bytearray" => "bytes",
+            "unknown" => "int32", // Default to int32 for unknown
+            "*" => "any", // Handle wildcard type
+            _ => throw new ArgumentException($"Unsupported value type: {valueType}")
+        };
+    }
+
     public async Task<List<nint>> ScanForValue(int processId, int value, MemoryValueType valueType)
     {
         try
@@ -131,7 +148,7 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
             {
                 SessionId = sessionId,
                 Value = ByteString.CopyFrom(BitConverter.GetBytes(value)),
-                ValueType = valueType.ToString(),
+                ValueType = MapValueType(valueType.ToString()),
                 ComparisonType = "exact",
                 ScanType = "exact"
             };
@@ -165,7 +182,7 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
             var request = new Proto.ScanRequest
             {
                 SessionId = sessionId,
-                ValueType = valueType.ToString(),
+                ValueType = MapValueType(valueType.ToString()),
                 ComparisonType = "all",
                 ScanType = "all"
             };
@@ -187,21 +204,32 @@ public sealed class ScannerGrpcService : BaseGrpcService, IScannerGrpcService
         string comparisonType,
         IEnumerable<(ulong start, ulong end)> ranges)
     {
+        ThrowIfDisposed();
+        
+        // Add pattern validation
+        if (valueType.Equals("pattern", StringComparison.OrdinalIgnoreCase))
+        {
+            if (value == null || value.Length == 0)
+            {
+                throw new ArgumentException("Pattern cannot be empty", nameof(value));
+            }
+            if (value.Length < 4) // Minimum pattern length requirement
+            {
+                throw new ArgumentException("Pattern must be at least 4 bytes long", nameof(value));
+            }
+            if (value.Length > 256) // Maximum pattern length
+            {
+                throw new ArgumentException("Pattern cannot be longer than 256 bytes", nameof(value));
+            }
+        }
+        else
+        {
+            // Map the value type for non-pattern scans
+            valueType = MapValueType(valueType);
+        }
+        
         try
         {
-            if (valueType.Equals("pattern", StringComparison.OrdinalIgnoreCase))
-            {
-                if (value == null || value.Length == 0)
-                {
-                    throw new ArgumentException("Pattern cannot be empty", nameof(value));
-                }
-
-                if (value.Length < 2) // Minimum pattern length check
-                {
-                    throw new ArgumentException("Pattern must be at least 2 bytes long", nameof(value));
-                }
-            }
-
             var channel = await GetChannelAsync();
             var client = CreateClient(channel);
             var request = new Proto.ScanRequest

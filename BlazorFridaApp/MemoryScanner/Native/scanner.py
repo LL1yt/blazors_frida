@@ -122,7 +122,8 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
         'Double': 'double',
         'String': 'string',
         'ByteArray': 'bytes',
-        '*': 'any' // Add support for wildcard type
+        '*': 'any', // Add support for wildcard type
+        'any': 'any' // Also support the already mapped type
     };
 
     // Normalize value type

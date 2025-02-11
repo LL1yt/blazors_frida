@@ -39,13 +39,13 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
     }
 
     [Theory]
-    [InlineData(MemoryValueType.Byte, 1)]
-    [InlineData(MemoryValueType.Int16, 2)]
-    [InlineData(MemoryValueType.Int32, 4)]
-    [InlineData(MemoryValueType.Int64, 8)]
-    [InlineData(MemoryValueType.Float, 4)]
-    [InlineData(MemoryValueType.Double, 8)]
-    public async Task ShouldScanWithDifferentValueTypes(MemoryValueType valueType, int expectedSize)
+    [InlineData(MemoryValueType.Byte, "uint8", 1)]
+    [InlineData(MemoryValueType.Int16, "int16", 2)]
+    [InlineData(MemoryValueType.Int32, "int32", 4)]
+    [InlineData(MemoryValueType.Int64, "int64", 8)]
+    [InlineData(MemoryValueType.Float, "float", 4)]
+    [InlineData(MemoryValueType.Double, "double", 8)]
+    public async Task ShouldScanWithDifferentValueTypes(MemoryValueType valueType, string expectedFridaType, int expectedSize)
     {
         // Arrange
         var processInfo = GetTestProcess();
@@ -59,6 +59,10 @@ public class MemoryScannerIntegrationTests : IntegrationTestBase
         // Assert
         Assert.NotNull(result);
         Assert.Equal(expectedSize, GetValueTypeSize(valueType));
+        
+        // Verify that the correct Frida type was used (this requires exposing the mapped type through the service)
+        var mappedType = ((ScannerGrpcService)_scannerService).MapValueType(valueType.ToString());
+        Assert.Equal(expectedFridaType, mappedType);
     }
 
     private int GetValueTypeSize(MemoryValueType valueType) => valueType switch
