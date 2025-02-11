@@ -149,10 +149,23 @@ class FridaMemoryScanner:
                 )
 
                 if isinstance(v, bytes):
-                    # Convert bytes to base64 string for safe JSON serialization
-                    encoded_value = b64encode(v).decode('utf-8')
-                    self._logger.debug(f"Encoding bytes value to base64: {encoded_value[:50]}...")
-                    return {"type": "bytes", "encoding": "base64", "data": encoded_value}
+                    # For pattern type, convert bytes to hex string
+                    if value_type == "pattern":
+                        hex_str = "".join(f"{b:02x}" for b in v)
+                        self._logger.debug(
+                            f"Converting pattern bytes to hex: {hex_str}"
+                        )
+                        return hex_str
+                    # For other types, use base64
+                    encoded_value = b64encode(v).decode("utf-8")
+                    self._logger.debug(
+                        f"Encoding bytes value to base64: {encoded_value[:50]}..."
+                    )
+                    return {
+                        "type": "bytes",
+                        "encoding": "base64",
+                        "data": encoded_value,
+                    }
 
                 if isinstance(v, (list, tuple)):
                     result = [make_serializable(x) for x in v]
@@ -179,6 +192,12 @@ class FridaMemoryScanner:
                 raise
 
         try:
+            # Ensure value_type is a string
+            if isinstance(value_type, bytes):
+                value_type = value_type.decode("utf-8", errors="replace")
+            elif not isinstance(value_type, str):
+                value_type = str(value_type)
+
             self._logger.debug(
                 f"Starting memory scan with parameters: type={value_type}, value={value}, comparison={comparison_type}"
             )
@@ -191,62 +210,56 @@ class FridaMemoryScanner:
             for start, end in ranges:
                 try:
                     self._logger.debug(f"Processing range {hex(start)}-{hex(end)}")
-                    self._logger.debug(
-                        f"Raw value before serialization: {value} (type: {type(value)})"
-                    )
 
-                    # Convert values to JSON serializable format
-                    json_value = make_serializable(value)
-
-                    # Verify JSON serialization works
-                    try:
-                        import json
-
-                        json_str = json.dumps(json_value)
-                        self._logger.debug(
-                            f"Successfully serialized to JSON: {json_str[:100]}..."
-                        )
-                    except Exception as je:
-                        self._logger.error(
-                            f"JSON serialization verification failed: {str(je)}, value type: {type(json_value)}"
-                        )
-                        if isinstance(json_value, (list, tuple)):
-                            self._logger.debug(
-                                "List contents types: "
-                                + str([type(x) for x in json_value])
-                            )
-                        raise
-
-                    if isinstance(json_value, bytes):
-                        encoded_value = b64encode(json_value).decode('utf-8')
-                        self._logger.debug(f"Encoding bytes value to base64: {encoded_value[:50]}...")
+                    # Prepare scan value based on type
+                    scan_value = value
+                    if isinstance(value, bytes):
+                        scan_value = make_serializable(value)
+                    elif isinstance(value, (int, float, str, bool)):
+                        scan_value = value
                     else:
-                        encoded_value = json_value
+                        scan_value = str(value)
 
-                    matches = script.exports.scan_memory(
-                        value_type, encoded_value, start, end, comparison_type
+                    self._logger.debug(
+                        f"Prepared scan value: {scan_value} (type: {type(scan_value)})"
                     )
-                    results.extend(
-                        [{"address": match, "value": json_value} for match in matches]
+
+                    # Call scan_memory with positional parameters in the order defined in the script
+                    self._logger.debug("Calling scanMemory with parameters:")
+                    self._logger.debug(f"  1. valueType: {value_type}")
+                    self._logger.debug(f"  2. value: {scan_value}")
+                    self._logger.debug(f"  3. startAddress: {hex(start)}")
+                    self._logger.debug(f"  4. endAddress: {hex(end)}")
+                    self._logger.debug(f"  5. comparisonType: {comparison_type}")
+
+                    if not hasattr(script.exports, 'scanMemory'):
+                        raise RuntimeError("Frida script missing required method: scanMemory")
+                
+                    matches = script.exports.scanMemory(
+                        value_type, scan_value, start, end, comparison_type
                     )
+
+                    self._logger.debug(
+                        f"Scan completed, found {len(matches) if matches else 0} matches"
+                    )
+
+                    # Process results
+                    if matches:
+                        results.extend(
+                            [
+                                {"address": int(match), "value": scan_value}
+                                for match in matches
+                            ]
+                        )
+
                 except TypeError as e:
-                    safe_details = {
-                        "error_type": "SerializationError",
-                        "value_type": type(json_value).__name__,
-                        "value_sample": repr(json_value)[:100],
-                        "stack_trace": traceback.format_exc()
-                    }
-                    
-                    try:
-                        logged_details = json.dumps(safe_details, default=str)
-                    except Exception as inner_e:
-                        logged_details = f"Failed to serialize error: {str(inner_e)}"
-                    
-                    self._logger.error("JSON serialization failed: %s", logged_details)
-                    
-                    if isinstance(json_value, bytes):
-                        hex_dump = ' '.join(f'{b:02x}' for b in json_value[:16])
-                        self._logger.debug("Partial hex dump: %s...", hex_dump)
+                    self._logger.error(
+                        f"Type error during scan: {str(e)}\n"
+                        f"Value type: {value_type} (type: {type(value_type)})\n"
+                        f"Value: {value} (type: {type(value)})\n"
+                        f"Scan value: {scan_value if 'scan_value' in locals() else 'not prepared'}"
+                    )
+                    raise
                 except Exception as e:
                     self._logger.error(
                         f"Failed to scan range {hex(start)}-{hex(end)}: {str(e)}"
