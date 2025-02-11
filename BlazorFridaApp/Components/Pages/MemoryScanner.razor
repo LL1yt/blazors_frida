@@ -207,20 +207,9 @@ protected new INotificationService NotificationService { get; set; } = default!;
 
         try 
         {
-            var config = new ScannerConfig 
-            {
-                Name = configName,
-                Description = $"Configuration saved at {DateTime.Now}",
-                ValueType = _state.SelectedValueType,
-                ScanType = _state.SelectedScanType.ToString(),
-                ComparisonType = "exact", // default value
-                CustomSettings = new Dictionary<string, string>
-                {
-                    ["PatternHex"] = _state.PatternHex,
-                    ["Mask"] = _state.Mask,
-                    ["SearchValue"] = _state.SearchValue.ToString()
-                }
-            };
+            var config = _state.ToConfig();
+            config.Name = configName;
+            config.Description = $"Configuration saved at {DateTime.Now}";
             
             await ProfileService.SaveScannerConfig(configName, config);
             _saveConfigModal?.Hide();
@@ -239,15 +228,7 @@ protected new INotificationService NotificationService { get; set; } = default!;
 
         try
         {
-            _state.LoadConfig(new Components.Pages.ScannerConfig 
-            {
-                ScanType = Enum.Parse<ScanType>(config.ScanType),
-                ValueType = config.ValueType,
-                PatternHex = config.CustomSettings?.GetValueOrDefault("PatternHex", "") ?? "",
-                Mask = config.CustomSettings?.GetValueOrDefault("Mask", "") ?? "",
-                SearchValue = int.Parse(config.CustomSettings?.GetValueOrDefault("SearchValue", "0") ?? "0")
-            });
-            
+            _state.LoadConfig(config);
             _loadConfigModal?.Hide();
             NotificationService.ShowSuccess("Configuration loaded", "Configuration loaded successfully");
             return Task.CompletedTask;

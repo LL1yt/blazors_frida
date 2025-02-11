@@ -5,7 +5,9 @@
 <DataGrid TItem="IntPtr"
           Data="@Results"
           Responsive>
-    <DataGridColumn TItem="IntPtr" Field="@nameof(IntPtr)" Caption="Address">
+    <DataGridColumn TItem="IntPtr" 
+                   Caption="Address"
+                   Sortable="false">
         <DisplayTemplate>
             @context.ToString("X8")
         </DisplayTemplate>
@@ -63,12 +65,12 @@
             _ => GetCurrentValue(value).ToString()
         };
     }
-    private async Task HandleValueChanged(IntPtr address, object newValue)
+
+    private async Task HandleValueChanged(IntPtr address, int value)
     {
-        // Add null check and proper event invocation
         if (OnValueChanged.HasDelegate)
         {
-            await OnValueChanged.InvokeAsync((address, (int)newValue));
+            await OnValueChanged.InvokeAsync((address, value));
         }
     }
 }

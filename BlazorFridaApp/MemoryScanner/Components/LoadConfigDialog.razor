@@ -7,27 +7,27 @@
 @using BlazorFridaApp.MemoryScanner.Models
 
 <div class="load-config-dialog">
-    <DataGrid TItem="KeyValuePair<string, Models.ScannerConfig>"
-              Data="@Configs"
+    <DataGrid TItem="ConfigGridItem"
+              Data="@GridData"
               Filterable
               Sortable
               RowClicked="@(args => selectedConfig = args.Item)"
               Margin="Margin.Is3.FromBottom">
-        <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
-                       Field="Key"
+        <DataGridColumn TItem="ConfigGridItem"
+                       Field="@nameof(ConfigGridItem.Name)"
                        Caption="Name" />
-        <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
-                       Field="Value.ScanType"
+        <DataGridColumn TItem="ConfigGridItem"
+                       Field="@nameof(ConfigGridItem.ScanType)"
                        Caption="Scan Type" />
-        <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
-                       Field="Value.ValueType"
+        <DataGridColumn TItem="ConfigGridItem"
+                       Field="@nameof(ConfigGridItem.ValueType)"
                        Caption="Value Type" />
-        <DataGridColumn TItem="KeyValuePair<string, Models.ScannerConfig>"
+        <DataGridColumn TItem="ConfigGridItem"
                        Caption="Actions">
             <DisplayTemplate>
                 <Button Color="Color.Danger"
                         Size="Size.Small"
-                        Clicked="@(() => DeleteConfig(context.Key))">
+                        Clicked="@(() => DeleteConfig(context.Name))">
                     <Blazorise.Icon Name="@FontAwesomeIcons.Trash" />
                 </Button>
             </DisplayTemplate>
@@ -40,7 +40,7 @@
             Cancel
         </Button>
         <Button Color="Color.Primary"
-                Clicked="@(() => OnConfigSelected.InvokeAsync(selectedConfig?.Value))"
+                Clicked="@(() => OnConfigSelected.InvokeAsync(selectedConfig?.Config))"
                 Disabled="@(selectedConfig == null)">
             Load
         </Button>
@@ -48,6 +48,25 @@
 </div>
 
 @code {
+    private class ConfigGridItem
+    {
+        public string Name { get; set; } = "";
+        public string ScanType { get; set; } = "";
+        public string ValueType { get; set; } = "";
+        public ScannerConfig Config { get; set; } = new();
+
+        public static ConfigGridItem FromKeyValuePair(KeyValuePair<string, ScannerConfig> kvp)
+        {
+            return new ConfigGridItem
+            {
+                Name = kvp.Key,
+                ScanType = kvp.Value.ScanType.ToString(),
+                ValueType = kvp.Value.ValueType.ToString(),
+                Config = kvp.Value
+            };
+        }
+    }
+
     [Parameter]
     public required Dictionary<string, Models.ScannerConfig> Configs { get; set; }
 
@@ -57,7 +76,8 @@
     [Inject] public required IScanProfileService ProfileService { get; set; }
     [Inject] public required BlazorFridaApp.Services.INotificationService NotificationService { get; set; }
 
-    private KeyValuePair<string, Models.ScannerConfig>? selectedConfig;
+    private ConfigGridItem? selectedConfig;
+    private IEnumerable<ConfigGridItem> GridData => Configs.Select(ConfigGridItem.FromKeyValuePair);
 
     private Task OnCancel() => OnCanceled.InvokeAsync();
 

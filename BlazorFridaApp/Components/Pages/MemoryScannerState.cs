@@ -18,7 +18,7 @@ namespace BlazorFridaApp.Components.Pages
         public int SearchValue { get; set; }
         public bool IsFirstScan { get; set; } = true;
         public bool IsLoading { get; set; }
-        public Dictionary<string, Models.ScannerConfig> SavedConfigs { get; set; } = new();
+        public Dictionary<string, ScannerConfig> SavedConfigs { get; set; } = new();
 
         public Array ScanTypes => Enum.GetValues(typeof(ScanType));
         public Array ValueTypes => Enum.GetValues(typeof(MemoryValueType));
@@ -51,38 +51,32 @@ namespace BlazorFridaApp.Components.Pages
         {
             return new ScannerConfig
             {
-                ScanType = SelectedScanType,
                 ValueType = SelectedValueType,
-                PatternHex = PatternHex,
-                Mask = Mask,
-                SearchValue = SearchValue
+                ScanType = SelectedScanType.ToString(),
+                ComparisonType = "exact",
+                CustomSettings = new Dictionary<string, string>
+                {
+                    ["PatternHex"] = PatternHex,
+                    ["Mask"] = Mask,
+                    ["SearchValue"] = SearchValue.ToString()
+                }
             };
         }
 
         public void LoadConfig(ScannerConfig config)
         {
-            SelectedScanType = config.ScanType;
+            if (Enum.TryParse<ScanType>(config.ScanType, out var scanType))
+            {
+                SelectedScanType = scanType;
+            }
             SelectedValueType = config.ValueType;
-            PatternHex = config.PatternHex;
-            Mask = config.Mask;
-            SearchValue = config.SearchValue;
+            PatternHex = config.CustomSettings?.GetValueOrDefault("PatternHex", "") ?? "";
+            Mask = config.CustomSettings?.GetValueOrDefault("Mask", "") ?? "";
+            if (int.TryParse(config.CustomSettings?.GetValueOrDefault("SearchValue", "0"), out var searchValue))
+            {
+                SearchValue = searchValue;
+            }
             Reset();
-        }
-    }
-
-    public class ScannerConfig
-    {
-        public ScanType ScanType { get; set; }
-        public MemoryValueType ValueType { get; set; }
-        public string PatternHex { get; set; } = "";
-        public string Mask { get; set; } = "";
-        public int SearchValue { get; set; }
-
-        public string ToJson() => JsonSerializer.Serialize(this);
-        public static ScannerConfig FromJson(string json)
-        {
-            var config = JsonSerializer.Deserialize<ScannerConfig>(json);
-            return config ?? throw new JsonException("Failed to deserialize ScannerConfig");
         }
     }
 }

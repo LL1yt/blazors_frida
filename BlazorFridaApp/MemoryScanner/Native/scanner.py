@@ -10,6 +10,7 @@ import weakref
 import psutil
 from threading import Lock
 from weakref import WeakValueDictionary
+import frida
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,8 @@ async def scan_memory(session, value_type: str, value: Any) -> List[str]:
     try:
         scanner = get_or_create_scanner(session.session_id, session)
         # Get all readable memory ranges
-        ranges = await scanner.frida_scanner.enumerate_ranges("r--")
+        process = frida.Process(session.pid)
+        ranges = process.enumerate_ranges("r--")
 
         # Convert ranges to list of tuples
         range_tuples = [
@@ -212,9 +214,8 @@ class MemoryScanner:
         """Scan memory for a specific value"""
         if not ranges:
             # Get all readable memory ranges from the Frida session
-            session_ranges = (
-                await self.frida_scanner._attacher.session.enumerate_ranges("r--")
-            )
+            process = frida.Process(self.frida_scanner._attacher.session.pid)
+            session_ranges = process.enumerate_ranges("r--")
             ranges = [
                 (int(r.base_address, 16), int(r.base_address, 16) + r.size)
                 for r in session_ranges

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.MemoryScanner.Models;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Blazorise;
 using Blazorise.DataGrid;
 using Moq;
@@ -42,17 +43,21 @@ public class DialogTests : TestContextBase
             { "Test", new ScannerConfig() }
         };
 
+        var profileServiceMock = new Mock<IScanProfileService>();
+        Services.AddScoped<IScanProfileService>(_ => profileServiceMock.Object);
+
         ScannerConfig? selectedConfig = null;
         var cut = RenderComponent<LoadConfigDialog>(parameters => parameters
             .Add(p => p.Configs, configs)
             .Add(p => p.OnConfigSelected, EventCallback.Factory.Create<ScannerConfig>(this, config => selectedConfig = config)));
 
         // Act
-        var grid = cut.FindComponent<DataGrid<KeyValuePair<string, ScannerConfig>>>();
-        var row = grid.Find("tbody tr");
+        // First click the row to select it
+        var row = cut.Find("tbody tr");
         row.Click();
 
-        var loadButton = cut.Find("button[color='Primary']");
+        // Then click the load button
+        var loadButton = cut.Find("button.btn.btn-primary");
         loadButton.Click();
 
         // Assert
