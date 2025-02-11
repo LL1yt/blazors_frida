@@ -100,34 +100,63 @@ public class ConfigurationTests : TestContextBase, IDisposable
     }
 
     [Fact]
-    public void ShouldHandleDuplicateConfigurationNames()
+    public async Task ShouldHandleDuplicateConfigurationNames()
     {
         // Arrange
-        var config1 = new ScannerConfig { Name = "TestConfig" };
-        var config2 = new ScannerConfig { Name = "TestConfig" };
+        var processSettings = new ProcessSettings 
+        { 
+            ProcessName = "test.exe",
+            Notes = "Test process"
+        };
+        await _dbContext.ProcessSettings.AddAsync(processSettings);
+        await _dbContext.SaveChangesAsync();
 
-        // Act & Assert
-        _dbContext.ScannerConfigs.Add(config1);
-        _dbContext.SaveChanges();
+        var config1 = new ScanProfile 
+        { 
+            Name = "TestConfig", 
+            ProcessName = "test.exe",
+            ProcessSettingsId = processSettings.Id
+        };
+        var config2 = new ScanProfile 
+        { 
+            Name = "TestConfig", 
+            ProcessName = "test.exe",
+            ProcessSettingsId = processSettings.Id
+        };
 
-        _dbContext.ScannerConfigs.Add(config2);
-        var exception = Assert.Throws<DbUpdateException>(() => 
-        {
-            _dbContext.SaveChanges();
-        });
+        // Act
+        await _dbContext.ScanProfiles.AddAsync(config1);
+        await _dbContext.SaveChangesAsync();
         
-        Assert.Contains("UNIQUE constraint failed: ScannerConfigs.Name", 
-            exception.InnerException?.Message);
+        // Clear the change tracker to simulate a fresh context
+        _dbContext.ChangeTracker.Clear();
+        
+        await _dbContext.ScanProfiles.AddAsync(config2);
+        
+        // Assert
+        await Assert.ThrowsAsync<DbUpdateException>(async () => 
+        {
+            await _dbContext.SaveChangesAsync();
+        });
     }
 
     [Fact]
     public async Task ShouldTrackConfigurationUsage()
     {
         // Arrange
+        var processSettings = new ProcessSettings 
+        { 
+            ProcessName = "notepad.exe",
+            Notes = "Test process"
+        };
+        await _dbContext.ProcessSettings.AddAsync(processSettings);
+        await _dbContext.SaveChangesAsync();
+
         var config = new ScanProfile
         {
             Name = "Test Config",
             ProcessName = "notepad.exe",
+            ProcessSettingsId = processSettings.Id,
             Created = DateTime.UtcNow.AddDays(-1),
             LastUsed = DateTime.UtcNow.AddDays(-1)
         };

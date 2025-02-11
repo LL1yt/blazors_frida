@@ -140,17 +140,13 @@ class FridaMemoryScanner:
             raise RuntimeError("Not attached to any process")
 
         try:
-            script = await self._attacher.session.create_script(SCAN_SCRIPT)
-            await script.load()
+            script = self._attacher.session.create_script(SCAN_SCRIPT)
+            script.load()
 
             results = []
             for start, end in ranges:
-                matches = await script.exports.scan_memory(
-                    value_type=value_type,
-                    value=value,
-                    start_address=start,
-                    end_address=end,
-                    comparison_type=comparison_type,
+                matches = script.exports.scan_memory(
+                    value_type, value, start, end, comparison_type
                 )
                 results.extend(
                     [{"address": match, "value": value} for match in matches]
