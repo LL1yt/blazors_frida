@@ -162,12 +162,20 @@
     {
         Logger.LogInformation("Starting first scan for process {ProcessId} with scan type {ScanType}", processId, ScanType);
 
-        scanResults = ScanType switch
+        try
         {
-            ScanType.ExactValue => await MemoryScanner.ScanForValue(processId, SearchValue, ValueType),
-            ScanType.UnknownInitialValue => await MemoryScanner.GetAllAddresses(processId, ValueType),
-            _ => new List<IntPtr>()
-        };
+            scanResults = ScanType switch
+            {
+                ScanType.ExactValue => await MemoryScanner.ScanForValue(processId, SearchValue, ValueType),
+                ScanType.UnknownInitialValue => await MemoryScanner.GetAllAddresses(processId, ValueType),
+                _ => new List<IntPtr>()
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "First scan failed for process {ProcessId}: {ErrorMessage}", processId, ex.Message);
+            throw;
+        }
 
         Logger.LogDebug("First scan completed with {Count} results", scanResults.Count);
     }

@@ -32,20 +32,20 @@ public class TestLogger<T> : ILogger<T>
 public class ScanExecutorTests : TestContextBase
 {
     private readonly Mock<IMemoryScannerService> _scannerServiceMock;
-    private readonly Mock<ILogger<ScanExecutor>> _loggerMock;
+    private readonly TestLogger<ScanExecutor> _logger;
     private readonly Mock<BlazorFridaApp.Services.INotificationService> _notificationServiceMock;
     private readonly Mock<IProcessMemoryScanner> _processMemoryScannerMock;
 
     public ScanExecutorTests()
     {
         _scannerServiceMock = new Mock<IMemoryScannerService>();
-        _loggerMock = new Mock<ILogger<ScanExecutor>>();
+        _logger = new TestLogger<ScanExecutor>();
         _notificationServiceMock = new Mock<BlazorFridaApp.Services.INotificationService>();
         _processMemoryScannerMock = new Mock<IProcessMemoryScanner>();
         
         Services.AddScoped<IMemoryScannerService>(_ => _scannerServiceMock.Object);
-        Services.AddScoped<ILogger<ScanExecutor>>(_ => _loggerMock.Object);
-        Services.AddScoped<ILogger<MemoryScannerComponentBase>>(_ => Mock.Of<ILogger<MemoryScannerComponentBase>>());
+        Services.AddScoped<ILogger<ScanExecutor>>(_ => _logger);
+        Services.AddScoped<ILogger<MemoryScannerComponentBase>>(_ => _logger);
         Services.AddScoped<BlazorFridaApp.Services.INotificationService>(_ => _notificationServiceMock.Object);
         Services.AddScoped<IProcessMemoryScanner>(_ => _processMemoryScannerMock.Object);
         
@@ -56,8 +56,6 @@ public class ScanExecutorTests : TestContextBase
         _notificationServiceMock.Setup(x => x.ShowSuccess(It.IsAny<string>(), It.IsAny<string>()));
         _notificationServiceMock.Setup(x => x.ShowError(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Exception>()));
         _notificationServiceMock.Setup(x => x.ShowInfo(It.IsAny<string>(), It.IsAny<string>()));
-
-        _loggerMock.Setup(x => x.IsEnabled(It.IsAny<LogLevel>())).Returns(true);
     }
 
     [Fact]
@@ -110,14 +108,11 @@ public class ScanExecutorTests : TestContextBase
         await cut.InvokeAsync(() => cut.Instance.ExecuteScan(_ => value));
 
         // Assert
-        _loggerMock.Verify(
-            x => x.Log(
-                LogLevel.Error,
-                It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((state, _) => true),
-                testException,
-                (Func<It.IsAnyType, Exception?, string>)It.IsAny<object>()),
-            Times.Once);
+        var errorLogs = _logger.LogEntries.Where(x => x.Level == LogLevel.Error).ToList();
+        Assert.NotEmpty(errorLogs);
+        var errorLog = errorLogs.First();
+        Assert.Equal(LogLevel.Error, errorLog.Level);
+        Assert.Same(testException, errorLog.Exception);
     }
 
     [Fact]
