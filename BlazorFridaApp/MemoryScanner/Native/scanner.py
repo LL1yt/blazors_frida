@@ -323,7 +323,16 @@ class MemoryScanner:
         ranges: Optional[List[Tuple[int, int]]] = None,
     ) -> List[Dict[str, Any]]:
         """Scan memory for a specific value"""
+        self._logger.debug("Starting memory scan with parameters:")
+        self._logger.debug(f"  value_type: {value_type!r} (type: {type(value_type)})")
+        self._logger.debug(f"  value: {value!r} (type: {type(value)})")
+        self._logger.debug(f"  comparison_type: {comparison_type!r}")
+        self._logger.debug(f"  ranges: {ranges}")
+
         if not ranges:
+            self._logger.debug(
+                "No ranges provided, enumerating all readable memory ranges"
+            )
             # Get all readable memory ranges using the session's enumerate_ranges
             script = self.frida_scanner._attacher.session.create_script(
                 """
@@ -344,14 +353,32 @@ class MemoryScanner:
         results = []
         for chunk_start, chunk_end in ranges:
             try:
+                self._logger.debug(
+                    f"Preparing to scan memory range {hex(chunk_start)}-{hex(chunk_end)}"
+                )
+                self._logger.debug(f"Parameters being passed to scan_memory_range:")
+                self._logger.debug(
+                    f"  value_type: {value_type!r} (type: {type(value_type)})"
+                )
+                self._logger.debug(f"  value: {value!r} (type: {type(value)})")
+                self._logger.debug(f"  comparison_type: {comparison_type!r}")
+                self._logger.debug(f"  ranges: [(0x{chunk_start:x}, 0x{chunk_end:x})]")
+
                 chunk_results = await self.frida_scanner.scan_memory_range(
                     value_type, value, comparison_type, [(chunk_start, chunk_end)]
                 )
+
+                self._logger.debug(
+                    f"Scan completed for range {hex(chunk_start)}-{hex(chunk_end)}"
+                )
+                self._logger.debug(f"Results found: {len(chunk_results)}")
+
                 results.extend(chunk_results)
                 self._check_memory_usage()
             except Exception as e:
-                self._logger.warning(
-                    f"Error scanning memory range {chunk_start:x}-{chunk_end:x}: {e}"
+                self._logger.error(
+                    f"Error scanning memory range {chunk_start:x}-{chunk_end:x}: {e}",
+                    exc_info=True,
                 )
                 continue
 

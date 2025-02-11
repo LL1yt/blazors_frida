@@ -7,6 +7,7 @@ import logging
 from typing import List, Tuple, Dict, Any
 from base64 import b64encode
 import traceback
+import datetime
 
 
 class FridaMemoryScanner:
@@ -128,82 +129,22 @@ class FridaMemoryScanner:
         comparison_type: str,
         ranges: List[Tuple[int, int]],
     ) -> List[Dict[str, Any]]:
-        """
-        Scan a specific memory range for a value
-        Args:
-            value_type: Type of value to scan for
-            value: The value to search for
-            comparison_type: Type of comparison to perform
-            ranges: List of (start, end) address tuples to scan
-        Returns:
-            List of results containing addresses and values
-        """
-        if not self._attacher.session:
-            raise RuntimeError("Not attached to any process")
-
-        def make_serializable(v):
-            """Convert value to JSON serializable format"""
-            try:
-                self._logger.debug(
-                    f"make_serializable input: type={type(v)}, value={v}"
-                )
-
-                if isinstance(v, bytes):
-                    # For pattern type, convert bytes to hex string
-                    if value_type == "pattern":
-                        hex_str = "".join(f"{b:02x}" for b in v)
-                        self._logger.debug(
-                            f"Converting pattern bytes to hex: {hex_str}"
-                        )
-                        return hex_str
-                    # For other types, use base64
-                    encoded_value = b64encode(v).decode("utf-8")
-                    self._logger.debug(
-                        f"Encoding bytes value to base64: {encoded_value[:50]}..."
-                    )
-                    return {
-                        "type": "bytes",
-                        "encoding": "base64",
-                        "data": encoded_value,
-                    }
-
-                if isinstance(v, (list, tuple)):
-                    result = [make_serializable(x) for x in v]
-                    self._logger.debug(f"Converted sequence: {result}")
-                    return result
-
-                if isinstance(v, dict):
-                    result = {str(k): make_serializable(val) for k, val in v.items()}
-                    self._logger.debug(f"Converted dict: {result}")
-                    return result
-
-                if isinstance(v, (int, float, str, bool, type(None))):
-                    return v
-
-                # Handle any other types by converting to string
-                self._logger.warning(f"Converting unknown type {type(v)} to string")
-                return str(v)
-
-            except Exception as e:
-                self._logger.error(
-                    f"Serialization error for value type {type(v)}: {str(e)}"
-                )
-                self._logger.debug(f"Value content: {v}")
-                raise
-
+        """Scan a specific memory range for a value."""
         try:
-            # Ensure value_type is a string
-            if isinstance(value_type, bytes):
-                value_type = value_type.decode("utf-8", errors="replace")
-            elif not isinstance(value_type, str):
-                value_type = str(value_type)
-
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+            self._logger.debug(f"[{timestamp}] Starting scan_memory_range")
+            self._logger.debug(f"[{timestamp}] Input parameters:")
             self._logger.debug(
-                f"Starting memory scan with parameters: type={value_type}, value={value}, comparison={comparison_type}"
+                f"[{timestamp}] - value_type: {value_type} (type: {type(value_type)})"
             )
-            self._logger.debug(f"Memory ranges to scan: {ranges}")
+            self._logger.debug(f"[{timestamp}] - value: {value} (type: {type(value)})")
+            self._logger.debug(f"[{timestamp}] - comparison_type: {comparison_type}")
+            self._logger.debug(f"[{timestamp}] - ranges: {ranges}")
 
-            # Validate value type before scanning
+            if not self.is_initialized:
+                self._logger.error(f"[{timestamp}] Scanner not initialized")
+                raise RuntimeError("Scanner not initialized")
+
             valid_types = [
                 "int8",
                 "uint8",
@@ -217,13 +158,78 @@ class FridaMemoryScanner:
                 "double",
                 "bytes",
                 "any",
-                "*",  # Allow raw wildcard type
+                "*",  # Wildcard type
             ]
 
+            self._logger.debug(f"[{timestamp}] Valid types: {valid_types}")
+            self._logger.debug(
+                f"[{timestamp}] Checking if {value_type!r} in valid_types"
+            )
+            self._logger.debug(
+                f"[{timestamp}] Type comparison result: {value_type in valid_types}"
+            )
+
             if value_type not in valid_types:
+                self._logger.error(f"[{timestamp}] Invalid value_type: {value_type!r}")
+                self._logger.error(f"[{timestamp}] Value type validation failed")
+                self._logger.error(
+                    f"[{timestamp}] Stack trace:\n{traceback.format_stack()}"
+                )
                 raise ValueError(
                     f"Invalid value type: {value_type}. Supported types: {valid_types}"
                 )
+
+            def make_serializable(v):
+                """Convert value to JSON serializable format"""
+                try:
+                    self._logger.debug(
+                        f"make_serializable input: type={type(v)}, value={v}"
+                    )
+
+                    if isinstance(v, bytes):
+                        # For pattern type, convert bytes to hex string
+                        if value_type == "pattern":
+                            hex_str = "".join(f"{b:02x}" for b in v)
+                            self._logger.debug(
+                                f"Converting pattern bytes to hex: {hex_str}"
+                            )
+                            return hex_str
+                        # For other types, use base64
+                        encoded_value = b64encode(v).decode("utf-8")
+                        self._logger.debug(
+                            f"Encoding bytes value to base64: {encoded_value[:50]}..."
+                        )
+                        return {
+                            "type": "bytes",
+                            "encoding": "base64",
+                            "data": encoded_value,
+                        }
+
+                    if isinstance(v, (list, tuple)):
+                        result = [make_serializable(x) for x in v]
+                        self._logger.debug(f"Converted sequence: {result}")
+                        return result
+
+                    if isinstance(v, dict):
+                        result = {
+                            str(k): make_serializable(val) for k, val in v.items()
+                        }
+                        self._logger.debug(f"Converted dict: {result}")
+                        return result
+
+                    if isinstance(v, (int, float, str, bool, type(None))):
+                        return v
+
+                    # Handle any other types by converting to string
+                    self._logger.warning(f"Converting unknown type {type(v)} to string")
+                    return str(v)
+
+                except Exception as e:
+                    self._logger.error(
+                        f"Serialization error for value type {type(v)}: {str(e)}"
+                    )
+                    self._logger.debug(f"Value content: {v}")
+                    raise
 
             scan_value = make_serializable(value)
 
