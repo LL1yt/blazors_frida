@@ -111,8 +111,25 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
         throw new Error('All parameters are required: valueType, value, startAddress, endAddress, comparisonType');
     }
 
+    // Map C# MemoryValueType enum to Frida types
+    const valueTypeMap = {
+        'Unknown': 'int32',
+        'Byte': 'uint8',
+        'Int16': 'int16', 
+        'Int32': 'int32',
+        'Int64': 'int64',
+        'Float': 'float',
+        'Double': 'double',
+        'String': 'string',
+        'ByteArray': 'bytes'
+    };
+
     // Normalize value type
     valueType = String(valueType).toLowerCase();
+    const normalizedType = valueTypeMap[valueType] || valueTypeMap[Object.keys(valueTypeMap).find(k => k.toLowerCase() === valueType)];
+    if (!normalizedType) {
+        throw new Error(`Unsupported value type: ${valueType}`);
+    }
     
     // Convert addresses to numbers if they're strings
     startAddress = typeof startAddress === 'string' ? parseInt(startAddress) : startAddress;
@@ -124,7 +141,7 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
     }
 
     console.log(`[Frida Script] Normalized parameters:
-        valueType: ${valueType},
+        valueType: ${normalizedType},
         value: ${value},
         startAddress: 0x${startAddress.toString(16)},
         endAddress: 0x${endAddress.toString(16)},
@@ -141,7 +158,7 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
     try {
         // Handle different value types
         let searchValue;
-        switch(valueType) {
+        switch(normalizedType) {
             case 'pattern':
                 const pattern = patternToBytes(value);
                 const data = range.readByteArray(range.size);
@@ -156,6 +173,14 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
                 
             case 'string':
                 searchValue = value.toString();
+                break;
+                
+            case 'uint8':
+                searchValue = new Uint8Array([parseInt(value)])[0];
+                break;
+
+            case 'int16':
+                searchValue = new Int16Array([parseInt(value)])[0];
                 break;
                 
             case 'int32':
@@ -175,11 +200,15 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
                 searchValue = new Float64Array([parseFloat(value)])[0];
                 break;
                 
+            case 'bytes':
+                searchValue = value;
+                break;
+                
             default:
-                throw new Error(`Unsupported value type: ${valueType}`);
+                throw new Error(`Unsupported normalized value type: ${normalizedType}`);
         }
         
-        if (valueType !== 'pattern' && searchValue !== undefined) {
+        if (normalizedType !== 'pattern' && searchValue !== undefined) {
             const scanResults = Memory.scanSync(range.base, range.size, searchValue);
             scanResults.forEach(match => {
                 matches.push(match.address);
