@@ -55,8 +55,8 @@ public class ScanControlsTests : TestContextBase
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var memoEdits = cut.FindComponents<MemoEdit>();
-        Assert.Equal(2, memoEdits.Count); // One for pattern, one for mask
+        var inputs = cut.FindAll(".pattern-input, .mask-input");
+        Assert.Equal(2, inputs.Count); // One for pattern, one for mask
     }
 
     [Fact]
