@@ -1,8 +1,9 @@
 # План рефакторинга тестовой инфраструктуры gRPC
 
-## 1. Очистка базовых классов
+## 1. Очистка базовых классов ✅ (Частично)
 
-Удалить дублирование в IntegrationTestBase:
+- Создан BaseTestGrpcService ✅
+- Осталось удалить дублирование в IntegrationTestBase ⏳:
 
 ```csharp
 - Удалить _channels (уже есть в BaseGrpcService)
@@ -11,7 +12,7 @@
 - Перенести специфичные настройки канала в конфигурацию
 ```
 
-## 2. Создание тестовой конфигурации
+## 2. Создание тестовой конфигурации ⏳
 
 ```csharp
 // Создать TestGrpcConfiguration.cs:
@@ -21,9 +22,9 @@
 - Retry политики
 ```
 
-## 3. Реорганизация тестовых сервисов
+## 3. Реорганизация тестовых сервисов ✅ (Частично)
 
-### a. Создать интерфейсы для тестовых сервисов:
+### a. Создать интерфейсы для тестовых сервисов ✅:
 
 ```csharp
 public interface ITestHealthService
@@ -40,17 +41,18 @@ public interface ITestMemoryService
 // и т.д. для других сервисов
 ```
 
-### b. Реализовать тестовые сервисы:
+### b. Реализовать тестовые сервисы ✅ (Частично):
 
 ```csharp
-- TestProcessService
-- TestMemoryService
-- TestScannerService
-- TestStateService
-- TestFreezeService
+- TestHealthService ✅
+- TestProcessService ⏳
+- TestMemoryService ⏳
+- TestScannerService ⏳
+- TestStateService ⏳
+- TestFreezeService ⏳
 ```
 
-## 4. Создание фабрики тестовых сервисов
+## 4. Создание фабрики тестовых сервисов ⏳
 
 ```csharp
 public class TestServiceFactory
@@ -72,9 +74,9 @@ public class TestServiceFactory
 }
 ```
 
-## 5. Обновление существующих тестов
+## 5. Обновление существующих тестов ⏳
 
-### a. Создать базовый класс для тестов с сервисами:
+### a. Создать базовый класс для тестов с сервисами ⏳:
 
 ```csharp
 public abstract class ServiceTestBase : IntegrationTestBase
@@ -94,9 +96,9 @@ public abstract class ServiceTestBase : IntegrationTestBase
 }
 ```
 
-### b. Обновить существующие тесты для использования новой структуры
+### b. Обновить существующие тесты для использования новой структуры ⏳
 
-## 6. Создание моков для тестирования
+## 6. Создание моков для тестирования ⏳
 
 ```csharp
 public class MockTestServiceFactory : TestServiceFactory
@@ -110,9 +112,9 @@ public class MockTestServiceFactory : TestServiceFactory
 }
 ```
 
-## 7. Добавление тестовых утилит
+## 7. Добавление тестовых утилит ⏳
 
-### a. Создать TestContext для управления состоянием тестов:
+### a. Создать TestContext для управления состоянием тестов ⏳:
 
 ```csharp
 public class TestContext : IAsyncDisposable
@@ -124,7 +126,7 @@ public class TestContext : IAsyncDisposable
 }
 ```
 
-### b. Создать TestHelper для часто используемых операций:
+### b. Создать TestHelper для часто используемых операций ⏳:
 
 ```csharp
 public static class TestHelper
@@ -141,9 +143,9 @@ public static class TestHelper
 }
 ```
 
-## 8. Обновление конфигурации тестов
+## 8. Обновление конфигурации тестов ⏳
 
-### a. Создать appsettings.Test.json:
+### a. Создать appsettings.Test.json ⏳:
 
 ```json
 {
@@ -161,7 +163,7 @@ public static class TestHelper
 }
 ```
 
-## 9. Добавление интеграции с OpenTelemetry
+## 9. Добавление интеграции с OpenTelemetry ⏳
 
 ```csharp
 public static class TestTelemetryExtensions
@@ -173,7 +175,7 @@ public static class TestTelemetryExtensions
 }
 ```
 
-## 10. Создание тестовых фикстур
+## 10. Создание тестовых фикстур ⏳
 
 ```csharp
 public class GrpcTestFixture : IAsyncLifetime
@@ -193,17 +195,17 @@ public class GrpcTestFixture : IAsyncLifetime
 }
 ```
 
-## 11. Порядок выполнения рефакторинга:
+## 11. Порядок выполнения рефакторинга ⏳:
 
-1. Создать новые файлы конфигурации
-2. Реализовать базовые интерфейсы и классы
-3. Создать фабрику сервисов
-4. Обновить существующие тесты по одному
-5. Добавить новые тестовые утилиты
-6. Интегрировать телеметрию
-7. Обновить CI/CD пайплайны
+1. Создать новые файлы конфигурации ⏳
+2. Реализовать базовые интерфейсы и классы ✅ (Частично)
+3. Создать фабрику сервисов ⏳
+4. Обновить существующие тесты по одному ⏳
+5. Добавить новые тестовые утилиты ⏳
+6. Интегрировать телеметрию ⏳
+7. Обновить CI/CD пайплайны ⏳
 
-## 12. Проверки после рефакторинга:
+## 12. Проверки после рефакторинга ⏳:
 
 - Все тесты проходят
 - Логирование работает корректно
@@ -220,3 +222,7 @@ public class GrpcTestFixture : IAsyncLifetime
 - Лучшая изоляция тестов
 - Более простое добавление новых тестов
 - Лучший контроль над ресурсами
+
+Условные обозначения:
+✅ - Выполнено
+⏳ - В процессе/Ожидает выполнения
