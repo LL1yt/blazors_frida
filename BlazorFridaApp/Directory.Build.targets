@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <Target Name="CopyBlazoriseDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <BlazoriseDependencies Include="$(NuGetPackageRoot)blazorise.bootstrap\1.7.4\staticwebassets\**\*.*" />
+      <BlazoriseDependencies Include="$(NuGetPackageRoot)blazorise\1.7.4\staticwebassets\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BlazoriseDependencies)" 
+          DestinationFiles="@(BlazoriseDependencies->'$(MSBuildProjectDirectory)\wwwroot\_content\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+</Project>

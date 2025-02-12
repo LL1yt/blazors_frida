@@ -218,18 +218,15 @@ try
     }
 
     app.UseHttpsRedirection();
-    
-    // Serve embedded content first
+    app.UseStaticFiles();
+
+    // Map content root path for library static assets
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new CompositeFileProvider(
-            new ManifestEmbeddedFileProvider(typeof(Blazorise.Bootstrap.Config).Assembly, "_content/Blazorise.Bootstrap"),
-            new ManifestEmbeddedFileProvider(typeof(Blazorise.Config).Assembly, "_content/Blazorise")
-        )
+        FileProvider = new PhysicalFileProvider(
+            Path.Combine(builder.Environment.ContentRootPath, "_content")),
+        RequestPath = "/_content"
     });
-
-    // Then serve regular static files
-    app.UseStaticFiles();
 
     app.UseAntiforgery();
 
