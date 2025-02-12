@@ -1,54 +1,42 @@
-@using Blazorise
 @using BlazorFridaApp.MemoryScanner.Models
-@using BlazorFridaApp.MemoryScanner.Services.Interfaces
+@using BlazorFridaApp.Services.Interfaces
 @inject ILogger<ProcessSelector> Logger
 @inject IProcessService ProcessService
 @implements IAsyncDisposable
 
-<div>
-    <Row>
-        <Column ColumnSize="ColumnSize.Is9">
-            <Select TValue="int?" 
-                   Value="@SelectedProcessId"
-                   ValueChanged="@HandleProcessSelected"
-                   Disabled="@IsLoading"
-                   SearchChanged="@((string value) => { _searchTerm = value; StateHasChanged(); })">
-                <ChildContent>
-                    <SelectItem TValue="int?" Value="null">@(IsLoading ? "Loading processes..." : "Select a process")</SelectItem>
-                    @foreach (var process in FilteredProcesses)
-                    {
-                        <SelectItem TValue="int?" Value="@process.Id">@($"{process.Name} ({process.Id})")</SelectItem>
-                    }
-                </ChildContent>
-            </Select>
-        </Column>
-        @if (ShowRefreshButton)
-        {
-            <Column ColumnSize="ColumnSize.Is3">
-                <Button Color="Color.Primary" 
-                        Disabled="@IsLoading"
-                        Clicked="@HandleRefreshClick">
-                    <Blazorise.Icon Name="@(IsLoading ? "fas fa-hourglass-half" : "fas fa-sync")" />
-                    @(IsLoading ? "Loading..." : "Process Scan")
-                </Button>
-            </Column>
-        }
-    </Row>
-    @if (IsLoading)
-    {
-        <Progress Striped Animated>
-            <ProgressBar Value="100" />
-        </Progress>
-    }
+<div class="process-selector">
+    <div class="input-group mb-3">
+        <select class="form-select" @bind="SelectedProcessId">
+            <option value="">Select a process...</option>
+            @if (Processes != null)
+            {
+                @foreach (var process in Processes)
+                {
+                    <option value="@process.Id">@process.Name (@process.Id)</option>
+                }
+            }
+        </select>
+        <button class="btn btn-outline-secondary" @onclick="RefreshProcessList" disabled="@IsLoading">
+            <i class="@(IsLoading ? "fas fa-hourglass-half" : "fas fa-sync")"></i>
+        </button>
+    </div>
 </div>
 
 @code {
-    [Parameter] public List<ProcessInfo> ProcessList { get; set; } = new();
-    [Parameter] public int? SelectedProcessId { get; set; }
-    [Parameter] public EventCallback<int?> OnProcessSelected { get; set; }
-    [Parameter] public EventCallback OnRefreshClick { get; set; }
-    [Parameter] public bool ShowRefreshButton { get; set; } = true;
-    [Parameter] public bool IsLoading { get; set; }
+    [Parameter]
+    public List<ProcessInfo> Processes { get; set; }
+
+    [Parameter]
+    public int? SelectedProcessId { get; set; }
+
+    [Parameter]
+    public EventCallback<int?> SelectedProcessIdChanged { get; set; }
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public EventCallback OnRefreshClick { get; set; }
 
     private readonly CancellationTokenSource _cts = new();
     private readonly Stopwatch _lifecycleTimer = new();
@@ -61,7 +49,7 @@
         try
         {
             IsLoading = true;
-            ProcessList = await ProcessService.GetProcessesAsync(_cts.Token);
+            Processes = await ProcessService.GetProcessesAsync(_cts.Token);
         }
         catch (Exception ex)
         {
@@ -78,7 +66,7 @@
     {
         try
         {
-            if (ProcessList == null)
+            if (Processes == null)
             {
                 Logger.LogWarning("{Operation}: ProcessList is null", operation);
             }
@@ -90,7 +78,7 @@
 
             if (SelectedProcessId.HasValue)
             {
-                var processExists = ProcessList?.Any(p => p.Id == SelectedProcessId.Value) ?? false;
+                var processExists = Processes?.Any(p => p.Id == SelectedProcessId.Value) ?? false;
                 if (!processExists)
                 {
                     Logger.LogWarning(
@@ -124,22 +112,22 @@
             "- Is Loading: {IsLoading}\n" +
             "- Render Count: {RenderCount}\n" +
             "- Selected Process Exists: {ProcessExists}",
-            ProcessList?.Count ?? 0,
+            Processes?.Count ?? 0,
             SelectedProcessId,
             IsLoading,
             _renderCount,
-            SelectedProcessId.HasValue && ProcessList?.Any(p => p.Id == SelectedProcessId.Value) == true);
+            SelectedProcessId.HasValue && Processes?.Any(p => p.Id == SelectedProcessId.Value) == true);
 
         // Ensure selection stays valid
-        if (SelectedProcessId.HasValue && ProcessList != null)
+        if (SelectedProcessId.HasValue && Processes != null)
         {
-            var processExists = ProcessList.Any(p => p.Id == SelectedProcessId.Value);
+            var processExists = Processes.Any(p => p.Id == SelectedProcessId.Value);
             if (!processExists)
             {
                 Logger.LogWarning(
                     "Selected process {ProcessId} no longer exists in the list. Available processes:\n{Processes}",
                     SelectedProcessId.Value,
-                    string.Join("\n", ProcessList.Select(p => $"- {p.Name} ({p.Id})")));
+                    string.Join("\n", Processes.Select(p => $"- {p.Name} ({p.Id})")));
             }
         }
         
@@ -163,112 +151,16 @@
                 "ProcessSelector re-rendered (#{RenderCount}) at {ElapsedMs}ms. State: {{ ProcessCount: {Count}, SelectedId: {ProcessId}, IsLoading: {IsLoading} }}",
                 _renderCount,
                 _lifecycleTimer.ElapsedMilliseconds,
-                ProcessList?.Count ?? 0,
+                Processes?.Count ?? 0,
                 SelectedProcessId,
                 IsLoading);
         }
         base.OnAfterRender(firstRender);
     }
 
-    private async Task HandleProcessSelected()
+    private async Task RefreshProcessList()
     {
-        _operationTimer.Restart();
-        ValidateComponentState("ProcessSelection");
-        
-        try
-        {
-            var previousId = SelectedProcessId;
-            Logger.LogInformation(
-                "Process selection changing from {PreviousId} to {NewId} at {ElapsedMs}ms",
-                previousId, SelectedProcessId, _lifecycleTimer.ElapsedMilliseconds);
-
-            if (IsLoading)
-            {
-                Logger.LogWarning(
-                    "Process selection attempted while component is loading. Previous: {PreviousId}, New: {NewId}",
-                    previousId, SelectedProcessId);
-                return;
-            }
-
-            await OnProcessSelected.InvokeAsync(SelectedProcessId);
-            StateHasChanged();
-            
-            _operationTimer.Stop();
-            Logger.LogDebug(
-                "Process selection handler completed in {OpElapsedMs}ms (total uptime: {TotalElapsedMs}ms). Previous: {PreviousId}, New: {NewId}, IsLoading: {IsLoading}",
-                _operationTimer.ElapsedMilliseconds,
-                _lifecycleTimer.ElapsedMilliseconds,
-                previousId,
-                SelectedProcessId,
-                IsLoading);
-
-            ValidateComponentState("PostProcessSelection");
-        }
-        catch (Exception ex)
-        {
-            _operationTimer.Stop();
-            Logger.LogError(ex,
-                "Error handling process selection after {OpElapsedMs}ms (total uptime: {TotalElapsedMs}ms). ID: {ProcessId}, IsLoading: {IsLoading}",
-                _operationTimer.ElapsedMilliseconds,
-                _lifecycleTimer.ElapsedMilliseconds,
-                SelectedProcessId,
-                IsLoading);
-            throw;
-        }
-    }
-
-    private async Task HandleRefreshClick()
-    {
-        _operationTimer.Restart();
-        ValidateComponentState("ProcessListRefresh");
-        
-        try
-        {
-            var currentProcessCount = ProcessList?.Count ?? 0;
-            Logger.LogInformation(
-                "Process list refresh requested at {ElapsedMs}ms. Current count: {Count}, Selected: {ProcessId}, IsLoading: {IsLoading}",
-                _lifecycleTimer.ElapsedMilliseconds,
-                currentProcessCount,
-                SelectedProcessId,
-                IsLoading);
-
-            if (IsLoading)
-            {
-                Logger.LogWarning("Process list refresh attempted while component is already loading");
-                return;
-            }
-
-            IsLoading = true;
-            ProcessList = await ProcessService.RefreshProcessesAsync(_cts.Token);
-            await OnRefreshClick.InvokeAsync();
-
-            var newProcessCount = ProcessList?.Count ?? 0;
-            _operationTimer.Stop();
-            Logger.LogDebug(
-                "Process list refresh completed in {OpElapsedMs}ms (total uptime: {TotalElapsedMs}ms). Previous count: {PreviousCount}, New count: {NewCount}, IsLoading: {IsLoading}",
-                _operationTimer.ElapsedMilliseconds,
-                _lifecycleTimer.ElapsedMilliseconds,
-                currentProcessCount,
-                newProcessCount,
-                IsLoading);
-
-            ValidateComponentState("PostProcessListRefresh");
-        }
-        catch (Exception ex)
-        {
-            _operationTimer.Stop();
-            Logger.LogError(ex,
-                "Error handling process list refresh after {OpElapsedMs}ms (total uptime: {TotalElapsedMs}ms). IsLoading: {IsLoading}",
-                _operationTimer.ElapsedMilliseconds,
-                _lifecycleTimer.ElapsedMilliseconds,
-                IsLoading);
-            throw;
-        }
-        finally
-        {
-            IsLoading = false;
-            StateHasChanged();
-        }
+        await OnRefreshClick.InvokeAsync();
     }
 
     public async Task HandleFilter(ChangeEventArgs args)
@@ -290,7 +182,7 @@
         await ValueTask.CompletedTask;
     }
 
-    private IEnumerable<ProcessInfo> FilteredProcesses => ProcessList?
+    private IEnumerable<ProcessInfo> FilteredProcesses => Processes?
         .Where(p => string.IsNullOrEmpty(_searchTerm) || 
                     p.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase))
         .ToList() ?? new List<ProcessInfo>();
@@ -302,7 +194,7 @@
 
         if (item is SelectItem<int?> selectItem && selectItem.Value.HasValue)
         {
-            var process = ProcessList.FirstOrDefault(p => p.Id == selectItem.Value.Value);
+            var process = Processes.FirstOrDefault(p => p.Id == selectItem.Value.Value);
             return process != null && process.Name.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase);
         }
 

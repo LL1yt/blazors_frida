@@ -1,76 +1,48 @@
 @using BlazorFridaApp.MemoryScanner.Models
-@using Blazorise
-@using Blazorise.DataGrid
 
-<DataGrid TItem="IntPtr"
-          Data="@Results"
-          Responsive>
-    <DataGridColumn TItem="IntPtr" 
-                   Caption="Address"
-                   Sortable="false">
-        <DisplayTemplate>
-            @context.ToString("X8")
-        </DisplayTemplate>
-    </DataGridColumn>
-    <DataGridColumn TItem="IntPtr" Caption="Value">
-        <DisplayTemplate>
-            @{
-                var row = context;
-            }
-            @if (IsFrozen(row))
-            {
-                <span>@FormatValue(row)</span>
-            }
-            else
-            {
-                var currentValue = GetCurrentValue(row);
-                <div class="d-flex align-items-center">
-                    <NumericEdit TValue="int" 
-                               Value="@currentValue"
-                               ValueChanged="@(async v => await HandleValueChanged(row, v))" />
-                    <span class="ms-2">@FormatValue(row)</span>
-                </div>
-            }
-        </DisplayTemplate>
-    </DataGridColumn>
-    <DataGridColumn TItem="IntPtr" Caption="Actions">
-        <DisplayTemplate>
-            <Button Color="Color.Primary"
-                    Disabled="@(IsFrozen(context))"
-                    Clicked="@(() => OnFreezeToggle.InvokeAsync(context))">
-                <Blazorise.Icon Name="@FontAwesomeIcons.Lock" />
-            </Button>
-        </DisplayTemplate>
-    </DataGridColumn>
-</DataGrid>
+<div class="scan-results">
+    @if (Results != null && Results.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Address</th>
+                        <th>Value</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var result in Results)
+                    {
+                        <tr>
+                            <td>@result.Address.ToString("X")</td>
+                            <td>@result.Value</td>
+                            <td>@result.Type</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" @onclick="() => OnFreezeClick.InvokeAsync(result)">
+                                    <i class="fas fa-lock"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            No scan results to display.
+        </div>
+    }
+</div>
 
 @code {
-    [Parameter] public required List<IntPtr> Results { get; set; }
-    [Parameter] public required MemoryValueType ValueType { get; set; }
-    [Parameter] public required Func<IntPtr, int> GetCurrentValue { get; set; }
-    [Parameter] public required Func<IntPtr, bool> IsFrozen { get; set; }
-    [Parameter] public EventCallback<(IntPtr address, int value)> OnValueChanged { get; set; }
-    [Parameter] public EventCallback<IntPtr> OnFreezeToggle { get; set; }
+    [Parameter]
+    public List<ScanResult> Results { get; set; }
 
-    private string FormatValue(IntPtr value)
-    {
-        return ValueType switch
-        {
-            MemoryValueType.Float => ((float)GetCurrentValue(value)).ToString("F2"),
-            MemoryValueType.Double => ((double)GetCurrentValue(value)).ToString("F2"),
-            MemoryValueType.Byte => $"0x{GetCurrentValue(value):X2}",
-            MemoryValueType.Int16 => GetCurrentValue(value).ToString(),
-            MemoryValueType.Int32 => GetCurrentValue(value).ToString(),
-            MemoryValueType.Int64 => GetCurrentValue(value).ToString(),
-            _ => GetCurrentValue(value).ToString()
-        };
-    }
-
-    private async Task HandleValueChanged(IntPtr address, int value)
-    {
-        if (OnValueChanged.HasDelegate)
-        {
-            await OnValueChanged.InvokeAsync((address, value));
-        }
-    }
+    [Parameter]
+    public EventCallback<ScanResult> OnFreezeClick { get; set; }
 }

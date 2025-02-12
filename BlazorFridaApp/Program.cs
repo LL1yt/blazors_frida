@@ -24,18 +24,7 @@ using BlazorFridaApp.MemoryScanner.Base;
 using Microsoft.Extensions.Http;
 using Scrutor;
 using Microsoft.Extensions.Options;
-using Blazorise;
-using Blazorise.Bootstrap5;
-using Blazorise.Icons.FontAwesome;
-using Blazorise.RichTextEdit;
-using Blazorise.LoadingIndicator;
-using Blazorise.Sidebar;
-using Blazorise.Snackbar;
-using Blazorise.TreeView;
 using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.FileProviders.Composite;
-using Microsoft.Extensions.FileProviders.Embedded;
-using Microsoft.Extensions.FileProviders.Physical;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -58,13 +47,6 @@ try
     // Add services to the container.
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
-
-    // Add Blazorise
-    builder.Services
-        .AddBlazorise()
-        .AddBootstrap5Providers()
-        .AddFontAwesomeIcons()
-        .AddBlazoriseRichTextEdit();
 
     // Add assets service
     builder.Services.AddScoped<AssetsService>();

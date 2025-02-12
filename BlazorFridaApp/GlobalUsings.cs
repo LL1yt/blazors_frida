@@ -1,5 +1,13 @@
 global using System;
+global using System.Collections.Generic;
+global using System.Linq;
+global using System.Threading;
+global using System.Threading.Tasks;
 global using Microsoft.AspNetCore.Components;
+global using Microsoft.Extensions.Logging;
+global using BlazorFridaApp.MemoryScanner.Models;
+global using BlazorFridaApp.MemoryScanner.Services;
+global using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 global using Microsoft.AspNetCore.Components.Web;
 global using Microsoft.AspNetCore.Components.Routing;
 global using BlazorFridaApp.Components;
@@ -11,9 +19,6 @@ global using System.Runtime.InteropServices;
 
 // Memory Scanner Core
 global using BlazorFridaApp.MemoryScanner;
-global using BlazorFridaApp.MemoryScanner.Models;
-global using BlazorFridaApp.MemoryScanner.Services;
-global using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 global using BlazorFridaApp.MemoryScanner.Components;
 
 // Database and Persistence
@@ -23,7 +28,6 @@ global using Microsoft.EntityFrameworkCore;
 // Services
 global using BlazorFridaApp.Services;
 global using Microsoft.Extensions.DependencyInjection;
-global using Microsoft.Extensions.Logging;
 
 // UI Components
 global using Blazorise;

@@ -1,93 +1,104 @@
-@using Blazorise
-@using Blazorise.DataGrid
-@using Blazorise.Components
-@using Blazorise.Icons.FontAwesome
-@using BlazorFridaApp.Components.Pages
-@using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @using BlazorFridaApp.MemoryScanner.Models
+@using BlazorFridaApp.Services.Interfaces
 
-<div class="load-config-dialog">
-    <DataGrid TItem="ConfigGridItem"
-              Data="@GridData"
-              Filterable
-              Sortable
-              RowClicked="@(args => selectedConfig = args.Item)"
-              Margin="Margin.Is3.FromBottom">
-        <DataGridColumn TItem="ConfigGridItem"
-                       Field="@nameof(ConfigGridItem.Name)"
-                       Caption="Name" />
-        <DataGridColumn TItem="ConfigGridItem"
-                       Field="@nameof(ConfigGridItem.ScanType)"
-                       Caption="Scan Type" />
-        <DataGridColumn TItem="ConfigGridItem"
-                       Field="@nameof(ConfigGridItem.ValueType)"
-                       Caption="Value Type" />
-        <DataGridColumn TItem="ConfigGridItem"
-                       Caption="Actions">
-            <DisplayTemplate>
-                <Button Color="Color.Danger"
-                        Size="Size.Small"
-                        Clicked="@(() => DeleteConfig(context.Name))">
-                    <Blazorise.Icon Name="@FontAwesomeIcons.Trash" />
-                </Button>
-            </DisplayTemplate>
-        </DataGridColumn>
-    </DataGrid>
-    
-    <div class="d-flex justify-content-end gap-2">
-        <Button Color="Color.Light"
-                Clicked="@OnCancel">
-            Cancel
-        </Button>
-        <Button Color="Color.Primary"
-                Clicked="@(() => OnConfigSelected.InvokeAsync(selectedConfig?.Config))"
-                Disabled="@(selectedConfig == null)">
-            Load
-        </Button>
+<div class="modal @(_isVisible ? "show d-block" : "d-none")" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Load Configuration</h5>
+                <button type="button" class="btn-close" @onclick="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (_configs != null && _configs.Any())
+                {
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var config in _configs)
+                            {
+                                <tr>
+                                    <td>@config.Name</td>
+                                    <td>@config.CreatedAt.ToLocalTime().ToString("g")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteConfig(config)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-primary ms-2" @onclick="() => LoadConfig(config)">
+                                            Load
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        No saved configurations found.
+                    </div>
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @onclick="Close">Close</button>
+            </div>
+        </div>
     </div>
 </div>
 
-@code {
-    private class ConfigGridItem
-    {
-        public string Name { get; set; } = "";
-        public string ScanType { get; set; } = "";
-        public string ValueType { get; set; } = "";
-        public ScannerConfig Config { get; set; } = new();
+@if (_isVisible)
+{
+    <div class="modal-backdrop show"></div>
+}
 
-        public static ConfigGridItem FromKeyValuePair(KeyValuePair<string, ScannerConfig> kvp)
-        {
-            return new ConfigGridItem
-            {
-                Name = kvp.Key,
-                ScanType = kvp.Value.ScanType.ToString(),
-                ValueType = kvp.Value.ValueType.ToString(),
-                Config = kvp.Value
-            };
-        }
-    }
+@code {
+    private bool _isVisible;
+    private List<ScanConfiguration> _configs;
+
+    [Inject]
+    private IScanProfileService ScanProfileService { get; set; }
 
     [Parameter]
-    public required Dictionary<string, Models.ScannerConfig> Configs { get; set; }
+    public EventCallback<ScanConfiguration> OnConfigurationSelected { get; set; }
 
-    [Parameter] public EventCallback<Models.ScannerConfig> OnConfigSelected { get; set; }
-    [Parameter] public EventCallback OnCanceled { get; set; }
-    
-    [Inject] public required IScanProfileService ProfileService { get; set; }
-    [Inject] public required BlazorFridaApp.Services.INotificationService NotificationService { get; set; }
-
-    private ConfigGridItem? selectedConfig;
-    private IEnumerable<ConfigGridItem> GridData => Configs.Select(ConfigGridItem.FromKeyValuePair);
-
-    private Task OnCancel() => OnCanceled.InvokeAsync();
-
-    private async Task DeleteConfig(string name)
+    protected override async Task OnInitializedAsync()
     {
-        if (await NotificationService.Confirm($"Are you sure you want to delete '{name}'?", "Confirm Delete"))
-        {
-            await ProfileService.DeleteScannerConfig(name);
-            Configs.Remove(name);
-            StateHasChanged();
-        }
+        await LoadConfigurations();
+    }
+
+    private async Task LoadConfigurations()
+    {
+        _configs = await ScanProfileService.GetAllConfigurationsAsync();
+    }
+
+    public async Task Show()
+    {
+        await LoadConfigurations();
+        _isVisible = true;
+        StateHasChanged();
+    }
+
+    private void Close()
+    {
+        _isVisible = false;
+        StateHasChanged();
+    }
+
+    private async Task DeleteConfig(ScanConfiguration config)
+    {
+        await ScanProfileService.DeleteConfigurationAsync(config.Id);
+        await LoadConfigurations();
+    }
+
+    private async Task LoadConfig(ScanConfiguration config)
+    {
+        await OnConfigurationSelected.InvokeAsync(config);
+        Close();
     }
 }

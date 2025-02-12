@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
-  <Target Name="CopyBlazoriseDependencies" AfterTargets="Build">
+  <Target Name="CopyLibraryDependencies" AfterTargets="Build">
     <ItemGroup>
-      <BlazoriseDependencies Include="$(NuGetPackageRoot)blazorise.bootstrap\1.7.4\staticwebassets\**\*.*" />
-      <BlazoriseDependencies Include="$(NuGetPackageRoot)blazorise\1.7.4\staticwebassets\**\*.*" />
+      <LibraryDependencies Include="$(NuGetPackageRoot)bootstrap\5.3.2\staticwebassets\**\*.*" />
+      <LibraryDependencies Include="$(NuGetPackageRoot)font-awesome\6.5.1\staticwebassets\**\*.*" />
     </ItemGroup>
-    <Copy SourceFiles="@(BlazoriseDependencies)" 
-          DestinationFiles="@(BlazoriseDependencies->'$(MSBuildProjectDirectory)\wwwroot\_content\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(LibraryDependencies)"
+          DestinationFiles="@(LibraryDependencies->'$(MSBuildProjectDirectory)\wwwroot\lib\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 </Project>

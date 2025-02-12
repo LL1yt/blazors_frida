@@ -1,30 +1,19 @@
 using Bunit;
 using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
-using Xunit;
+using BlazorFridaApp.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using Blazorise;
-using Blazorise.Bootstrap5;
-using Blazorise.Icons.FontAwesome;
+using Xunit;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ScanControlsValidationTests : TestContext
+public class ScanControlsValidationTests : TestBase
 {
-    private readonly TestContext _context;
     private IRenderedComponent<ScanControls> _component;
     private bool _scanClicked;
 
     public ScanControlsValidationTests()
     {
-        _context = new TestContext();
-        _context.JSInterop.Mode = JSRuntimeMode.Loose;
-        
-        _context.Services
-            .AddBlazorise(options => { options.Immediate = true; })
-            .AddBootstrap5Providers()
-            .AddFontAwesomeIcons();
-
         _scanClicked = false;
     }
 
@@ -35,7 +24,7 @@ public class ScanControlsValidationTests : TestContext
                               int searchValue = 0,
                               bool isFirstScan = true)
     {
-        _component = _context.RenderComponent<ScanControls>(parameters => parameters
+        _component = Context.RenderComponent<ScanControls>(parameters => parameters
             .Add(p => p.ScanType, scanType)
             .Add(p => p.ValueType, valueType)
             .Add(p => p.PatternHex, patternHex)
