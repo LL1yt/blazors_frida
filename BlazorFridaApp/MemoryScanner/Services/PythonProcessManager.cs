@@ -103,8 +103,8 @@ public class PythonProcessManager : IPythonProcessManager, IDisposable
         var activity = new Activity("VerifyGrpcConnection").Start();
         
         const int maxRetries = 3; // Increased retries
-        const int timeoutMs = 10000; // Increased timeout
-        const int retryDelayMs = 1000; // Increased delay between retries
+        const int timeoutMs = 1000; // Increased timeout
+        const int retryDelayMs = 200; // Increased delay between retries
         var attempts = 0;
         Exception? lastException = null;
 
