@@ -114,5 +114,12 @@
       <BasePath>_content/Blazorise.Bootstrap5</BasePath>
       <RelativePath>**</RelativePath>
     </StaticWebAsset>
+    <StaticWebAsset Include="_content/**">
+      <SourceType>Package</SourceType>
+      <SourceId>Blazorise.Icons.FontAwesome</SourceId>
+      <ContentRoot>$(NuGetPackageRoot)blazorise.icons.fontawesome\1.7.4\staticwebassets\</ContentRoot>
+      <BasePath>_content/Blazorise.Icons.FontAwesome</BasePath>
+      <RelativePath>**</RelativePath>
+    </StaticWebAsset>
   </ItemGroup>
 </Project>

@@ -220,17 +220,11 @@ try
     // Serve static files from wwwroot
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new PhysicalFileProvider(
-            Path.Combine(builder.Environment.ContentRootPath, "wwwroot")),
+        FileProvider = new CompositeFileProvider(
+            new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "wwwroot")),
+            new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "_content"))
+        ),
         RequestPath = ""
-    });
-
-    // Serve static files from NuGet packages
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(
-            Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "_content")),
-        RequestPath = "/_content"
     });
 
     app.UseAntiforgery();

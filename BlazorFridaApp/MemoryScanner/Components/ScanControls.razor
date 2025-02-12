@@ -6,116 +6,216 @@
 @using System.ComponentModel
 @using Blazorise
 
-<div>
+<div class="scan-controls">
     <Row>
         <Column>
-            <ErrorBoundary>
-                <ChildContent>
-                    <Select TValue="ScanType"
-                            @bind-Value="@ScanType"
-                            Style="width: 200px">
-                        @foreach (var type in ScanTypes)
-                        {
-                            <SelectItem Value="@type">@type</SelectItem>
-                        }
-                    </Select>
-                </ChildContent>
-                <ErrorContent>
-                    <Alert Color="Color.Danger">An error occurred loading scan types</Alert>
-                </ErrorContent>
-            </ErrorBoundary>
+            <Field>
+                <FieldLabel>Scan Type</FieldLabel>
+                <ErrorBoundary>
+                    <ChildContent>
+                        <Select TValue="ScanType"
+                                @bind-Value="@ScanType"
+                                Class="scan-type-select">
+                            @foreach (var type in ScanTypes)
+                            {
+                                <SelectItem Value="@type">@type</SelectItem>
+                            }
+                        </Select>
+                    </ChildContent>
+                    <ErrorContent>
+                        <Alert Color="Color.Danger">An error occurred loading scan types</Alert>
+                    </ErrorContent>
+                </ErrorBoundary>
+            </Field>
         </Column>
         <Column>
-            <ErrorBoundary>
-                <ChildContent>
-                    <Select TValue="MemoryValueType"
-                            @bind-Value="@ValueType"
-                            Style="width: 200px">
-                        @foreach (var type in ValueTypes)
+            <Field>
+                <FieldLabel>Value Type</FieldLabel>
+                <ErrorBoundary>
+                    <ChildContent>
+                        <Select TValue="MemoryValueType"
+                                @bind-Value="@ValueType"
+                                Class="value-type-select">
+                            @foreach (var type in ValueTypes)
+                            {
+                                <SelectItem Value="@type">@type</SelectItem>
+                            }
+                        </Select>
+                        @if (ValueType == MemoryValueType.ByteArray)
                         {
-                            <SelectItem Value="@type">@type</SelectItem>
+                            <Alert Color="Color.Warning" Class="mt-2">Byte arrays are not supported yet</Alert>
                         }
-                    </Select>
-                </ChildContent>
-                <ErrorContent>
-                    <Alert Color="Color.Danger">An error occurred loading value types</Alert>
-                </ErrorContent>
-            </ErrorBoundary>
+                    </ChildContent>
+                    <ErrorContent>
+                        <Alert Color="Color.Danger">An error occurred loading value types</Alert>
+                    </ErrorContent>
+                </ErrorBoundary>
+            </Field>
         </Column>
     </Row>
 
-    @if (ScanType == ScanType.Pattern)
-    {
-        <div class="pattern-inputs">
-            <MemoEdit Text="@PatternHex"
-                     TextChanged="@OnPatternHexChanged"
-                     Placeholder="Pattern (hex, space-separated)"
-                     Rows="2" />
-                     
-            <MemoEdit Text="@Mask"
-                     TextChanged="@OnMaskChanged"
-                     Placeholder="Mask (x - match, ? - wildcard)"
-                     Rows="2" />
-
-            @if (!string.IsNullOrEmpty(_errorMessage))
-            {
-                <Alert Color="Color.Danger" Margin="Margin.Is3.FromTop">@_errorMessage</Alert>
-            }
-        </div>
-    }
-    else
-    {
-        @if (ValueType == MemoryValueType.String)
+    <div class="search-section mt-4">
+        @if (ScanType == ScanType.Pattern)
         {
-            <TextEdit @bind-Text="@StringSearchValue"
-                     Placeholder="Search text value" />
+            <div class="pattern-inputs">
+                <Field>
+                    <FieldLabel>Pattern (hex, space-separated)</FieldLabel>
+                    <MemoEdit Text="@PatternHex"
+                             TextChanged="@OnPatternHexChanged"
+                             Class="pattern-input"
+                             Rows="2" />
+                    @if (!string.IsNullOrEmpty(_patternError))
+                    {
+                        <Alert Color="Color.Danger" Class="mt-2">@_patternError</Alert>
+                    }
+                </Field>
+                             
+                <Field Class="mt-3">
+                    <FieldLabel>Mask (x - match, ? - wildcard)</FieldLabel>
+                    <MemoEdit Text="@Mask"
+                             TextChanged="@OnMaskChanged"
+                             Class="mask-input"
+                             Rows="2" />
+                    @if (!string.IsNullOrEmpty(_maskError))
+                    {
+                        <Alert Color="Color.Danger" Class="mt-2">@_maskError</Alert>
+                    }
+                </Field>
+            </div>
         }
         else
         {
-            <NumericEdit TValue="int"
-                        @bind-Value="@SearchValue"
-                        Placeholder="Search value" />
+            <Field>
+                <FieldLabel>Search Value</FieldLabel>
+                @if (ValueType == MemoryValueType.String)
+                {
+                    <TextEdit Text="@StringSearchValue"
+                             TextChanged="@OnStringSearchValueChanged"
+                             Placeholder="Enter text to search"
+                             Class="search-input" />
+                }
+                else
+                {
+                    <NumericEdit TValue="int"
+                                @bind-Value="@SearchValue"
+                                Placeholder="Enter number to search"
+                                Class="search-input" />
+                }
+                @if (!string.IsNullOrEmpty(_searchValueError))
+                {
+                    <Alert Color="Color.Danger" Class="mt-2">@_searchValueError</Alert>
+                }
+            </Field>
+                        
+            @if (ScanType == ScanType.UnknownInitialValue)
+            {
+                <div class="text-muted mt-2">
+                    Perform first scan to initialize, then change value in game and perform next scan
+                </div>
+            }
         }
-                    
-        @if (ScanType == ScanType.UnknownInitialValue)
+    </div>
+
+    <div class="scan-actions mt-4">
+        @if (!SelectedProcessId.HasValue)
         {
-            <div class="text-muted">
-                Perform first scan to initialize, then change value in game and perform next scan
-            </div>
+            <Alert Color="Color.Warning">Please select a process first</Alert>
         }
-    }
 
-    @if (IsFirstScan)
-    {
-        <Button Color="Color.Primary"
-                Disabled="@(!CanScan || IsLoading || !IsValid)"
-                Clicked="@OnScanClick">
-            <Blazorise.Icon Name="@(IsLoading ? FontAwesomeIcons.Refresh : FontAwesomeIcons.Search)" />
-            First Memory Scan
-        </Button>
-    }
-    else 
-    {
-        <Button Color="Color.Secondary"
-                Disabled="@(!CanScan || IsLoading || !IsValid)"
-                Clicked="@OnScanClick">
-            <Blazorise.Icon Name="@(IsLoading ? FontAwesomeIcons.Refresh : FontAwesomeIcons.Search)" />
-            Next Scan
-        </Button>
-    }
+        @if (IsFirstScan)
+        {
+            <Button Color="Color.Primary"
+                    Block
+                    Disabled="@IsLoading"
+                    Clicked="@OnValidatedScanClick">
+                <Blazorise.Icon Name="@(IsLoading ? FontAwesomeIcons.Refresh : FontAwesomeIcons.Search)" />
+                First Memory Scan
+            </Button>
+        }
+        else 
+        {
+            <Button Color="Color.Secondary"
+                    Block
+                    Disabled="@IsLoading"
+                    Clicked="@OnValidatedScanClick">
+                <Blazorise.Icon Name="@(IsLoading ? FontAwesomeIcons.Refresh : FontAwesomeIcons.Search)" />
+                Next Scan
+            </Button>
+        }
 
-    @if (IsLoading)
-    {
-        <Progress Striped Animated>
-            <ProgressBar Value="100" />
-        </Progress>
-    }
+        @if (IsLoading)
+        {
+            <Progress Striped Animated Class="mt-3">
+                <ProgressBar Value="100" />
+            </Progress>
+        }
+    </div>
 </div>
 
+<style>
+    .scan-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .scan-type-select,
+    .value-type-select,
+    .search-input {
+        width: 100%;
+        border-radius: 0.375rem;
+    }
+
+    .pattern-inputs {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .pattern-input,
+    .mask-input {
+        font-family: monospace;
+        resize: none;
+    }
+
+    .scan-actions {
+        margin-top: auto;
+    }
+
+    .scan-actions .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .scan-actions .btn:not(:disabled):hover {
+        transform: translateY(-1px);
+    }
+
+    .scan-actions .btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .scan-actions .icon {
+        font-size: 1rem;
+    }
+
+    .progress {
+        height: 0.5rem;
+        border-radius: 1rem;
+    }
+</style>
+
 @code {
-    private string? _errorMessage;
-    private bool IsValid => string.IsNullOrEmpty(_errorMessage);
-    private string StringSearchValue { get; set; } = string.Empty;
+    private string? _patternError;
+    private string? _maskError;
+    private string? _searchValueError;
+    public string StringSearchValue { get; private set; } = string.Empty;
 
     [Parameter] public ScanType ScanType { get; set; }
     [Parameter] public MemoryValueType ValueType { get; set; }
@@ -130,6 +230,7 @@
     [Parameter] public bool IsFirstScan { get; set; }
     [Parameter] public bool IsLoading { get; set; }
     [Parameter] public bool CanScan { get; set; }
+    [Parameter] public int? SelectedProcessId { get; set; }
     [Parameter] public EventCallback<ScanType> OnScanTypeChanged { get; set; }
     [Parameter] public EventCallback<MemoryValueType> OnValueTypeChanged { get; set; }
     [Parameter] public EventCallback OnScanClick { get; set; }
@@ -143,65 +244,119 @@
         }
     }
 
+    private async Task OnStringSearchValueChanged(string value)
+    {
+        _searchValueError = null;
+        StringSearchValue = value;
+        await SearchValueChanged.InvokeAsync(0); // Reset numeric value when using string
+    }
+
+    private async Task OnValidatedScanClick()
+    {
+        ClearErrors();
+        
+        if (!SelectedProcessId.HasValue)
+        {
+            return;
+        }
+
+        if (ValueType == MemoryValueType.ByteArray)
+        {
+            return;
+        }
+
+        if (ScanType == ScanType.Pattern)
+        {
+            if (string.IsNullOrWhiteSpace(PatternHex))
+            {
+                _patternError = "Pattern cannot be empty";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(Mask))
+            {
+                _maskError = "Mask cannot be empty";
+                return;
+            }
+
+            if (!ValidatePattern(PatternHex))
+            {
+                return;
+            }
+
+            if (!ValidateMask(Mask))
+            {
+                return;
+            }
+        }
+        else if (ScanType != ScanType.UnknownInitialValue)
+        {
+            if (ValueType == MemoryValueType.String)
+            {
+                if (string.IsNullOrWhiteSpace(StringSearchValue))
+                {
+                    _searchValueError = "Search value cannot be empty";
+                    return;
+                }
+            }
+            else if (SearchValue == 0)
+            {
+                _searchValueError = "Search value cannot be empty";
+                return;
+            }
+        }
+
+        await OnScanClick.InvokeAsync();
+    }
+
+    private void ClearErrors()
+    {
+        _patternError = null;
+        _maskError = null;
+        _searchValueError = null;
+    }
+
+    private bool ValidatePattern(string value)
+    {
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in parts)
+        {
+            if (part.Length != 2 || !part.All(c => "0123456789ABCDEFabcdef".Contains(c)))
+            {
+                _patternError = "Pattern must be space-separated hex bytes (e.g. 'FF 00 A5')";
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private bool ValidateMask(string value)
+    {
+        if (value.Any(c => c != 'x' && c != '?'))
+        {
+            _maskError = "Mask can only contain 'x' (match) or '?' (wildcard)";
+            return false;
+        }
+
+        var pattern = PatternHex.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (pattern.Length != value.Length)
+        {
+            _maskError = "Mask length must match pattern length";
+            return false;
+        }
+
+        return true;
+    }
+
     private async Task OnPatternHexChanged(string value)
     {
-        ValidatePattern(value);
+        _patternError = null;
         await PatternHexChanged.InvokeAsync(value);
     }
 
     private async Task OnMaskChanged(string value)
     {
-        ValidateMask(value);
+        _maskError = null;
         await MaskChanged.InvokeAsync(value);
-    }
-
-    private void ValidatePattern(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            _errorMessage = "Pattern cannot be empty";
-            return;
-        }
-
-        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        foreach (var part in parts)
-        {
-            if (!byte.TryParse(part, System.Globalization.NumberStyles.HexNumber, null, out _))
-            {
-                _errorMessage = "Invalid pattern format";
-                return;
-            }
-        }
-
-        ValidateMaskLength(parts.Length);
-    }
-
-    private void ValidateMask(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            _errorMessage = "Mask cannot be empty";
-            return;
-        }
-
-        if (!value.All(c => c == 'x' || c == '?'))
-        {
-            _errorMessage = "Mask can only contain 'x' or '?'";
-            return;
-        }
-
-        var patternLength = PatternHex?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0;
-        ValidateMaskLength(patternLength);
-    }
-
-    private void ValidateMaskLength(int patternLength)
-    {
-        if (patternLength > 0 && Mask?.Length != patternLength)
-        {
-            _errorMessage = "Pattern and mask must have the same length";
-            return;
-        }
-
-        _errorMessage = null;
     }
 }
