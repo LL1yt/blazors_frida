@@ -33,6 +33,9 @@ using Blazorise.Sidebar;
 using Blazorise.Snackbar;
 using Blazorise.TreeView;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.FileProviders.Composite;
+using Microsoft.Extensions.FileProviders.Embedded;
+using Microsoft.Extensions.FileProviders.Physical;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -215,13 +218,19 @@ try
     }
 
     app.UseHttpsRedirection();
-    app.UseStaticFiles();
+    
+    // Serve embedded content first
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new PhysicalFileProvider(
-            Path.Combine(builder.Environment.ContentRootPath, "wwwroot/_content")),
-        RequestPath = "/_content"
+        FileProvider = new CompositeFileProvider(
+            new ManifestEmbeddedFileProvider(typeof(Blazorise.Bootstrap.Config).Assembly, "_content/Blazorise.Bootstrap"),
+            new ManifestEmbeddedFileProvider(typeof(Blazorise.Config).Assembly, "_content/Blazorise")
+        )
     });
+
+    // Then serve regular static files
+    app.UseStaticFiles();
+
     app.UseAntiforgery();
 
     app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
