@@ -41,7 +41,7 @@
                         ProcessList="@_state.ProcessList"
                         SelectedProcessId="@_state.SelectedProcessId"
                         OnProcessSelected="@OnProcessSelected"
-                        OnRefreshClick="@RefreshProcessList"
+                        OnRefreshClick="@(async () => await RefreshProcessList())"
                         IsLoading="@_state.IsLoading" />
                 </CardBody>
             </Card>
@@ -59,9 +59,9 @@
                         IsFirstScan="@_state.IsFirstScan"
                         IsLoading="@_state.IsLoading"
                         CanScan="@_state.CanScan"
-                        OnScanTypeChanged="@OnScanTypeChanged"
-                        OnValueTypeChanged="@OnValueTypeChanged"
-                        OnScanClick="@OnScan" />
+                        OnScanTypeChanged="@(async type => await OnScanTypeChanged(type))"
+                        OnValueTypeChanged="@(type => OnValueTypeChanged(type))"
+                        OnScanClick="@(async () => await OnScan())" />
 
                     <ScanExecutor @ref="scanExecutor"
                         ProcessId="@_state.SelectedProcessId"
@@ -72,8 +72,8 @@
                         SearchValue="@_state.SearchValue"
                         IsFirstScan="@_state.IsFirstScan"
                         IsLoading="@_state.IsLoading"
-                        OnScanComplete="@OnScanComplete"
-                        OnLoadingChanged="@OnLoadingChanged" />
+                        OnScanComplete="@(results => OnScanComplete(results))"
+                        OnLoadingChanged="@(loading => OnLoadingChanged(loading))" />
                 </CardBody>
             </Card>
 
@@ -98,10 +98,10 @@
                 <ScanResultsGrid
                     Results="@_state.ScanResults"
                     ValueType="@_state.SelectedValueType"
-                    GetCurrentValue="@(addr => BitConverter.ToInt32(GetCurrentValue(addr).Result, 0))"
+                    GetCurrentValue="@(async addr => BitConverter.ToInt32((await GetCurrentValue(addr)), 0))"
                     IsFrozen="@IsFrozen"
-                    OnValueChanged="@(args => OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
-                    OnFreezeToggle="@(addr => ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
+                    OnValueChanged="@(async args => await OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
+                    OnFreezeToggle="@(async addr => await ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
             </CardBody>
         </Card>
     </div>
@@ -219,10 +219,7 @@
 @code {
     private Modal? _saveConfigModal;
     private Modal? _loadConfigModal;
-    private ScanExecutor? scanExecutor;
-    private MemoryValueHandler? valueHandler;
-    private ValueFreezer? valueFreezer;
-    private readonly MemoryScannerState _state = new();
+    private new MemoryScannerState _state = new();
 
     protected override void OnInitialized()
     {
@@ -334,7 +331,7 @@
         }
     }
 
-    public override void OnScanComplete(List<IntPtr> results)
+    public override void OnScanComplete(List<nint> results)
     {
         Logger.LogInformation("Scan completed:\n" +
             "- Results Count: {Count}\n" +
@@ -346,30 +343,30 @@
             _state.SelectedScanType,
             _state.SelectedValueType);
 
-        _state.OnScanComplete(results);
+        _state.OnScanComplete(results.Cast<IntPtr>().ToList());
         StateHasChanged();
     }
 
-    public override Task OnLoadingChanged(bool isLoading)
+    public override void OnLoadingChanged(bool isLoading)
     {
         Logger.LogDebug("Loading state changed to {IsLoading}", isLoading);
         _state.IsLoading = isLoading;
         StateHasChanged();
-        return Task.CompletedTask;
     }
 
-    public override void OnScanTypeChanged(ScanType scanType)
+    public override async Task OnScanTypeChanged(ScanType newType)
     {
-        Logger.LogInformation("Scan type changed from {OldType} to {NewType}", _state.SelectedScanType, scanType);
-        _state.SelectedScanType = scanType;
+        Logger.LogInformation("Scan type changed from {OldType} to {NewType}", _state.SelectedScanType, newType);
+        _state.SelectedScanType = newType;
         _state.Reset();
         StateHasChanged();
+        await Task.CompletedTask;
     }
 
-    public override void OnValueTypeChanged(MemoryValueType valueType)
+    public override void OnValueTypeChanged(MemoryValueType newType)
     {
-        Logger.LogInformation("Value type changed from {OldType} to {NewType}", _state.SelectedValueType, valueType);
-        _state.SelectedValueType = valueType;
+        Logger.LogInformation("Value type changed from {OldType} to {NewType}", _state.SelectedValueType, newType);
+        _state.SelectedValueType = newType;
         _state.Reset();
         StateHasChanged();
     }
