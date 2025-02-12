@@ -4,7 +4,7 @@
 <div class="config-list">
     @if (Configs?.Any() != true)
     {
-        <Text>No saved configurations found.</Text>
+        <div>No saved configurations found.</div>
     }
     else
     {
@@ -14,10 +14,12 @@
                 <ListGroupItem Clicked="@(() => LoadConfig(config))">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <Text>@config.Name</Text>
+                            <div>@config.Name</div>
                             @if (!string.IsNullOrEmpty(config.Description))
                             {
-                                <Text Color="TextColor.Muted"><small>@config.Description</small></Text>
+                                <div class="text-muted">
+                                    <small>@config.Description</small>
+                                </div>
                             }
                         </div>
                         <Button Color="Color.Primary" Size="Size.Small">Load</Button>

@@ -41,7 +41,7 @@
                     <ProcessSelector
                         ProcessList="@_state.ProcessList"
                         SelectedProcessId="@_state.SelectedProcessId"
-                        OnProcessSelected="@OnProcessSelected"
+                        OnProcessSelected="@(async (int? id) => await OnProcessSelected(id))"
                         OnRefreshClick="@(async () => await RefreshProcessList())"
                         IsLoading="@_state.IsLoading" />
                 </CardBody>
@@ -57,7 +57,7 @@
                         PatternHex="@_state.PatternHex"
                         Mask="@_state.Mask"
                         Value="@_state.SearchValue"
-                        ValueChanged="@(v => _state.SearchValue = v)"
+                        ValueChanged="@((int v) => _state.SearchValue = v)"
                         IsFirstScan="@_state.IsFirstScan"
                         IsLoading="@_state.IsLoading"
                         CanScan="@_state.CanScan"
@@ -109,29 +109,29 @@
     </div>
 </div>
 
-<Modal @ref="_saveConfigModal">
+<Modal @bind-Visible="_saveConfigModalVisible">
     <ModalContent>
         <ModalHeader>
             <ModalTitle>Save Configuration</ModalTitle>
         </ModalHeader>
         <ModalBody>
-            <SaveConfigDialog 
+            <BlazorFridaApp.Components.Dialogs.SaveConfigDialog 
                 OnConfigSaved="@HandleConfigSaved"
-                OnCanceled="@(() => _saveConfigModal?.Hide())" />
+                OnCanceled="@(() => _saveConfigModalVisible = false)" />
         </ModalBody>
     </ModalContent>
 </Modal>
 
-<Modal @ref="_loadConfigModal">
+<Modal @bind-Visible="_loadConfigModalVisible">
     <ModalContent>
         <ModalHeader>
             <ModalTitle>Load Configuration</ModalTitle>
         </ModalHeader>
         <ModalBody>
-            <LoadConfigDialog 
-                Configs="@(_state.SavedConfigs ?? new())"
+            <BlazorFridaApp.Components.Dialogs.LoadConfigDialog 
+                Configs="@(new List<ScannerConfig>(_state.SavedConfigs.Values))"
                 OnConfigSelected="@HandleConfigLoaded"
-                OnCanceled="@(() => _loadConfigModal?.Hide())" />
+                OnCanceled="@(() => _loadConfigModalVisible = false)" />
         </ModalBody>
     </ModalContent>
 </Modal>
@@ -219,8 +219,8 @@
 </style>
 
 @code {
-    private Modal? _saveConfigModal;
-    private Modal? _loadConfigModal;
+    private bool _saveConfigModalVisible;
+    private bool _loadConfigModalVisible;
     private new MemoryScannerState _state = new();
 
     private int GetCurrentValueSync(nint addr)
@@ -234,54 +234,49 @@
         base.OnInitialized();
     }
 
-    private async Task OnProcessSelected(int? processId)
+    private Task OnProcessSelected(int? processId)
     {
-        await Task.Run(() => {
-            Logger.LogInformation("Process selection changed:\n" +
-                "- Previous Process ID: {PreviousId}\n" +
-                "- New Process ID: {NewId}\n" +
-                "- Can Scan: {CanScan}\n" +
-                "- Is First Scan: {IsFirstScan}",
-                _state.SelectedProcessId,
-                processId,
-                _state.CanScan,
-                _state.IsFirstScan);
-            _state.SelectedProcessId = processId;
-            _state.Reset();
-            if (processId.HasValue)
-            {
-                var process = _state.ProcessList.FirstOrDefault(p => p.Id == processId.Value);
-                Logger.LogInformation("Selected process details:\n" +
-                    "- Name: {Name}\n" +
-                    "- ID: {Id}\n" +
-                    "- Display Name: {DisplayName}",
-                    process?.Name,
-                    process?.Id,
-                    process?.DisplayName);
-            }
-            StateHasChanged();
-            Logger.LogDebug("State updated after process selection:\n" +
-                "- Selected Process ID: {ProcessId}\n" +
-                "- Can Scan: {CanScan}\n" +
-                "- Is First Scan: {IsFirstScan}",
-                _state.SelectedProcessId,
-                _state.CanScan,
-                _state.IsFirstScan);
-        });
-    }
-
-    private Task HandleSaveConfigClick()
-    {
-        if (_saveConfigModal is not null)
-            return _saveConfigModal.Show();
+        Logger.LogInformation("Process selection changed:\n" +
+            "- Previous Process ID: {PreviousId}\n" +
+            "- New Process ID: {NewId}\n" +
+            "- Can Scan: {CanScan}\n" +
+            "- Is First Scan: {IsFirstScan}",
+            _state.SelectedProcessId,
+            processId,
+            _state.CanScan,
+            _state.IsFirstScan);
+        _state.SelectedProcessId = processId;
+        _state.Reset();
+        if (processId.HasValue)
+        {
+            var process = _state.ProcessList.FirstOrDefault(p => p.Id == processId.Value);
+            Logger.LogInformation("Selected process details:\n" +
+                "- Name: {Name}\n" +
+                "- ID: {Id}\n" +
+                "- Display Name: {DisplayName}",
+                process?.Name,
+                process?.Id,
+                process?.DisplayName);
+        }
+        StateHasChanged();
+        Logger.LogDebug("State updated after process selection:\n" +
+            "- Selected Process ID: {ProcessId}\n" +
+            "- Can Scan: {CanScan}\n" +
+            "- Is First Scan: {IsFirstScan}",
+            _state.SelectedProcessId,
+            _state.CanScan,
+            _state.IsFirstScan);
         return Task.CompletedTask;
     }
 
-    private Task HandleLoadConfigClick()
+    private void HandleSaveConfigClick()
     {
-        if (_loadConfigModal is not null)
-            return _loadConfigModal.Show();
-        return Task.CompletedTask;
+        _saveConfigModalVisible = true;
+    }
+
+    private void HandleLoadConfigClick()
+    {
+        _loadConfigModalVisible = true;
     }
 
     private async Task HandleConfigSaved(string configName)
@@ -296,7 +291,7 @@
             config.Description = $"Configuration saved at {DateTime.Now}";
             
             await ProfileService.SaveScannerConfig(configName, config);
-            _saveConfigModal?.Hide();
+            _saveConfigModalVisible = false;
             NotificationService.ShowSuccess("Configuration saved", $"Configuration '{configName}' saved successfully");
         }
         catch (Exception ex)
@@ -305,21 +300,20 @@
         }
     }
 
-    private Task HandleConfigLoaded(ScannerConfig config)
+    private void HandleConfigLoaded(ScannerConfig config)
     {
         if (config == null)
-            return Task.CompletedTask;
+            return;
 
         try
         {
             _state.LoadConfig(config);
-            _loadConfigModal?.Hide();
+            _loadConfigModalVisible = false;
             NotificationService.ShowSuccess("Configuration loaded", "Configuration loaded successfully");
         }
         catch (Exception ex)
         {
             NotificationService.ShowError("Load failed", $"Failed to load configuration: {ex.Message}");
         }
-        return Task.CompletedTask;
     }
 }
