@@ -236,51 +236,52 @@
 
     private async Task OnProcessSelected(int? processId)
     {
-        Logger.LogInformation("Process selection changed:\n" +
-            "- Previous Process ID: {PreviousId}\n" +
-            "- New Process ID: {NewId}\n" +
-            "- Can Scan: {CanScan}\n" +
-            "- Is First Scan: {IsFirstScan}",
-            _state.SelectedProcessId,
-            processId,
-            _state.CanScan,
-            _state.IsFirstScan);
-
-        _state.SelectedProcessId = processId;
-        _state.Reset();
-
-        if (processId.HasValue)
-        {
-            var process = _state.ProcessList.FirstOrDefault(p => p.Id == processId.Value);
-            Logger.LogInformation("Selected process details:\n" +
-                "- Name: {Name}\n" +
-                "- ID: {Id}\n" +
-                "- Display Name: {DisplayName}",
-                process?.Name,
-                process?.Id,
-                process?.DisplayName);
-        }
-
-        StateHasChanged();
-        Logger.LogDebug("State updated after process selection:\n" +
-            "- Selected Process ID: {ProcessId}\n" +
-            "- Can Scan: {CanScan}\n" +
-            "- Is First Scan: {IsFirstScan}",
-            _state.SelectedProcessId,
-            _state.CanScan,
-            _state.IsFirstScan);
+        await Task.Run(() => {
+            Logger.LogInformation("Process selection changed:\n" +
+                "- Previous Process ID: {PreviousId}\n" +
+                "- New Process ID: {NewId}\n" +
+                "- Can Scan: {CanScan}\n" +
+                "- Is First Scan: {IsFirstScan}",
+                _state.SelectedProcessId,
+                processId,
+                _state.CanScan,
+                _state.IsFirstScan);
+            _state.SelectedProcessId = processId;
+            _state.Reset();
+            if (processId.HasValue)
+            {
+                var process = _state.ProcessList.FirstOrDefault(p => p.Id == processId.Value);
+                Logger.LogInformation("Selected process details:\n" +
+                    "- Name: {Name}\n" +
+                    "- ID: {Id}\n" +
+                    "- Display Name: {DisplayName}",
+                    process?.Name,
+                    process?.Id,
+                    process?.DisplayName);
+            }
+            StateHasChanged();
+            Logger.LogDebug("State updated after process selection:\n" +
+                "- Selected Process ID: {ProcessId}\n" +
+                "- Can Scan: {CanScan}\n" +
+                "- Is First Scan: {IsFirstScan}",
+                _state.SelectedProcessId,
+                _state.CanScan,
+                _state.IsFirstScan);
+        });
     }
 
-    private async Task HandleSaveConfigClick()
+    private Task HandleSaveConfigClick()
     {
         if (_saveConfigModal is not null)
-            await _saveConfigModal.Show();
+            return _saveConfigModal.Show();
+        return Task.CompletedTask;
     }
 
-    private async Task HandleLoadConfigClick()
+    private Task HandleLoadConfigClick()
     {
         if (_loadConfigModal is not null)
-            await _loadConfigModal.Show();
+            return _loadConfigModal.Show();
+        return Task.CompletedTask;
     }
 
     private async Task HandleConfigSaved(string configName)

@@ -1,0 +1,56 @@
+@using Blazorise
+@using BlazorFridaApp.MemoryScanner.Models
+
+<div class="config-list">
+    @if (Configs?.Any() != true)
+    {
+        <Text>No saved configurations found.</Text>
+    }
+    else
+    {
+        <ListGroup>
+            @foreach (var config in Configs)
+            {
+                <ListGroupItem Clicked="@(() => LoadConfig(config))">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <Text>@config.Name</Text>
+                            @if (!string.IsNullOrEmpty(config.Description))
+                            {
+                                <Text Color="TextColor.Muted"><small>@config.Description</small></Text>
+                            }
+                        </div>
+                        <Button Color="Color.Primary" Size="Size.Small">Load</Button>
+                    </div>
+                </ListGroupItem>
+            }
+        </ListGroup>
+    }
+</div>
+
+<div class="d-flex justify-content-end mt-3">
+    <Button Color="Color.Secondary" Clicked="@OnCanceled">Cancel</Button>
+</div>
+
+<style>
+    .config-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public List<ScannerConfig> Configs { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<ScannerConfig> OnConfigSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnCanceled { get; set; }
+
+    private Task LoadConfig(ScannerConfig config)
+    {
+        return OnConfigSelected.InvokeAsync(config);
+    }
+}

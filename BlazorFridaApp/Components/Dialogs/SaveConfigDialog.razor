@@ -1,0 +1,32 @@
+@using Blazorise
+
+<Field>
+    <FieldLabel>Configuration Name</FieldLabel>
+    <TextEdit @bind-Text="@_configName" Placeholder="Enter configuration name" />
+</Field>
+
+<Field>
+    <div class="d-flex justify-content-end gap-2">
+        <Button Color="Color.Secondary" Clicked="@OnCanceled">Cancel</Button>
+        <Button Color="Color.Primary" Clicked="@SaveConfig" Disabled="@string.IsNullOrWhiteSpace(_configName)">Save</Button>
+    </div>
+</Field>
+
+@code {
+    private string _configName = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> OnConfigSaved { get; set; }
+
+    [Parameter]
+    public EventCallback OnCanceled { get; set; }
+
+    private async Task SaveConfig()
+    {
+        if (!string.IsNullOrWhiteSpace(_configName))
+        {
+            await OnConfigSaved.InvokeAsync(_configName);
+            _configName = string.Empty;
+        }
+    }
+}
