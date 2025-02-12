@@ -7,6 +7,7 @@ using Moq;
 using Xunit;
 using System.Collections.Generic;
 using System.Threading;
+using AngleSharp.Dom;
 
 namespace BlazorFridaApp.Tests.Components;
 
@@ -42,15 +43,15 @@ public class ProcessSelectorDropdownTests : TestContextBase
             .Add(p => p.SelectedProcessId, 1000));
 
         // Assert initial selection
-        var selectedOption = cut.Find("select").GetAttributeValue<string>("value");
+        var selectedOption = cut.Find("select").GetAttribute("value");
         Assert.Equal("1000", selectedOption);
 
-        // Change selection
-        await cut.InvokeAsync(() => cut.Instance.SelectedProcessId = 2000);
-        cut.Render();
-
+        // Change selection programmatically through component instance
+        var select = cut.Find("select");
+        await cut.InvokeAsync(() => select.Change("2000"));
+        
         // Assert updated selection
-        selectedOption = cut.Find("select").GetAttributeValue<string>("value");
+        selectedOption = cut.Find("select").GetAttribute("value");
         Assert.Equal("2000", selectedOption);
     }
 }

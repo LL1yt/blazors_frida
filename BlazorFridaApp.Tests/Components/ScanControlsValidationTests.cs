@@ -10,7 +10,7 @@ namespace BlazorFridaApp.Tests.Components;
 
 public class ScanControlsValidationTests : TestBase
 {
-    private required IRenderedComponent<ScanControls> _component;
+    public required IRenderedComponent<ScanControls> _component { get; set; }
     private bool _scanClicked;
 
     public ScanControlsValidationTests()
