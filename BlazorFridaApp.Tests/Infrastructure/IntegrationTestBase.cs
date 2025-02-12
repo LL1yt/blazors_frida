@@ -21,8 +21,8 @@ public class IntegrationTestBase : IAsyncLifetime
     private readonly GrpcChannelOptions _channelOptions;
     protected static readonly TextMapPropagator Propagator = new TraceContextPropagator();
     private bool _disposed;
-    private const int MaxConnectionAttempts = 2;
-    private const int ConnectionRetryDelayMs = 1000;
+    private const int MaxConnectionAttempts = 1;
+    private const int ConnectionRetryDelayMs = 200;
 
     public IntegrationTestBase()
     {
@@ -108,7 +108,8 @@ public class IntegrationTestBase : IAsyncLifetime
         {
             try
             {
-                Logger.LogInformation("[InitializeAsync] Connection attempt {Attempt} of {MaxAttempts}", attempt, MaxConnectionAttempts);
+                Logger.LogInformation("[InitializeAsync] Connection attempt {Attempt} of {MaxAttempts} to port {Port}", 
+                    attempt, MaxConnectionAttempts, ProcessManager.Port);
                 
                 await ProcessManager.VerifyConnection();
                 Logger.LogInformation("[InitializeAsync] Successfully connected to gRPC server on attempt {Attempt}", attempt);
@@ -116,13 +117,14 @@ public class IntegrationTestBase : IAsyncLifetime
             }
             catch (Exception ex)
             {
-                Logger.LogWarning(ex, "[InitializeAsync] Connection attempt {Attempt} failed", attempt);
+                Logger.LogWarning(ex, "[InitializeAsync] Connection attempt {Attempt} failed. Error details: {ErrorMessage}", 
+                    attempt, ex.ToString());
                 
                 if (attempt == MaxConnectionAttempts)
                 {
-                    Logger.LogError("[InitializeAsync] All connection attempts failed");
+                    Logger.LogError("[InitializeAsync] All connection attempts failed after {MaxAttempts} tries", MaxConnectionAttempts);
                     throw new InvalidOperationException(
-                        "Failed to connect to gRPC server. Please ensure the server is running by executing 'start_test_server.bat' before running tests.", 
+                        $"Failed to connect to gRPC server after {MaxConnectionAttempts} attempts. Please ensure the server is running by executing 'start_test_server.bat' before running tests. Last error: {ex.Message}", 
                         ex);
                 }
                 
