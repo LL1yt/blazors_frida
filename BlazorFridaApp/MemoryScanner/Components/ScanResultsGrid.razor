@@ -17,9 +17,9 @@
                     @foreach (var result in Results)
                     {
                         <tr>
-                            <td>@result.Address.ToString("X")</td>
-                            <td>@result.Value</td>
-                            <td>@result.Type</td>
+                            <td>@(result.Addresses.FirstOrDefault().ToString("X"))</td>
+                            <td>@(BitConverter.ToString(result.Value))</td>
+                            <td>@result.ValueType</td>
                             <td>
                                 <button class="btn btn-sm btn-primary" @onclick="() => OnFreezeClick.InvokeAsync(result)">
                                     <i class="fas fa-lock"></i>
@@ -41,7 +41,7 @@
 
 @code {
     [Parameter]
-    public List<ScanResult> Results { get; set; }
+    public List<ScanResult> Results { get; set; } = new();
 
     [Parameter]
     public EventCallback<ScanResult> OnFreezeClick { get; set; }
