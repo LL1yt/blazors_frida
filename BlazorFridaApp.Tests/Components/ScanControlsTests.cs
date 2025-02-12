@@ -40,7 +40,7 @@ public class ScanControlsTests : TestContextBase
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var dropdown = cut.FindComponent<Select<ScanType>>();
+        var dropdown = cut.Find(".scan-type-select");
         Assert.NotNull(dropdown);
     }
 
@@ -70,7 +70,7 @@ public class ScanControlsTests : TestContextBase
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var numericEdit = cut.FindComponent<NumericEdit<int>>();
+        var numericEdit = cut.Find("input[type='number']");
         Assert.NotNull(numericEdit);
     }
 

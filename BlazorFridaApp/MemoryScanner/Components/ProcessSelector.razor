@@ -160,7 +160,21 @@
 
     private async Task RefreshProcessList()
     {
-        await OnRefreshClick.InvokeAsync();
+        try
+        {
+            IsLoading = true;
+            Processes = await ProcessService.RefreshProcessesAsync(_cts.Token);
+            await OnRefreshClick.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh process list");
+            throw;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 
     public async Task HandleFilter(ChangeEventArgs args)

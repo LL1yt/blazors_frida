@@ -172,8 +172,8 @@ public class ScanControlsValidationTests : TestBase
         SetupComponent(valueType: MemoryValueType.String);
         
         // Act
-        var input = _component.Find(".search-input");
-        input.Input("test string");
+        var input = _component.Find("input[type='text']");
+        input.Change("test string");
         
         var button = _component.Find("button");
         button.Click();
@@ -209,8 +209,8 @@ public class ScanControlsValidationTests : TestBase
         );
 
         // Act
-        var input = _component.Find(".search-input");
-        input.Input("test string");
+        var input = _component.Find("input[type='text']");
+        input.Change("test string");
 
         // Assert
         Assert.Equal("test string", _component.Instance.StringSearchValue);

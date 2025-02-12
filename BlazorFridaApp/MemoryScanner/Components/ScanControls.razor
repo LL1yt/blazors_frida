@@ -10,35 +10,29 @@
     <div class="row">
         <div class="col">
             <div class="mb-3">
-                <BaseSelect TValue="ScanType"
-                           Label="Scan Type"
-                           Value="@ScanType"
-                           ValueChanged="@(async (ScanType type) => await OnScanTypeChanged.InvokeAsync(type))"
-                           Class="scan-type-select">
+                <label class="form-label">Scan Type</label>
+                <select class="form-select scan-type-select" value="@ScanType" @onchange="@(async (ChangeEventArgs e) => await OnScanTypeChanged.InvokeAsync(Enum.Parse<ScanType>(e.Value?.ToString() ?? "")))">
                     @foreach (var type in ScanTypes)
                     {
                         <option value="@type">@type</option>
                     }
-                </BaseSelect>
+                </select>
             </div>
         </div>
         <div class="col">
             <div class="mb-3">
-                <BaseSelect TValue="MemoryValueType"
-                           Label="Value Type"
-                           Value="@ValueType"
-                           ValueChanged="@OnValueTypeChanged"
-                           Class="value-type-select">
+                <label class="form-label">Value Type</label>
+                <select class="form-select value-type-select" value="@ValueType" @onchange="@(e => OnValueTypeChanged.InvokeAsync(Enum.Parse<MemoryValueType>(e.Value?.ToString() ?? "")))">
                     @foreach (var type in ValueTypes)
                     {
                         <option value="@type">@type</option>
                     }
-                </BaseSelect>
+                </select>
                 @if (ValueType == MemoryValueType.ByteArray)
                 {
-                    <BaseAlert Color="warning" Class="mt-2">
+                    <div class="alert alert-warning mt-2">
                         Byte arrays are not supported yet
-                    </BaseAlert>
+                    </div>
                 }
             </div>
         </div>
@@ -49,26 +43,26 @@
         {
             <div class="pattern-inputs">
                 <div class="mb-3">
-                    <BaseInput Type="text"
-                              Label="Pattern (hex, space-separated)"
-                              Value="@PatternHex"
-                              ValueChanged="@PatternHexChanged"
-                              Class="pattern-input" />
+                    <label class="form-label">Pattern (hex, space-separated)</label>
+                    <input type="text"
+                           class="form-control pattern-input"
+                           value="@PatternHex"
+                           @onchange="@(e => PatternHexChanged.InvokeAsync(e.Value?.ToString()))" />
                     @if (!string.IsNullOrEmpty(_patternError))
                     {
-                        <BaseAlert Color="danger" Class="mt-2">@_patternError</BaseAlert>
+                        <div class="alert alert-danger mt-2">@_patternError</div>
                     }
                 </div>
                              
                 <div class="mb-3">
-                    <BaseInput Type="text"
-                              Label="Mask (x - match, ? - wildcard)"
-                              Value="@Mask"
-                              ValueChanged="@MaskChanged"
-                              Class="mask-input" />
+                    <label class="form-label">Mask (x - match, ? - wildcard)</label>
+                    <input type="text"
+                           class="form-control mask-input"
+                           value="@Mask"
+                           @onchange="@(e => MaskChanged.InvokeAsync(e.Value?.ToString()))" />
                     @if (!string.IsNullOrEmpty(_maskError))
                     {
-                        <BaseAlert Color="danger" Class="mt-2">@_maskError</BaseAlert>
+                        <div class="alert alert-danger mt-2">@_maskError</div>
                     }
                 </div>
             </div>
@@ -76,15 +70,27 @@
         else
         {
             <div class="mb-3">
-                <BaseInput Type="@(ValueType == MemoryValueType.String ? "text" : "number")"
-                          Label="Search Value"
-                          Value="@(ValueType == MemoryValueType.String ? StringSearchValue : SearchValue.ToString())"
-                          ValueChanged="@(v => SearchValueChanged.InvokeAsync(int.Parse(v)))"
-                          Placeholder="@(ValueType == MemoryValueType.String ? "Enter text to search" : "Enter number to search")"
-                          Class="search-input" />
+                @if (ValueType == MemoryValueType.String)
+                {
+                    <label class="form-label">Search Value</label>
+                    <input type="text"
+                           class="form-control search-input"
+                           value="@StringSearchValue"
+                           placeholder="Enter text to search"
+                           @onchange="@(e => SearchValueChanged.InvokeAsync(int.Parse(e.Value?.ToString() ?? "0")))" />
+                }
+                else
+                {
+                    <label class="form-label">Search Value</label>
+                    <input type="number"
+                           class="form-control search-input"
+                           value="@SearchValue"
+                           placeholder="Enter number to search"
+                           @onchange="@(e => SearchValueChanged.InvokeAsync(int.Parse(e.Value?.ToString() ?? "0")))" />
+                }
                 @if (!string.IsNullOrEmpty(_searchValueError))
                 {
-                    <BaseAlert Color="danger" Class="mt-2">@_searchValueError</BaseAlert>
+                    <div class="alert alert-danger mt-2">@_searchValueError</div>
                 }
             </div>
                         
@@ -100,36 +106,24 @@
     <div class="scan-actions mt-4">
         @if (!SelectedProcessId.HasValue)
         {
-            <BaseAlert Color="warning">Please select a process first</BaseAlert>
+            <div class="alert alert-warning">Please select a process first</div>
         }
 
-        @if (IsFirstScan)
-        {
-            <BaseButton Color="primary"
-                       Class="w-100"
-                       Disabled="@IsLoading"
-                       OnClick="@OnValidatedScanClick"
-                       Icon="@(IsLoading ? "fas fa-refresh" : "fas fa-search")">
-                First Memory Scan
-            </BaseButton>
-        }
-        else 
-        {
-            <BaseButton Color="secondary"
-                       Class="w-100"
-                       Disabled="@IsLoading"
-                       OnClick="@OnValidatedScanClick"
-                       Icon="@(IsLoading ? "fas fa-refresh" : "fas fa-search")">
-                Next Scan
-            </BaseButton>
-        }
+        <button type="button" 
+                class="btn btn-primary w-100" 
+                disabled="@(IsLoading || !CanScan)"
+                @onclick="OnValidatedScanClick">
+            <i class="@(IsLoading ? "fas fa-refresh" : "fas fa-search")"></i>
+            @(IsFirstScan ? "First Memory Scan" : "Next Scan")
+        </button>
 
         @if (IsLoading)
         {
             <div class="progress mt-3">
                 <div class="progress-bar progress-bar-striped progress-bar-animated" 
                      role="progressbar" 
-                     style="width: 100%"></div>
+                     style="width: 100%">
+                </div>
             </div>
         }
     </div>
@@ -201,6 +195,50 @@
 
     private async Task OnValidatedScanClick()
     {
+        // Validate pattern scan inputs
+        if (ScanType == ScanType.Pattern)
+        {
+            _patternError = string.Empty;
+            _maskError = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(PatternHex))
+            {
+                _patternError = "Pattern cannot be empty";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(Mask))
+            {
+                _maskError = "Mask cannot be empty";
+                return;
+            }
+
+            try
+            {
+                var pattern = PatternHex.Split(' ').Select(b => Convert.ToByte(b, 16)).ToArray();
+                if (pattern.Length != Mask.Length)
+                {
+                    _maskError = "Mask length must match pattern length";
+                    return;
+                }
+            }
+            catch
+            {
+                _patternError = "Pattern must be space-separated hex bytes";
+                return;
+            }
+        }
+        else
+        {
+            _searchValueError = string.Empty;
+            if ((ValueType == MemoryValueType.String && string.IsNullOrEmpty(StringSearchValue)) ||
+                (ValueType != MemoryValueType.String && SearchValue == 0))
+            {
+                _searchValueError = "Search value cannot be empty";
+                return;
+            }
+        }
+
         if (OnScanClick.HasDelegate)
         {
             await OnScanClick.InvokeAsync();

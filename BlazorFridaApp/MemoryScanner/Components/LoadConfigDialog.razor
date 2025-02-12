@@ -11,30 +11,23 @@
             <div class="modal-body">
                 @if (_configs != null && _configs.Any())
                 {
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var config in _configs)
-                            {
-                                <tr>
-                                    <td>@config.Name</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteConfig(config)">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-primary ms-2" @onclick="() => LoadConfig(config)">
-                                            Load
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                    <div class="list-group">
+                        @foreach (var config in _configs)
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center"
+                                 @onclick="() => LoadConfig(config)">
+                                <div>@config.Name</div>
+                                <div>
+                                    <button class="btn btn-sm btn-danger" @onclick:stopPropagation="true" @onclick="() => DeleteConfig(config)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-primary ms-2">
+                                        Load
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 }
                 else
                 {
