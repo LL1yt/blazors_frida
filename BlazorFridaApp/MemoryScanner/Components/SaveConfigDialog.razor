@@ -37,7 +37,7 @@
     private bool _isVisible;
     private string _configName = "";
     private string _error = "";
-    private required ScannerConfig _config;
+    public required ScannerConfig _config;
 
     [Inject]
     public required IScanProfileService ScanProfileService { get; set; }

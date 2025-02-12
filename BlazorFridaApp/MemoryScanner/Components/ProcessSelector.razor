@@ -24,7 +24,7 @@
 
 @code {
     [Parameter]
-    public List<ProcessInfo> Processes { get; set; }
+    public List<ProcessInfo> Processes { get; set; } = new();
 
     [Parameter]
     public int? SelectedProcessId { get; set; }

@@ -79,8 +79,7 @@
                 <BaseInput Type="@(ValueType == MemoryValueType.String ? "text" : "number")"
                           Label="Search Value"
                           Value="@(ValueType == MemoryValueType.String ? StringSearchValue : SearchValue.ToString())"
-                          ValueExpression="() => SearchValue"
-                          ValueChanged="@(async (int v) => await SearchValueChanged.InvokeAsync(v))"
+                          ValueChanged="@(v => SearchValueChanged.InvokeAsync(int.Parse(v)))"
                           Placeholder="@(ValueType == MemoryValueType.String ? "Enter text to search" : "Enter number to search")"
                           Class="search-input" />
                 @if (!string.IsNullOrEmpty(_searchValueError))

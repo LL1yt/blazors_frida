@@ -5,6 +5,7 @@
 @using BlazorFridaApp.Services
 @using BlazorFridaApp.Components.Dialogs
 @using System.ComponentModel
+@using System.Text.Json
 @inherits MemoryScannerComponentBase
 
 @inject DialogService DialogService
@@ -92,12 +93,12 @@
         <div class="card">
             <div class="card-body">
                 <ScanResultsGrid
-                    Results="@(_state.ScanResults?.Select(addr => new ScanResult { Address = addr }).ToList() ?? new List<ScanResult>())"
+                    Results="@(_state.ScanResults?.Select(addr => new ScanResult { AddressesJson = JsonSerializer.Serialize(new List<long> { addr.ToInt64() }) }).ToList() ?? new List<ScanResult>())"
                     ValueType="@_state.SelectedValueType"
-                    GetCurrentValue="@(() => GetCurrentValueSync())"
-                    IsFrozen="@(() => IsFrozen())"
-                    OnValueChanged="@(async args => await OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
-                    OnFreezeToggle="@(async addr => await ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
+                    GetCurrentValue="@(new Func<long, byte[]>(addr => GetCurrentValueSync(addr)))"
+                    IsFrozen="@(new Func<long, bool>(addr => IsFrozen(addr)))"
+                    OnValueChanged="@(new Func<(long, double), Task>(async args => await OnValueChanged(args.Item1, BitConverter.GetBytes(args.Item2))))"
+                    OnFreezeToggle="@(new Func<long, Task>(async addr => await ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType))))" />
             </div>
         </div>
     </div>
@@ -255,15 +256,12 @@
         base.OnInitialized();
     }
 
-    private void HandleProcessSelected(int? processId)
+    private async Task HandleProcessSelected(int? processId)
     {
-        _state.SelectedProcessId = processId;
-        _state.NotifyStateChanged();
-        StateHasChanged();
-        Logger.LogDebug($"Process selected: {processId}");
+        await OnProcessSelected(processId);
     }
 
-    private Task OnProcessSelected(int? processId)
+    private async Task OnProcessSelected(int? processId)
     {
         Logger.LogInformation("Process selection changed:\n" +
             "- Previous Process ID: {PreviousId}\n" +
@@ -274,8 +272,10 @@
             processId,
             _state.CanScan,
             _state.IsFirstScan);
+        
         _state.SelectedProcessId = processId;
         _state.Reset();
+        
         if (processId.HasValue)
         {
             var process = _state.ProcessList.FirstOrDefault(p => p.Id == processId.Value);
@@ -287,6 +287,7 @@
                 process?.Id,
                 process?.DisplayName);
         }
+        
         StateHasChanged();
         Logger.LogDebug("State updated after process selection:\n" +
             "- Selected Process ID: {ProcessId}\n" +
@@ -295,7 +296,6 @@
             _state.SelectedProcessId,
             _state.CanScan,
             _state.IsFirstScan);
-        return Task.CompletedTask;
     }
 
     private void HandleSaveConfigClick()

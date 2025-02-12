@@ -15,7 +15,6 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>Created</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -24,7 +23,6 @@
                             {
                                 <tr>
                                     <td>@config.Name</td>
-                                    <td>@config.CreatedAt.ToLocalTime().ToString("g")</td>
                                     <td>
                                         <button class="btn btn-sm btn-danger" @onclick="() => DeleteConfig(config)">
                                             <i class="fas fa-trash"></i>
@@ -59,7 +57,7 @@
 
 @code {
     private bool _isVisible;
-    private required List<ScannerConfig> _configs;
+    public required List<ScannerConfig> _configs;
 
     [Inject]
     public required IScanProfileService ScanProfileService { get; set; }
