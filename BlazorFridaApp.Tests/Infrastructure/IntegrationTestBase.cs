@@ -21,6 +21,8 @@ public class IntegrationTestBase : IAsyncLifetime
     private readonly GrpcChannelOptions _channelOptions;
     protected static readonly TextMapPropagator Propagator = new TraceContextPropagator();
     private bool _disposed;
+    private const int MaxConnectionAttempts = 2;
+    private const int ConnectionRetryDelayMs = 1000;
 
     public IntegrationTestBase()
     {
@@ -37,6 +39,13 @@ public class IntegrationTestBase : IAsyncLifetime
         {
             MaxReceiveMessageSize = null, // Remove message size limits
             MaxSendMessageSize = null,
+            HttpHandler = new SocketsHttpHandler
+            {
+                EnableMultipleHttp2Connections = true,
+                KeepAlivePingDelay = TimeSpan.FromSeconds(60),
+                KeepAlivePingTimeout = TimeSpan.FromSeconds(30),
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(1)
+            }
         };
 
         Logger.LogInformation("[IntegrationTestBase] Created PythonProcessManager instance");
@@ -94,31 +103,32 @@ public class IntegrationTestBase : IAsyncLifetime
     public virtual async Task InitializeAsync()
     {
         Logger.LogInformation("[IntegrationTestBase] InitializeAsync started");
-        try
+        
+        for (int attempt = 1; attempt <= MaxConnectionAttempts; attempt++)
         {
-            // Add a small delay before first connection attempt to allow for server startup
-            await Task.Delay(2000);
-            Logger.LogInformation("[IntegrationTestBase] Verifying gRPC server connection");
-            
             try
             {
+                Logger.LogInformation("[InitializeAsync] Connection attempt {Attempt} of {MaxAttempts}", attempt, MaxConnectionAttempts);
+                
                 await ProcessManager.VerifyConnection();
-                Logger.LogInformation("[IntegrationTestBase] Successfully connected to gRPC server");
+                Logger.LogInformation("[InitializeAsync] Successfully connected to gRPC server on attempt {Attempt}", attempt);
+                return;
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "[IntegrationTestBase] Initial connection attempt failed, retrying...");
+                Logger.LogWarning(ex, "[InitializeAsync] Connection attempt {Attempt} failed", attempt);
                 
-                // One more retry with a longer delay
-                await Task.Delay(5000);
-                await ProcessManager.VerifyConnection();
-                Logger.LogInformation("[IntegrationTestBase] Successfully connected to gRPC server on retry");
+                if (attempt == MaxConnectionAttempts)
+                {
+                    Logger.LogError("[InitializeAsync] All connection attempts failed");
+                    throw new InvalidOperationException(
+                        "Failed to connect to gRPC server. Please ensure the server is running by executing 'start_test_server.bat' before running tests.", 
+                        ex);
+                }
+                
+                Logger.LogInformation("[InitializeAsync] Waiting {Delay}ms before next attempt", ConnectionRetryDelayMs);
+                await Task.Delay(ConnectionRetryDelayMs);
             }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "[IntegrationTestBase] Failed to connect to gRPC server. Make sure the server is running on port 50051");
-            throw new InvalidOperationException("Failed to connect to gRPC server. Make sure to start the server manually before running tests.", ex);
         }
     }
 

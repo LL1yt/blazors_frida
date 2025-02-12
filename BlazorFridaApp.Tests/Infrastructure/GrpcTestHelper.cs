@@ -17,7 +17,7 @@ public class GrpcTestHelper
                 It.IsAny<Metadata>(),
                 It.IsAny<DateTime?>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((HealthCheckRequest request, Metadata metadata, DateTime? deadline, CancellationToken token) =>
+            .Returns((HealthCheckRequest request, Metadata metadata, DateTime? deadline, CancellationToken token) =>
             {
                 // Simulate real service behavior
                 if (token.IsCancellationRequested)
@@ -25,10 +25,17 @@ public class GrpcTestHelper
                     throw new RpcException(new Status(StatusCode.Cancelled, "Call canceled by the client."));
                 }
 
-                return new HealthCheckResponse
+                var response = new HealthCheckResponse
                 {
                     Status = HealthCheckResponse.Types.ServingStatus.Serving
                 };
+
+                return new AsyncUnaryCall<HealthCheckResponse>(
+                    Task.FromResult(response),
+                    Task.FromResult(new Metadata()),
+                    () => Status.DefaultSuccess,
+                    () => new Metadata(),
+                    () => { });
             });
 
         return healthClientMock;

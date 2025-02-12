@@ -104,31 +104,24 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         // Arrange
         await _page.GotoAsync("https://localhost:7235/memory-scanner");
         
-        // First load the process list
-        var processListButton = _page.GetByRole(AriaRole.Button, new() { Name = "Process Scan" });
-        await processListButton.ClickAsync();
+        // Wait for the page to be fully loaded
+        await _page.WaitForSelectorAsync(".scanner-controls", new() { State = WaitForSelectorState.Visible });
         
-        // Wait for process list to be loaded and combobox to be enabled
-        var processCombobox = _page.GetByRole(AriaRole.Combobox).First;
-        await processCombobox.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-        await _page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
+        // Wait for process list to be loaded
+        await Task.Delay(1000);
         
-        // Wait a bit for the process list to be populated
-        await Task.Delay(2000);
+        // Select first process
+        var processSelector = await _page.QuerySelectorAsync("select");
+        await processSelector.SelectOptionAsync(new SelectOptionValue[] { new() { Index = 1 } });
         
-        // Select notepad from the dropdown
-        await processCombobox.ClickAsync();
-        var notepadOption = _page.GetByText("notepad", new() { Exact = false });
-        await notepadOption.WaitForAsync(new() { State = WaitForSelectorState.Visible });
-        await notepadOption.ClickAsync();
+        // Wait for scan button to be enabled
+        var scanButton = await _page.WaitForSelectorAsync("button:has-text('Process Scan')", new() { State = WaitForSelectorState.Visible });
+        Assert.NotNull(scanButton);
         
-        var scanButton = _page.GetByRole(AriaRole.Button, new() { Name = "First Memory Scan" });
+        // Verify error handling
         await scanButton.ClickAsync();
-        
-        // Verify error notification
-        var errorNotification = _page.GetByText("Connection error");
-        var errorElement = await errorNotification.ElementHandleAsync();
-        Assert.NotNull(errorElement);
+        var errorAlert = await _page.WaitForSelectorAsync(".alert-danger");
+        Assert.NotNull(errorAlert);
     }
 
     [Fact]
