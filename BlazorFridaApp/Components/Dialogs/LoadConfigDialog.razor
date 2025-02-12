@@ -1,4 +1,3 @@
-@using Blazorise
 @using BlazorFridaApp.MemoryScanner.Models
 
 <div class="config-list">
@@ -8,10 +7,10 @@
     }
     else
     {
-        <ListGroup>
+        <div class="list-group">
             @foreach (var config in Configs)
             {
-                <ListGroupItem Clicked="@(() => LoadConfig(config))">
+                <div class="list-group-item" @onclick="@(() => LoadConfig(config))">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <div>@config.Name</div>
@@ -22,16 +21,16 @@
                                 </div>
                             }
                         </div>
-                        <Button Color="Color.Primary" Size="Size.Small">Load</Button>
+                        <button class="btn btn-primary btn-sm">Load</button>
                     </div>
-                </ListGroupItem>
+                </div>
             }
-        </ListGroup>
+        </div>
     }
 </div>
 
 <div class="d-flex justify-content-end mt-3">
-    <Button Color="Color.Secondary" Clicked="@OnCanceled">Cancel</Button>
+    <button class="btn btn-secondary" @onclick="OnCanceled">Cancel</button>
 </div>
 
 <style>
@@ -51,8 +50,8 @@
     [Parameter]
     public EventCallback OnCanceled { get; set; }
 
-    private Task LoadConfig(ScannerConfig config)
+    private async Task LoadConfig(ScannerConfig config)
     {
-        return OnConfigSelected.InvokeAsync(config);
+        await OnConfigSelected.InvokeAsync(config);
     }
 }
