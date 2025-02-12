@@ -3,6 +3,7 @@
 @using BlazorFridaApp.MemoryScanner.Components
 @using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @using BlazorFridaApp.Services
+@using BlazorFridaApp.Components.Dialogs
 @using Blazorise
 @using Blazorise.Components
 @using Blazorise.Icons.FontAwesome
@@ -55,7 +56,8 @@
                         ValueTypes="@_state.ValueTypes"
                         PatternHex="@_state.PatternHex"
                         Mask="@_state.Mask"
-                        @bind-SearchValue="@_state.SearchValue"
+                        Value="@_state.SearchValue"
+                        ValueChanged="@(v => _state.SearchValue = v)"
                         IsFirstScan="@_state.IsFirstScan"
                         IsLoading="@_state.IsLoading"
                         CanScan="@_state.CanScan"
@@ -98,7 +100,7 @@
                 <ScanResultsGrid
                     Results="@_state.ScanResults"
                     ValueType="@_state.SelectedValueType"
-                    GetCurrentValue="@(async addr => BitConverter.ToInt32((await GetCurrentValue(addr)), 0))"
+                    GetCurrentValue="@GetCurrentValueSync"
                     IsFrozen="@IsFrozen"
                     OnValueChanged="@(async args => await OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
                     OnFreezeToggle="@(async addr => await ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
@@ -221,6 +223,11 @@
     private Modal? _loadConfigModal;
     private new MemoryScannerState _state = new();
 
+    private int GetCurrentValueSync(nint addr)
+    {
+        return BitConverter.ToInt32(GetCurrentValue(addr).Result, 0);
+    }
+
     protected override void OnInitialized()
     {
         Logger.LogInformation("Initializing MemoryScanner component");
@@ -248,10 +255,10 @@
             Logger.LogInformation("Selected process details:\n" +
                 "- Name: {Name}\n" +
                 "- ID: {Id}\n" +
-                "- Window Title: {Title}",
+                "- Display Name: {DisplayName}",
                 process?.Name,
                 process?.Id,
-                process?.WindowTitle);
+                process?.DisplayName);
         }
 
         StateHasChanged();
@@ -264,113 +271,6 @@
             _state.IsFirstScan);
     }
 
-    public override async Task RefreshProcessList()
-    {
-        try
-        {
-            Logger.LogInformation("Refreshing process list");
-            _state.IsLoading = true;
-            _state.ProcessList = await ProcessService.GetProcessesAsync();
-            Logger.LogInformation("Process list refreshed, found {Count} processes", _state.ProcessList.Count);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to refresh process list");
-            NotificationService.ShowError("Error", "Failed to refresh process list");
-        }
-        finally
-        {
-            _state.IsLoading = false;
-            StateHasChanged();
-        }
-    }
-
-    public override async Task OnScan()
-    {
-        if (!_state.CanScan)
-        {
-            Logger.LogWarning("Scan attempted but CanScan is false:\n" +
-                "- Selected Process ID: {ProcessId}\n" +
-                "- Value Type: {ValueType}\n" +
-                "- Scan Type: {ScanType}\n" +
-                "- Pattern: {Pattern}\n" +
-                "- Mask: {Mask}",
-                _state.SelectedProcessId,
-                _state.SelectedValueType,
-                _state.SelectedScanType,
-                _state.PatternHex,
-                _state.Mask);
-            return;
-        }
-
-        try
-        {
-            Logger.LogInformation("Starting scan:\n" +
-                "- Process ID: {ProcessId}\n" +
-                "- Scan Type: {ScanType}\n" +
-                "- Value Type: {ValueType}\n" +
-                "- Is First Scan: {IsFirstScan}",
-                _state.SelectedProcessId,
-                _state.SelectedScanType,
-                _state.SelectedValueType,
-                _state.IsFirstScan);
-
-            if (scanExecutor != null)
-            {
-                await scanExecutor.ExecuteScan(async (addr) =>
-                {
-                    var bytes = await valueHandler?.GetCurrentValue(addr) ?? Array.Empty<byte>();
-                    return bytes.Length >= 4 ? BitConverter.ToInt32(bytes, 0) : 0;
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Scan failed");
-            NotificationService.ShowError("Error", "Failed to execute scan");
-        }
-    }
-
-    public override void OnScanComplete(List<nint> results)
-    {
-        Logger.LogInformation("Scan completed:\n" +
-            "- Results Count: {Count}\n" +
-            "- Process ID: {ProcessId}\n" +
-            "- Scan Type: {ScanType}\n" +
-            "- Value Type: {ValueType}",
-            results.Count,
-            _state.SelectedProcessId,
-            _state.SelectedScanType,
-            _state.SelectedValueType);
-
-        _state.OnScanComplete(results.Cast<IntPtr>().ToList());
-        StateHasChanged();
-    }
-
-    public override void OnLoadingChanged(bool isLoading)
-    {
-        Logger.LogDebug("Loading state changed to {IsLoading}", isLoading);
-        _state.IsLoading = isLoading;
-        StateHasChanged();
-    }
-
-    public override async Task OnScanTypeChanged(ScanType newType)
-    {
-        Logger.LogInformation("Scan type changed from {OldType} to {NewType}", _state.SelectedScanType, newType);
-        _state.SelectedScanType = newType;
-        _state.Reset();
-        StateHasChanged();
-        await Task.CompletedTask;
-    }
-
-    public override void OnValueTypeChanged(MemoryValueType newType)
-    {
-        Logger.LogInformation("Value type changed from {OldType} to {NewType}", _state.SelectedValueType, newType);
-        _state.SelectedValueType = newType;
-        _state.Reset();
-        StateHasChanged();
-    }
-    
     private async Task HandleSaveConfigClick()
     {
         if (_saveConfigModal is not null)
