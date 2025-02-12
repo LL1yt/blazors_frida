@@ -128,6 +128,8 @@ public class PythonProcessManager : IPythonProcessManager, IDisposable
                 var request = new HealthCheckRequest { Service = "" };
                 
                 using var cts = new CancellationTokenSource(TimeoutMs);
+                _logger.LogDebug("[VerifyConnection] Deadline: {Deadline}, Current time: {CurrentTime}", 
+                    DateTime.UtcNow.AddMilliseconds(TimeoutMs).ToString("o"), DateTime.UtcNow.ToString("o"));
                 _logger.LogDebug("[VerifyConnection] Attempt {Attempt}: Sending health check request with timeout {Timeout}ms", 
                     attempts + 1, TimeoutMs);
                 

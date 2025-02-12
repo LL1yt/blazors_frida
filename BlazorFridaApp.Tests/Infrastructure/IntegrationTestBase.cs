@@ -23,6 +23,7 @@ public class IntegrationTestBase : IAsyncLifetime
     private bool _disposed;
     private const int MaxConnectionAttempts = 1;
     private const int ConnectionRetryDelayMs = 200;
+    protected virtual int ConnectionTimeoutMs { get; } = 5000; // 5 секунд
 
     public IntegrationTestBase()
     {
@@ -111,7 +112,7 @@ public class IntegrationTestBase : IAsyncLifetime
                 Logger.LogInformation("[InitializeAsync] Connection attempt {Attempt} of {MaxAttempts} to port {Port}", 
                     attempt, MaxConnectionAttempts, ProcessManager.Port);
                 
-                await ProcessManager.VerifyConnection();
+                await ProcessManager.VerifyConnection(ConnectionTimeoutMs);
                 Logger.LogInformation("[InitializeAsync] Successfully connected to gRPC server on attempt {Attempt}", attempt);
                 return;
             }
