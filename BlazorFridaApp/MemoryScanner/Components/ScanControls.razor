@@ -238,14 +238,25 @@
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
+        Logger.LogDebug("ScanControls parameters updated:\n" +
+            "- ScanType: {ScanType}\n" +
+            "- ValueType: {ValueType}\n" +
+            "- IsFirstScan: {IsFirstScan}\n" +
+            "- IsLoading: {IsLoading}\n" +
+            "- CanScan: {CanScan}\n" +
+            "- SelectedProcessId: {ProcessId}",
+            ScanType, ValueType, IsFirstScan, IsLoading, CanScan, SelectedProcessId);
+
         if (ValueType == MemoryValueType.String && SearchValue != 0)
         {
             StringSearchValue = SearchValue.ToString();
+            Logger.LogDebug("Converted numeric search value {Value} to string", SearchValue);
         }
     }
 
     private async Task OnStringSearchValueChanged(string value)
     {
+        Logger.LogDebug("String search value changed to: {Value}", value);
         _searchValueError = null;
         StringSearchValue = value;
         await SearchValueChanged.InvokeAsync(0); // Reset numeric value when using string
@@ -253,15 +264,33 @@
 
     private async Task OnValidatedScanClick()
     {
+        Logger.LogInformation("Validating scan parameters:\n" +
+            "- Process: {ProcessId}\n" +
+            "- ScanType: {ScanType}\n" +
+            "- ValueType: {ValueType}\n" +
+            "- Pattern: {Pattern}\n" +
+            "- Mask: {Mask}\n" +
+            "- SearchValue: {SearchValue}\n" +
+            "- StringSearchValue: {StringValue}",
+            SelectedProcessId,
+            ScanType,
+            ValueType,
+            PatternHex,
+            Mask,
+            SearchValue,
+            StringSearchValue);
+
         ClearErrors();
         
         if (!SelectedProcessId.HasValue)
         {
+            Logger.LogWarning("Scan attempted without selected process");
             return;
         }
 
         if (ValueType == MemoryValueType.ByteArray)
         {
+            Logger.LogWarning("Scan attempted with unsupported ByteArray type");
             return;
         }
 
@@ -269,23 +298,27 @@
         {
             if (string.IsNullOrWhiteSpace(PatternHex))
             {
+                Logger.LogWarning("Pattern scan attempted with empty pattern");
                 _patternError = "Pattern cannot be empty";
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(Mask))
             {
+                Logger.LogWarning("Pattern scan attempted with empty mask");
                 _maskError = "Mask cannot be empty";
                 return;
             }
 
             if (!ValidatePattern(PatternHex))
             {
+                Logger.LogWarning("Invalid pattern format: {Pattern}", PatternHex);
                 return;
             }
 
             if (!ValidateMask(Mask))
             {
+                Logger.LogWarning("Invalid mask format: {Mask}", Mask);
                 return;
             }
         }
@@ -295,22 +328,29 @@
             {
                 if (string.IsNullOrWhiteSpace(StringSearchValue))
                 {
+                    Logger.LogWarning("String scan attempted with empty value");
                     _searchValueError = "Search value cannot be empty";
                     return;
                 }
             }
             else if (SearchValue == 0)
             {
+                Logger.LogWarning("Numeric scan attempted with zero value");
                 _searchValueError = "Search value cannot be empty";
                 return;
             }
         }
 
+        Logger.LogInformation("Scan validation passed, initiating scan");
         await OnScanClick.InvokeAsync();
     }
 
     private void ClearErrors()
     {
+        if (_patternError != null || _maskError != null || _searchValueError != null)
+        {
+            Logger.LogDebug("Clearing validation errors");
+        }
         _patternError = null;
         _maskError = null;
         _searchValueError = null;
@@ -318,33 +358,41 @@
 
     private bool ValidatePattern(string value)
     {
+        Logger.LogDebug("Validating pattern: {Pattern}", value);
         var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         foreach (var part in parts)
         {
             if (part.Length != 2 || !part.All(c => "0123456789ABCDEFabcdef".Contains(c)))
             {
+                Logger.LogWarning("Invalid pattern part: {Part}", part);
                 _patternError = "Pattern must be space-separated hex bytes (e.g. 'FF 00 A5')";
                 return false;
             }
         }
+        Logger.LogDebug("Pattern validation passed");
         return true;
     }
 
     private bool ValidateMask(string value)
     {
+        Logger.LogDebug("Validating mask: {Mask}", value);
         if (value.Any(c => c != 'x' && c != '?'))
         {
-            _maskError = "Mask can only contain 'x' (match) or '?' (wildcard)";
+            Logger.LogWarning("Invalid mask character found in: {Mask}", value);
+            _maskError = "Mask can only contain 'x' and '?' characters";
             return false;
         }
 
         var pattern = PatternHex.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (pattern.Length != value.Length)
         {
+            Logger.LogWarning("Mask length {MaskLength} does not match pattern length {PatternLength}", 
+                value.Length, pattern.Length);
             _maskError = "Mask length must match pattern length";
             return false;
         }
 
+        Logger.LogDebug("Mask validation passed");
         return true;
     }
 

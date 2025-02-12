@@ -219,6 +219,160 @@
 @code {
     private Modal? _saveConfigModal;
     private Modal? _loadConfigModal;
+    private ScanExecutor? scanExecutor;
+    private MemoryValueHandler? valueHandler;
+    private ValueFreezer? valueFreezer;
+    private readonly MemoryScannerState _state = new();
+
+    protected override void OnInitialized()
+    {
+        Logger.LogInformation("Initializing MemoryScanner component");
+        base.OnInitialized();
+    }
+
+    private async Task OnProcessSelected(int? processId)
+    {
+        Logger.LogInformation("Process selection changed:\n" +
+            "- Previous Process ID: {PreviousId}\n" +
+            "- New Process ID: {NewId}\n" +
+            "- Can Scan: {CanScan}\n" +
+            "- Is First Scan: {IsFirstScan}",
+            _state.SelectedProcessId,
+            processId,
+            _state.CanScan,
+            _state.IsFirstScan);
+
+        _state.SelectedProcessId = processId;
+        _state.Reset();
+
+        if (processId.HasValue)
+        {
+            var process = _state.ProcessList.FirstOrDefault(p => p.Id == processId.Value);
+            Logger.LogInformation("Selected process details:\n" +
+                "- Name: {Name}\n" +
+                "- ID: {Id}\n" +
+                "- Window Title: {Title}",
+                process?.Name,
+                process?.Id,
+                process?.WindowTitle);
+        }
+
+        StateHasChanged();
+        Logger.LogDebug("State updated after process selection:\n" +
+            "- Selected Process ID: {ProcessId}\n" +
+            "- Can Scan: {CanScan}\n" +
+            "- Is First Scan: {IsFirstScan}",
+            _state.SelectedProcessId,
+            _state.CanScan,
+            _state.IsFirstScan);
+    }
+
+    public override async Task RefreshProcessList()
+    {
+        try
+        {
+            Logger.LogInformation("Refreshing process list");
+            _state.IsLoading = true;
+            _state.ProcessList = await ProcessService.GetProcessesAsync();
+            Logger.LogInformation("Process list refreshed, found {Count} processes", _state.ProcessList.Count);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh process list");
+            NotificationService.ShowError("Error", "Failed to refresh process list");
+        }
+        finally
+        {
+            _state.IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    public override async Task OnScan()
+    {
+        if (!_state.CanScan)
+        {
+            Logger.LogWarning("Scan attempted but CanScan is false:\n" +
+                "- Selected Process ID: {ProcessId}\n" +
+                "- Value Type: {ValueType}\n" +
+                "- Scan Type: {ScanType}\n" +
+                "- Pattern: {Pattern}\n" +
+                "- Mask: {Mask}",
+                _state.SelectedProcessId,
+                _state.SelectedValueType,
+                _state.SelectedScanType,
+                _state.PatternHex,
+                _state.Mask);
+            return;
+        }
+
+        try
+        {
+            Logger.LogInformation("Starting scan:\n" +
+                "- Process ID: {ProcessId}\n" +
+                "- Scan Type: {ScanType}\n" +
+                "- Value Type: {ValueType}\n" +
+                "- Is First Scan: {IsFirstScan}",
+                _state.SelectedProcessId,
+                _state.SelectedScanType,
+                _state.SelectedValueType,
+                _state.IsFirstScan);
+
+            if (scanExecutor != null)
+            {
+                await scanExecutor.ExecuteScan(async (addr) =>
+                {
+                    var bytes = await valueHandler?.GetCurrentValue(addr) ?? Array.Empty<byte>();
+                    return bytes.Length >= 4 ? BitConverter.ToInt32(bytes, 0) : 0;
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Scan failed");
+            NotificationService.ShowError("Error", "Failed to execute scan");
+        }
+    }
+
+    public override void OnScanComplete(List<IntPtr> results)
+    {
+        Logger.LogInformation("Scan completed:\n" +
+            "- Results Count: {Count}\n" +
+            "- Process ID: {ProcessId}\n" +
+            "- Scan Type: {ScanType}\n" +
+            "- Value Type: {ValueType}",
+            results.Count,
+            _state.SelectedProcessId,
+            _state.SelectedScanType,
+            _state.SelectedValueType);
+
+        _state.OnScanComplete(results);
+        StateHasChanged();
+    }
+
+    public override Task OnLoadingChanged(bool isLoading)
+    {
+        Logger.LogDebug("Loading state changed to {IsLoading}", isLoading);
+        _state.IsLoading = isLoading;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public override void OnScanTypeChanged(ScanType scanType)
+    {
+        Logger.LogInformation("Scan type changed from {OldType} to {NewType}", _state.SelectedScanType, scanType);
+        _state.SelectedScanType = scanType;
+        _state.Reset();
+        StateHasChanged();
+    }
+
+    public override void OnValueTypeChanged(MemoryValueType valueType)
+    {
+        Logger.LogInformation("Value type changed from {OldType} to {NewType}", _state.SelectedValueType, valueType);
+        _state.SelectedValueType = valueType;
+        _state.Reset();
+        StateHasChanged();
+    }
     
     private async Task HandleSaveConfigClick()
     {

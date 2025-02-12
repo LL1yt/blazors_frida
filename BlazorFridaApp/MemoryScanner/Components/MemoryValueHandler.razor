@@ -12,8 +12,14 @@
     {
         try
         {
+            Logger.LogDebug("Getting current value:\n" +
+                "- Address: {Address:X}\n" +
+                "- Value Type: {ValueType}",
+                address.ToInt64(), ValueType);
+
             if (ValueType == MemoryValueType.String || ValueType == MemoryValueType.ByteArray)
             {
+                Logger.LogWarning("Attempted to read unsupported value type: {ValueType}", ValueType);
                 ShowWarning("Unsupported type", $"Type {ValueType} is not supported yet");
                 return Array.Empty<byte>();
             }
@@ -29,13 +35,27 @@
                 _ => throw new ArgumentException($"Unsupported value type: {ValueType}")
             };
 
+            Logger.LogTrace("Reading {Size} bytes from address {Address:X}", size, address.ToInt64());
+
             byte[] bytes;
             try
             {
                 bytes = await MemoryReader.ReadMemoryBytes(address, size);
+                Logger.LogDebug("Successfully read {Size} bytes from address {Address:X}", bytes.Length, address.ToInt64());
+                
+                if (bytes.Length > 0)
+                {
+                    Logger.LogTrace("Read bytes: {Bytes}", 
+                        string.Join(" ", bytes.Select(b => b.ToString("X2"))));
+                }
             }
             catch (Exception ex)
             {
+                Logger.LogError(ex, "Memory read failed:\n" +
+                    "- Address: {Address:X}\n" +
+                    "- Size: {Size}\n" +
+                    "- Error: {Error}",
+                    address.ToInt64(), size, ex.Message);
                 ShowError("Memory read error", $"Failed to read memory at {address:X}", ex);
                 return Array.Empty<byte>();
             }
@@ -44,6 +64,11 @@
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Unexpected error getting value:\n" +
+                "- Address: {Address:X}\n" +
+                "- Value Type: {ValueType}\n" +
+                "- Error: {Error}",
+                address.ToInt64(), ValueType, ex.Message);
             ShowError("Unexpected error", "Error getting value", ex);
             return Array.Empty<byte>();
         }

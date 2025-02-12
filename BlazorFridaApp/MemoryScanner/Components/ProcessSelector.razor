@@ -9,7 +9,8 @@
     <Row>
         <Column ColumnSize="ColumnSize.Is9">
             <Select TValue="int?" 
-                   @bind-SelectedValue="@SelectedProcessId"
+                   Value="@SelectedProcessId"
+                   ValueChanged="@OnProcessSelected"
                    Disabled="@IsLoading"
                    SearchChanged="@((string value) => { _searchTerm = value; StateHasChanged(); })">
                 <ChildContent>
@@ -117,12 +118,17 @@
     protected override void OnParametersSet()
     {
         Logger.LogDebug(
-            "ProcessSelector parameters updating at {ElapsedMs}ms. ProcessList count: {Count}, SelectedProcessId: {ProcessId}, IsLoading: {IsLoading}, RenderCount: {RenderCount}",
-            _lifecycleTimer.ElapsedMilliseconds,
+            "ProcessSelector parameters updating:\n" +
+            "- Process List Count: {Count}\n" +
+            "- Selected Process ID: {ProcessId}\n" +
+            "- Is Loading: {IsLoading}\n" +
+            "- Render Count: {RenderCount}\n" +
+            "- Selected Process Exists: {ProcessExists}",
             ProcessList?.Count ?? 0,
             SelectedProcessId,
             IsLoading,
-            _renderCount);
+            _renderCount,
+            SelectedProcessId.HasValue && ProcessList?.Any(p => p.Id == SelectedProcessId.Value) == true);
 
         // Ensure selection stays valid
         if (SelectedProcessId.HasValue && ProcessList != null)
@@ -130,7 +136,10 @@
             var processExists = ProcessList.Any(p => p.Id == SelectedProcessId.Value);
             if (!processExists)
             {
-                Logger.LogWarning("Selected process {ProcessId} no longer exists in the list", SelectedProcessId.Value);
+                Logger.LogWarning(
+                    "Selected process {ProcessId} no longer exists in the list. Available processes:\n{Processes}",
+                    SelectedProcessId.Value,
+                    string.Join("\n", ProcessList.Select(p => $"- {p.Name} ({p.Id})")));
             }
         }
         
