@@ -6,9 +6,6 @@ using BlazorFridaApp.MemoryScanner.Base;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
-using Blazorise;
-using Blazorise.Bootstrap5;
-using Blazorise.Icons.FontAwesome;
 
 namespace BlazorFridaApp.Tests.Components;
 
@@ -24,15 +21,6 @@ public class ValueFreezerTests : TestContextBase
         
         Services.AddSingleton(_freezerMock.Object);
         Services.AddSingleton(_scannerMock.Object);
-        
-        Services
-            .AddBlazorise()
-            .AddBootstrap5Providers()
-            .AddFontAwesomeIcons();
-            
-        // Add style provider
-        JSInterop.SetupModule("_content/Blazorise/blazorise.js");
-        JSInterop.SetupModule("_content/Blazorise.Bootstrap5/blazorise.bootstrap5.js");
     }
 
     [Fact]
@@ -43,8 +31,8 @@ public class ValueFreezerTests : TestContextBase
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var numericEdit = cut.FindComponent<NumericEdit<int>>();
-        Assert.NotNull(numericEdit);
+        var numericInput = cut.Find("input[type='number']");
+        Assert.NotNull(numericInput);
     }
 
     [Fact]
@@ -55,7 +43,8 @@ public class ValueFreezerTests : TestContextBase
             .Add(p => p.ValueType, MemoryValueType.Int32));
 
         // Assert
-        var button = cut.FindComponent<Button>();
+        var button = cut.Find("button");
         Assert.NotNull(button);
+        Assert.Equal("Freeze", button.TextContent.Trim());
     }
 }

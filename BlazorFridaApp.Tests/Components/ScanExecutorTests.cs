@@ -250,8 +250,10 @@ public class ScanExecutorTests : TestContextBase
             .Add(p => p.IsLoading, true));
 
         // Assert
-        var progressBar = cut.FindComponent<Progress>();
+        var progressBar = cut.Find(".progress");
         Assert.NotNull(progressBar);
+        var progressBarInner = cut.Find(".progress-bar");
+        Assert.NotNull(progressBarInner);
     }
 
     [Fact]
@@ -262,6 +264,7 @@ public class ScanExecutorTests : TestContextBase
             .Add(p => p.IsLoading, false));
 
         // Assert
-        Assert.Throws<ComponentNotFoundException>(() => cut.FindComponent<Progress>());
+        var progressBars = cut.FindAll(".progress");
+        Assert.Empty(progressBars);
     }
 }
