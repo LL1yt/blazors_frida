@@ -102,7 +102,7 @@ public class PythonProcessManager : IPythonProcessManager, IDisposable
         _logger.LogInformation("[VerifyConnection] Starting connection verification to gRPC server on port {Port}", _port);
         var activity = new Activity("VerifyGrpcConnection").Start();
         
-        const int maxRetries = 3; // Increased retries
+        const int maxRetries = 2; // Increased retries
         const int timeoutMs = 1000; // Increased timeout
         const int retryDelayMs = 200; // Increased delay between retries
         var attempts = 0;

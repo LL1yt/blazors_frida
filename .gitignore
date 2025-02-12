@@ -35,3 +35,5 @@ logs
 *.log
 states
 playwright-browsers
+bootstrap
+font-awesome
