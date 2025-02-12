@@ -1,6 +1,8 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
+using BlazorFridaApp.Services;
+using Moq;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 
@@ -22,6 +24,8 @@ public abstract class TestBase : TestContext
 
     protected virtual void ConfigureServices(IServiceCollection services)
     {
-        // Override in derived classes to add specific services
+        // Register notification service mock
+        var notificationServiceMock = new Mock<INotificationService>();
+        services.AddScoped<INotificationService>(_ => notificationServiceMock.Object);
     }
-} 
+}
