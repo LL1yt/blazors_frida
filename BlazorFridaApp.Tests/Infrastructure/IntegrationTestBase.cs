@@ -112,7 +112,7 @@ public class IntegrationTestBase : IAsyncLifetime
                 Logger.LogInformation("[InitializeAsync] Connection attempt {Attempt} of {MaxAttempts} to port {Port}", 
                     attempt, MaxConnectionAttempts, ProcessManager.Port);
                 
-                await ProcessManager.VerifyConnection(ConnectionTimeoutMs);
+                await ProcessManager.VerifyConnection();
                 Logger.LogInformation("[InitializeAsync] Successfully connected to gRPC server on attempt {Attempt}", attempt);
                 return;
             }

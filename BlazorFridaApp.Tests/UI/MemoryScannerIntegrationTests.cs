@@ -112,6 +112,7 @@ public class MemoryScannerIntegrationTests : IAsyncLifetime
         
         // Select first process
         var processSelector = await _page.QuerySelectorAsync("select");
+        Assert.NotNull(processSelector); // Fail early if element not found
         await processSelector.SelectOptionAsync(new SelectOptionValue[] { new() { Index = 1 } });
         
         // Wait for scan button to be enabled

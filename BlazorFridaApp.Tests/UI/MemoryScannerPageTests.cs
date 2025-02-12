@@ -86,6 +86,7 @@ public class MemoryScannerPageTests : IAsyncLifetime
         
         // Select pattern scan type
         var scanTypeSelect = await _page.QuerySelectorAsync("select[name='scanType']");
+        Assert.NotNull(scanTypeSelect); // Fail early if element not found
         await scanTypeSelect.SelectOptionAsync("Pattern");
         
         // Verify pattern input appears
