@@ -35,8 +35,8 @@
                     <ProcessSelector
                         ProcessList="@_state.ProcessList"
                         SelectedProcessId="@_state.SelectedProcessId"
-                        OnProcessSelected="@(id => HandleProcessSelected(id))"
-                        OnRefreshClick="@(() => RefreshProcessList())"
+                        OnProcessSelected="@(async (int? id) => await HandleProcessSelected(id))"
+                        OnRefreshClick="@(async () => await RefreshProcessList())"
                         IsLoading="@_state.IsLoading" />
                 </div>
             </div>
@@ -92,10 +92,10 @@
         <div class="card">
             <div class="card-body">
                 <ScanResultsGrid
-                    Results="@_state.ScanResults"
+                    Results="@(_state.ScanResults?.Select(addr => new ScanResult { Address = addr }).ToList() ?? new List<ScanResult>())"
                     ValueType="@_state.SelectedValueType"
-                    GetCurrentValue="@GetCurrentValueSync"
-                    IsFrozen="@IsFrozen"
+                    GetCurrentValue="@(() => GetCurrentValueSync())"
+                    IsFrozen="@(() => IsFrozen())"
                     OnValueChanged="@(async args => await OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
                     OnFreezeToggle="@(async addr => await ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
             </div>

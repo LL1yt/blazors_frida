@@ -1,5 +1,5 @@
 @using BlazorFridaApp.MemoryScanner.Models
-@using BlazorFridaApp.Services.Interfaces
+@using BlazorFridaApp.MemoryScanner.Services.Interfaces
 
 <div class="modal @(_isVisible ? "show d-block" : "d-none")" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
@@ -37,15 +37,15 @@
     private bool _isVisible;
     private string _configName = "";
     private string _error = "";
-    private ScanConfiguration _config;
+    private required ScannerConfig _config;
 
     [Inject]
-    private IScanProfileService ScanProfileService { get; set; }
+    public required IScanProfileService ScanProfileService { get; set; }
 
     [Parameter]
-    public EventCallback<ScanConfiguration> OnConfigurationSaved { get; set; }
+    public EventCallback<ScannerConfig> OnConfigurationSaved { get; set; }
 
-    public void Show(ScanConfiguration config)
+    public void Show(ScannerConfig config)
     {
         _config = config;
         _isVisible = true;

@@ -13,7 +13,7 @@
                 <BaseSelect TValue="ScanType"
                            Label="Scan Type"
                            Value="@ScanType"
-                           ValueChanged="@OnScanTypeChanged"
+                           ValueChanged="@(async (ScanType type) => await OnScanTypeChanged.InvokeAsync(type))"
                            Class="scan-type-select">
                     @foreach (var type in ScanTypes)
                     {
@@ -79,7 +79,8 @@
                 <BaseInput Type="@(ValueType == MemoryValueType.String ? "text" : "number")"
                           Label="Search Value"
                           Value="@(ValueType == MemoryValueType.String ? StringSearchValue : SearchValue.ToString())"
-                          ValueChanged="@SearchValueChanged"
+                          ValueExpression="() => SearchValue"
+                          ValueChanged="@(async (int v) => await SearchValueChanged.InvokeAsync(v))"
                           Placeholder="@(ValueType == MemoryValueType.String ? "Enter text to search" : "Enter number to search")"
                           Class="search-input" />
                 @if (!string.IsNullOrEmpty(_searchValueError))

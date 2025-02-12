@@ -16,5 +16,8 @@ namespace BlazorFridaApp.MemoryScanner.Services.Interfaces
         Task<ScanProfile> SaveProfileAsync(ScanProfile profile);
         Task<ScanProfile> GetProfileAsync(string name);
         List<string> ValidateProfile(ScanProfile profile);
+        Task<List<ScannerConfig>> GetAllConfigurationsAsync();
+        Task DeleteConfigurationAsync(string name);
+        Task SaveConfigurationAsync(ScannerConfig config);
     }
 }

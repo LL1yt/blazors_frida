@@ -59,13 +59,13 @@
 
 @code {
     private bool _isVisible;
-    private List<ScanConfiguration> _configs;
+    private required List<ScannerConfig> _configs;
 
     [Inject]
-    private IScanProfileService ScanProfileService { get; set; }
+    public required IScanProfileService ScanProfileService { get; set; }
 
     [Parameter]
-    public EventCallback<ScanConfiguration> OnConfigurationSelected { get; set; }
+    public EventCallback<ScannerConfig> OnConfigurationSelected { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -90,13 +90,13 @@
         StateHasChanged();
     }
 
-    private async Task DeleteConfig(ScanConfiguration config)
+    private async Task DeleteConfig(ScannerConfig config)
     {
-        await ScanProfileService.DeleteConfigurationAsync(config.Id);
+        await ScanProfileService.DeleteConfigurationAsync(config.Name);
         await LoadConfigurations();
     }
 
-    private async Task LoadConfig(ScanConfiguration config)
+    private async Task LoadConfig(ScannerConfig config)
     {
         await OnConfigurationSelected.InvokeAsync(config);
         Close();

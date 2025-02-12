@@ -90,5 +90,58 @@ namespace BlazorFridaApp.MemoryScanner.Services
                 throw;
             }
         }
+
+        public async Task<List<ScannerConfig>> GetAllConfigurationsAsync()
+        {
+            try
+            {
+                return await _dbContext.ScannerConfigs.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get all scanner configurations");
+                throw;
+            }
+        }
+
+        public async Task DeleteConfigurationAsync(string name)
+        {
+            try
+            {
+                var config = await _dbContext.ScannerConfigs.FindAsync(name);
+                if (config != null)
+                {
+                    _dbContext.ScannerConfigs.Remove(config);
+                    await _dbContext.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete scanner configuration {Name}", name);
+                throw;
+            }
+        }
+
+        public async Task SaveConfigurationAsync(ScannerConfig config)
+        {
+            try
+            {
+                var existingConfig = await _dbContext.ScannerConfigs.FindAsync(config.Name);
+                if (existingConfig != null)
+                {
+                    _dbContext.Entry(existingConfig).CurrentValues.SetValues(config);
+                }
+                else
+                {
+                    await _dbContext.ScannerConfigs.AddAsync(config);
+                }
+                await _dbContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to save scanner configuration {Name}", config.Name);
+                throw;
+            }
+        }
     }
 }
