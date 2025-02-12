@@ -1,0 +1,31 @@
+@if (Show)
+{
+    <div class="alert alert-@Color alert-dismissible fade show @Class" role="alert">
+        @if (!string.IsNullOrEmpty(Icon))
+        {
+            <i class="@Icon me-2"></i>
+        }
+        @ChildContent
+        @if (Dismissible)
+        {
+            <button type="button" class="btn-close" @onclick="OnDismiss" aria-label="Close"></button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; } = true;
+    [Parameter] public string Color { get; set; } = "primary";
+    [Parameter] public string Icon { get; set; }
+    [Parameter] public string Class { get; set; }
+    [Parameter] public bool Dismissible { get; set; }
+    [Parameter] public EventCallback OnDismissed { get; set; }
+    [Parameter] public RenderFragment ChildContent { get; set; }
+
+    private async Task OnDismiss()
+    {
+        Show = false;
+        if (OnDismissed.HasDelegate)
+            await OnDismissed.InvokeAsync();
+    }
+} 

@@ -1,7 +1,6 @@
 @using System
 @using System.Collections.Generic
 @using System.Threading.Tasks
-@using Blazorise
 @using Microsoft.AspNetCore.Components.Web
 @using BlazorFridaApp.MemoryScanner.Models
 @using BlazorFridaApp.MemoryScanner.Services.Interfaces
@@ -9,14 +8,28 @@
 @inherits MemoryScannerComponentBase
 @inject IMemoryScannerService MemoryScanner
 
-<div>
+<div class="scan-executor">
     @if (IsLoading)
     {
-        <Progress Striped Animated>
-            <ProgressBar Value="100" />
-        </Progress>
+        <div class="progress" style="height: 20px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 role="progressbar" 
+                 style="width: 100%">
+            </div>
+        </div>
     }
 </div>
+
+<style>
+    .scan-executor {
+        width: 100%;
+    }
+
+    .progress {
+        margin: 0.5rem 0;
+        background-color: var(--bs-light);
+    }
+</style>
 
 @code {
     private List<IntPtr> scanResults = new List<IntPtr>();

@@ -4,51 +4,45 @@
 @using BlazorFridaApp.MemoryScanner.Services.Interfaces
 @using BlazorFridaApp.Services
 @using BlazorFridaApp.Components.Dialogs
-@using Blazorise
-@using Blazorise.Components
-@using Blazorise.Icons.FontAwesome
-@using Blazorise.Icons
-@using Blazorise.Modules
-@using static Blazorise.ModalSize
 @using System.ComponentModel
 @inherits MemoryScannerComponentBase
 
 @inject DialogService DialogService
 
 <div class="memory-scanner-container">
-    <Card Margin="Margin.Is3.FromBottom">
-        <CardBody>
+    <div class="card mb-3">
+        <div class="card-body">
             <div class="d-flex justify-content-between align-items-center">
-                <Heading Size="HeadingSize.Is2">Memory Scanner</Heading>
-                <Addons>
-                    <Button Color="Color.Secondary" Clicked="@HandleSaveConfigClick">
-                        <Blazorise.Icon Name="@FontAwesomeIcons.Save" />
+                <h2 class="mb-0">Memory Scanner</h2>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" @onclick="HandleSaveConfigClick">
+                        <i class="fas fa-save"></i>
                         Save Config
-                    </Button>
-                    <Button Color="Color.Secondary" Clicked="@HandleLoadConfigClick">
-                        <Blazorise.Icon Name="@FontAwesomeIcons.FolderOpen" />
+                    </button>
+                    <button class="btn btn-secondary" @onclick="HandleLoadConfigClick">
+                        <i class="fas fa-folder-open"></i>
                         Load Config
-                    </Button>
-                </Addons>
+                    </button>
+                </div>
             </div>
-        </CardBody>
-    </Card>
+        </div>
+    </div>
 
     <div class="scanner-content">
         <div class="scanner-controls">
-            <Card Margin="Margin.Is3.FromBottom">
-                <CardBody>
+            <div class="card mb-3">
+                <div class="card-body">
                     <ProcessSelector
                         ProcessList="@_state.ProcessList"
                         SelectedProcessId="@_state.SelectedProcessId"
-                        OnProcessSelected="@(async (int? id) => await OnProcessSelected(id))"
-                        OnRefreshClick="@(async () => await RefreshProcessList())"
+                        OnProcessSelected="@(id => HandleProcessSelected(id))"
+                        OnRefreshClick="@(() => RefreshProcessList())"
                         IsLoading="@_state.IsLoading" />
-                </CardBody>
-            </Card>
+                </div>
+            </div>
 
-            <Card Margin="Margin.Is3.FromBottom" Class="scan-options-card">
-                <CardBody>
+            <div class="card mb-3 scan-options-card">
+                <div class="card-body">
                     <ScanControls
                         ScanType="@_state.SelectedScanType"
                         ValueType="@_state.SelectedValueType"
@@ -56,8 +50,8 @@
                         ValueTypes="@_state.ValueTypes"
                         PatternHex="@_state.PatternHex"
                         Mask="@_state.Mask"
-                        Value="@_state.SearchValue"
-                        ValueChanged="@((int v) => _state.SearchValue = v)"
+                        SearchValue="@_state.SearchValue"
+                        SearchValueChanged="@((int v) => _state.SearchValue = v)"
                         IsFirstScan="@_state.IsFirstScan"
                         IsLoading="@_state.IsLoading"
                         CanScan="@_state.CanScan"
@@ -76,27 +70,27 @@
                         IsLoading="@_state.IsLoading"
                         OnScanComplete="@(results => OnScanComplete(results))"
                         OnLoadingChanged="@(loading => OnLoadingChanged(loading))" />
-                </CardBody>
-            </Card>
+                </div>
+            </div>
 
-            <Card Margin="Margin.Is3.FromBottom">
-                <CardBody>
-                    <Row>
-                        <Column>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col">
                             <MemoryValueHandler @ref="valueHandler"
                                 ValueType="@_state.SelectedValueType" />
-                        </Column>
-                        <Column>
+                        </div>
+                        <div class="col">
                             <ValueFreezer @ref="valueFreezer"
                                 ValueType="@_state.SelectedValueType" />
-                        </Column>
-                    </Row>
-                </CardBody>
-            </Card>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <Card>
-            <CardBody>
+        <div class="card">
+            <div class="card-body">
                 <ScanResultsGrid
                     Results="@_state.ScanResults"
                     ValueType="@_state.SelectedValueType"
@@ -104,37 +98,50 @@
                     IsFrozen="@IsFrozen"
                     OnValueChanged="@(async args => await OnValueChanged(args.address, BitConverter.GetBytes(args.value)))"
                     OnFreezeToggle="@(async addr => await ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType)))" />
-            </CardBody>
-        </Card>
+            </div>
+        </div>
     </div>
 </div>
 
-<Modal @bind-Visible="_saveConfigModalVisible">
-    <ModalContent>
-        <ModalHeader>
-            <ModalTitle>Save Configuration</ModalTitle>
-        </ModalHeader>
-        <ModalBody>
-            <BlazorFridaApp.Components.Dialogs.SaveConfigDialog 
-                OnConfigSaved="@HandleConfigSaved"
-                OnCanceled="@(() => _saveConfigModalVisible = false)" />
-        </ModalBody>
-    </ModalContent>
-</Modal>
+<!-- Save Config Modal -->
+<div class="modal @(_saveConfigModalVisible ? "show d-block" : "d-none")" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Save Configuration</h5>
+                <button type="button" class="btn-close" @onclick="@(() => _saveConfigModalVisible = false)"></button>
+            </div>
+            <div class="modal-body">
+                <BlazorFridaApp.Components.Dialogs.SaveConfigDialog 
+                    OnConfigSaved="@HandleConfigSaved"
+                    OnCanceled="@(() => _saveConfigModalVisible = false)" />
+            </div>
+        </div>
+    </div>
+</div>
 
-<Modal @bind-Visible="_loadConfigModalVisible">
-    <ModalContent>
-        <ModalHeader>
-            <ModalTitle>Load Configuration</ModalTitle>
-        </ModalHeader>
-        <ModalBody>
-            <BlazorFridaApp.Components.Dialogs.LoadConfigDialog 
-                Configs="@(new List<ScannerConfig>(_state.SavedConfigs.Values))"
-                OnConfigSelected="@HandleConfigLoaded"
-                OnCanceled="@(() => _loadConfigModalVisible = false)" />
-        </ModalBody>
-    </ModalContent>
-</Modal>
+<!-- Load Config Modal -->
+<div class="modal @(_loadConfigModalVisible ? "show d-block" : "d-none")" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Load Configuration</h5>
+                <button type="button" class="btn-close" @onclick="@(() => _loadConfigModalVisible = false)"></button>
+            </div>
+            <div class="modal-body">
+                <BlazorFridaApp.Components.Dialogs.LoadConfigDialog 
+                    Configs="@(new List<ScannerConfig>(_state.SavedConfigs.Values))"
+                    OnConfigSelected="@HandleConfigLoaded"
+                    OnCanceled="@(() => _loadConfigModalVisible = false)" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_saveConfigModalVisible || _loadConfigModalVisible)
+{
+    <div class="modal-backdrop show"></div>
+}
 
 <style>
     .memory-scanner-container {
@@ -216,6 +223,20 @@
             grid-template-columns: 1fr;
         }
     }
+
+    .modal {
+        background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-group .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .btn-group .btn i {
+        font-size: 1rem;
+    }
 </style>
 
 @code {
@@ -232,6 +253,14 @@
     {
         Logger.LogInformation("Initializing MemoryScanner component");
         base.OnInitialized();
+    }
+
+    private void HandleProcessSelected(int? processId)
+    {
+        _state.SelectedProcessId = processId;
+        _state.NotifyStateChanged();
+        StateHasChanged();
+        Logger.LogDebug($"Process selected: {processId}");
     }
 
     private Task OnProcessSelected(int? processId)

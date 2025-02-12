@@ -10,7 +10,7 @@
         <Column ColumnSize="ColumnSize.Is9">
             <Select TValue="int?" 
                    Value="@SelectedProcessId"
-                   ValueChanged="@OnProcessSelected"
+                   ValueChanged="@HandleProcessSelected"
                    Disabled="@IsLoading"
                    SearchChanged="@((string value) => { _searchTerm = value; StateHasChanged(); })">
                 <ChildContent>

@@ -7,29 +7,70 @@
 
 <div class="freeze-control">
     <div class="d-flex align-items-center gap-2">
-        <NumericEdit TValue="int" />
-        <Button Color="Color.Primary">Freeze</Button>
+        <div class="input-group">
+            <span class="input-group-text">0x</span>
+            <input type="text" 
+                   class="form-control font-monospace" 
+                   placeholder="Address (hex)"
+                   value="@addressInput"
+                   @onchange="@(e => addressInput = e.Value?.ToString() ?? "")" />
+        </div>
+        <input type="number" 
+               class="form-control" 
+               placeholder="Value"
+               value="@freezeValue" 
+               @onchange="@(e => freezeValue = int.Parse(e.Value?.ToString() ?? "0"))" />
+        <button class="btn btn-primary" 
+                @onclick="@(() => OnFreezeClick())"
+                disabled="@(!IsValidAddress)">
+            Freeze
+        </button>
     </div>
+    @if (!IsValidAddress && !string.IsNullOrEmpty(addressInput))
+    {
+        <div class="text-danger small mt-1">Invalid address format</div>
+    }
 
     @if (frozenAddresses?.Any() == true)
     {
-        <div class="frozen-addresses">
-            <h4>Frozen Addresses</h4>
-            <ul>
+        <div class="frozen-addresses mt-3">
+            <h4 class="h5 mb-2">Frozen Addresses</h4>
+            <ul class="list-unstyled">
                 @foreach (var address in frozenAddresses)
                 {
-                    <li>@($"{address:X8}")</li>
+                    <li class="mb-1">
+                        <span class="badge bg-secondary">@($"{address:X8}")</span>
+                    </li>
                 }
             </ul>
         </div>
     }
 </div>
 
+<style>
+    .freeze-control {
+        padding: 1rem;
+        background-color: var(--bs-light);
+        border-radius: 0.375rem;
+    }
+
+    .frozen-addresses {
+        border-top: 1px solid var(--bs-border-color);
+        padding-top: 1rem;
+        margin-top: 1rem;
+    }
+</style>
+
 @code {
     private readonly ConcurrentDictionary<IntPtr, CancellationTokenSource> _freezeOperations = new();
     private readonly SemaphoreSlim _freezeOperationLock = new(1, 1);
     private bool _disposed;
     private HashSet<IntPtr> frozenAddresses = new();
+    private int freezeValue;
+    private string addressInput = "";
+    private bool IsValidAddress => !string.IsNullOrEmpty(addressInput) && 
+                                 addressInput.All(c => "0123456789abcdefABCDEF".Contains(c)) &&
+                                 addressInput.Length <= 16;
 
     [Parameter]
     public MemoryValueType ValueType { get; set; }
@@ -175,6 +216,34 @@
             {
                 Logger.LogError(ex, "Error disposing ValueFreezer component");
             }
+        }
+    }
+
+    private async Task OnFreezeClick()
+    {
+        try
+        {
+            if (!IsValidAddress)
+            {
+                ShowWarning("Invalid Address", "Please enter a valid hexadecimal address");
+                return;
+            }
+
+            var address = new IntPtr(Convert.ToInt64(addressInput, 16));
+            await ToggleFreeze(address, freezeValue);
+            
+            Logger.LogInformation("Manual freeze requested:\n" +
+                "- Address: {Address:X}\n" +
+                "- Value: {Value}",
+                address.ToInt64(), freezeValue);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to freeze value:\n" +
+                "- Address Input: {AddressInput}\n" +
+                "- Value: {Value}",
+                addressInput, freezeValue);
+            ShowError("Freeze Failed", "Failed to freeze value at specified address", ex);
         }
     }
 }

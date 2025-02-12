@@ -1,0 +1,52 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="form-group @WrapperClass">
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label for="@Id" class="form-label">@Label</label>
+    }
+    <input @ref="InputElement"
+           id="@Id"
+           class="form-control @Class"
+           type="@Type"
+           value="@CurrentValue"
+           @onchange="OnChangeHandler"
+           placeholder="@Placeholder"
+           disabled="@Disabled" />
+    @if (ValidationFor != null)
+    {
+        <ValidationMessage For="ValidationFor" />
+    }
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+    [Parameter] public string Label { get; set; }
+    [Parameter] public string Class { get; set; }
+    [Parameter] public string WrapperClass { get; set; }
+    [Parameter] public string Type { get; set; } = "text";
+    [Parameter] public string Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public Expression<Func<string>> ValidationFor { get; set; }
+
+    private ElementReference InputElement;
+    private string CurrentValue
+    {
+        get => Value;
+        set
+        {
+            if (Value != value)
+            {
+                Value = value;
+                _ = ValueChanged.InvokeAsync(value);
+            }
+        }
+    }
+
+    private async Task OnChangeHandler(ChangeEventArgs e)
+    {
+        CurrentValue = e.Value?.ToString();
+    }
+} 

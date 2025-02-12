@@ -8,6 +8,10 @@ namespace BlazorFridaApp.Components.Pages
 {
     public class MemoryScannerState
     {
+        public event Action? StateChanged;
+        
+        public void NotifyStateChanged() => StateChanged?.Invoke();
+
         public List<ProcessInfo> ProcessList { get; set; } = new();
         public int? SelectedProcessId { get; set; }
         public string PatternHex { get; set; } = "";

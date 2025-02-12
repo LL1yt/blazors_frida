@@ -1,0 +1,34 @@
+@typeparam TItem
+
+<div class="table-responsive @WrapperClass">
+    <table class="table @Class">
+        <thead>
+            <tr>@HeaderTemplate</tr>
+        </thead>
+        <tbody>
+            @if (Items != null && Items.Any())
+            {
+                @foreach (var item in Items)
+                {
+                    <tr>@RowTemplate(item)</tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="@ColumnCount" class="text-center">@EmptyText</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter] public IEnumerable<TItem> Items { get; set; }
+    [Parameter] public RenderFragment HeaderTemplate { get; set; }
+    [Parameter] public RenderFragment<TItem> RowTemplate { get; set; }
+    [Parameter] public string Class { get; set; }
+    [Parameter] public string WrapperClass { get; set; }
+    [Parameter] public int ColumnCount { get; set; }
+    [Parameter] public string EmptyText { get; set; } = "No data available";
+} 
