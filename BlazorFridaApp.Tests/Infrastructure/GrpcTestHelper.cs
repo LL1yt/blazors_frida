@@ -1,7 +1,7 @@
-using Grpc.Core;
-using Grpc.Health.V1;
 using Microsoft.Extensions.Logging;
 using Moq;
+using BlazorFridaApp.MemoryScanner.Proto.Health;
+using Grpc.Core;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 

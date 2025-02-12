@@ -6,7 +6,7 @@ using BlazorFridaApp.MemoryScanner.Base;
 using BlazorFridaApp.MemoryScanner.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Grpc.Health.V1;
+using BlazorFridaApp.MemoryScanner.Proto.Health;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 
