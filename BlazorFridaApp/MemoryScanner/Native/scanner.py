@@ -122,8 +122,8 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
         'Double': 'double',
         'String': 'string',
         'ByteArray': 'bytes',
-        '*': 'any', // Add support for wildcard type
-        'any': 'any' // Also support the already mapped type
+        '*': 'any',
+        'any': 'any'
     };
 
     // Normalize value type
@@ -151,88 +151,62 @@ function performScan(valueType, value, startAddress, endAddress, comparisonType)
         
     const matches = [];
     
-    // Get memory range to scan
-    const range = {
-        base: ptr(startAddress),
-        size: endAddress - startAddress
-    };
-    
     try {
-        // Handle different value types
-        let searchValue;
-        switch(normalizedType) {
-            case 'pattern':
-                const pattern = patternToBytes(value);
-                const data = range.readByteArray(range.size);
-                
-                for (let offset = 0; offset < data.byteLength - pattern.length; offset++) {
-                    const slice = new Uint8Array(data, offset, pattern.length);
-                    if (matchPattern(slice, pattern)) {
-                        matches.push(range.base.add(offset));
-                    }
-                }
-                break;
-                
-            case 'string':
-                searchValue = value.toString();
-                break;
-                
-            case 'uint8':
-                searchValue = new Uint8Array([parseInt(value)])[0];
-                break;
+        const range = {
+            base: ptr(startAddress),
+            size: endAddress - startAddress
+        };
 
-            case 'int16':
-                searchValue = new Int16Array([parseInt(value)])[0];
-                break;
-                
-            case 'int32':
-            case 'int':
-                searchValue = new Int32Array([parseInt(value)])[0];
-                break;
-                
-            case 'int64':
-                searchValue = new Int64(value.toString());
-                break;
-                
-            case 'float':
-                searchValue = new Float32Array([parseFloat(value)])[0];
-                break;
-                
-            case 'double':
-                searchValue = new Float64Array([parseFloat(value)])[0];
-                break;
-                
-            case 'bytes':
-                searchValue = value;
-                break;
-
-            case 'any':
-                // For wildcard type, we'll match any value
-                const valueSize = typeof value === 'number' ? 4 : value.length;
-                const scanData = range.readByteArray(range.size);
-                
-                // Simply collect all addresses as matches when using wildcard
-                for (let offset = 0; offset < scanData.byteLength - valueSize + 1; offset++) {
+        if (normalizedType === 'any' || normalizedType === '*') {
+            // For 'any' type, we'll match any value at each address
+            const scanData = Memory.readByteArray(range.base, range.size);
+            if (scanData) {
+                // Add every address as a match
+                for (let offset = 0; offset < range.size; offset++) {
                     matches.push(range.base.add(offset));
                 }
-                break;
-                
-            default:
-                throw new Error(`Unsupported normalized value type: ${normalizedType}`);
-        }
-        
-        if (normalizedType !== 'pattern' && normalizedType !== 'any' && searchValue !== undefined) {
+            }
+        } else {
+            // Handle specific types
+            let searchValue;
+            switch(normalizedType) {
+                case 'uint8':
+                    searchValue = new Uint8Array([parseInt(value)])[0];
+                    break;
+                case 'int16':
+                    searchValue = new Int16Array([parseInt(value)])[0];
+                    break;
+                case 'int32':
+                    searchValue = new Int32Array([parseInt(value)])[0];
+                    break;
+                case 'int64':
+                    searchValue = new Int64(value.toString());
+                    break;
+                case 'float':
+                    searchValue = new Float32Array([parseFloat(value)])[0];
+                    break;
+                case 'double':
+                    searchValue = new Float64Array([parseFloat(value)])[0];
+                    break;
+                case 'string':
+                    searchValue = value.toString();
+                    break;
+                case 'bytes':
+                    searchValue = value;
+                    break;
+                default:
+                    throw new Error(`Unsupported normalized value type: ${normalizedType}`);
+            }
+
             const scanResults = Memory.scanSync(range.base, range.size, searchValue);
-            scanResults.forEach(match => {
-                matches.push(match.address);
-            });
+            scanResults.forEach(match => matches.push(match.address));
         }
     } catch (e) {
         console.log('[Frida Script] Error scanning range:', e.stack || e);
         throw e;
     }
     
-    console.log(`[Frida Script] scan found ${matches.length} matches`);
+    console.log(`[Frida Script] Scan found ${matches.length} matches`);
     return matches.map(ptr => ptr.toString());
 }
 

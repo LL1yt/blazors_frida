@@ -7,7 +7,7 @@ import logging
 from typing import List, Tuple, Dict, Any
 from base64 import b64encode
 import traceback
-import datetime
+from datetime import datetime
 
 
 class FridaMemoryScanner:
@@ -135,9 +135,22 @@ class FridaMemoryScanner:
             self._logger.debug(f"[{timestamp}] Starting scan_memory_range")
             self._logger.debug(f"[{timestamp}] Input parameters:")
             self._logger.debug(
-                f"[{timestamp}] - value_type: {value_type} (type: {type(value_type)})"
+                f"[{timestamp}] - raw value_type: {value_type!r} (type: {type(value_type)})"
             )
-            self._logger.debug(f"[{timestamp}] - value: {value} (type: {type(value)})")
+
+            # Convert value_type to string if it's bytes
+            if isinstance(value_type, bytes):
+                value_type = value_type.decode("utf-8").strip("\x00")
+                self._logger.debug(
+                    f"[{timestamp}] - decoded value_type: {value_type!r}"
+                )
+            elif not isinstance(value_type, str):
+                value_type = str(value_type)
+
+            self._logger.debug(f"[{timestamp}] - final value_type: {value_type!r}")
+            self._logger.debug(
+                f"[{timestamp}] - value: {value!r} (type: {type(value)})"
+            )
             self._logger.debug(f"[{timestamp}] - comparison_type: {comparison_type}")
             self._logger.debug(f"[{timestamp}] - ranges: {ranges}")
 
@@ -296,7 +309,10 @@ class FridaMemoryScanner:
                     if matches:
                         results.extend(
                             [
-                                {"address": int(match), "value": scan_value}
+                                {
+                                    "address": int(str(match).replace("0x", ""), 16),
+                                    "value": scan_value,
+                                }
                                 for match in matches
                             ]
                         )
