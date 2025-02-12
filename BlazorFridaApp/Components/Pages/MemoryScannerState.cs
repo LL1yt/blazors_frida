@@ -25,7 +25,6 @@ namespace BlazorFridaApp.Components.Pages
 
         public bool CanScan =>
             SelectedProcessId.HasValue &&
-            SelectedValueType != MemoryValueType.String && // Strings not supported yet
             SelectedValueType != MemoryValueType.ByteArray &&  // Arrays not supported yet
             (SelectedScanType == ScanType.Pattern ?
                 !string.IsNullOrWhiteSpace(PatternHex) && !string.IsNullOrWhiteSpace(Mask) :

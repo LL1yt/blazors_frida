@@ -65,9 +65,17 @@
     }
     else
     {
-        <NumericEdit TValue="int"
-                    @bind-Value="@SearchValue"
-                    Placeholder="Search value" />
+        @if (ValueType == MemoryValueType.String)
+        {
+            <TextEdit @bind-Text="@StringSearchValue"
+                     Placeholder="Search text value" />
+        }
+        else
+        {
+            <NumericEdit TValue="int"
+                        @bind-Value="@SearchValue"
+                        Placeholder="Search value" />
+        }
                     
         @if (ScanType == ScanType.UnknownInitialValue)
         {
@@ -107,6 +115,7 @@
 @code {
     private string? _errorMessage;
     private bool IsValid => string.IsNullOrEmpty(_errorMessage);
+    private string StringSearchValue { get; set; } = string.Empty;
 
     [Parameter] public ScanType ScanType { get; set; }
     [Parameter] public MemoryValueType ValueType { get; set; }
@@ -124,6 +133,15 @@
     [Parameter] public EventCallback<ScanType> OnScanTypeChanged { get; set; }
     [Parameter] public EventCallback<MemoryValueType> OnValueTypeChanged { get; set; }
     [Parameter] public EventCallback OnScanClick { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (ValueType == MemoryValueType.String && SearchValue != 0)
+        {
+            StringSearchValue = SearchValue.ToString();
+        }
+    }
 
     private async Task OnPatternHexChanged(string value)
     {

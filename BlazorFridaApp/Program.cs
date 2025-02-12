@@ -224,7 +224,7 @@ try
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(
-            Path.Combine(builder.Environment.ContentRootPath, "_content")),
+            Path.Combine(builder.Environment.ContentRootPath, "wwwroot", "_content")),
         RequestPath = "/_content"
     });
 
