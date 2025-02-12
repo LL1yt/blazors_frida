@@ -158,9 +158,9 @@
 </style>
 
 @code {
-    private string? _patternError;
-    private string? _maskError;
-    private string? _searchValueError;
+    private string _patternError = string.Empty;
+    private string _maskError = string.Empty;
+    private string _searchValueError = string.Empty;
     public string StringSearchValue { get; private set; } = string.Empty;
 
     [Parameter] public ScanType ScanType { get; set; }

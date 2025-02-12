@@ -1,11 +1,10 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
-using BlazorFridaApp.MemoryScanner.Components;
+using BlazorFridaApp.Components.Dialogs;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Blazorise;
-using Blazorise.DataGrid;
 using Moq;
 using Xunit;
 using Microsoft.AspNetCore.Components;
@@ -35,16 +34,13 @@ public class DialogTests : TestContextBase
     }
 
     [Fact]
-    public void LoadConfigDialog_Should_RaiseEventOnSelect()
+    public async Task LoadConfigDialog_Should_RaiseEventOnSelect()
     {
         // Arrange
-        var configs = new Dictionary<string, ScannerConfig>
+        var configs = new List<ScannerConfig>
         {
-            { "Test", new ScannerConfig() }
+            new ScannerConfig { Name = "Test" }
         };
-
-        var profileServiceMock = new Mock<IScanProfileService>();
-        Services.AddScoped<IScanProfileService>(_ => profileServiceMock.Object);
 
         ScannerConfig? selectedConfig = null;
         var cut = RenderComponent<LoadConfigDialog>(parameters => parameters
@@ -52,15 +48,11 @@ public class DialogTests : TestContextBase
             .Add(p => p.OnConfigSelected, EventCallback.Factory.Create<ScannerConfig>(this, config => selectedConfig = config)));
 
         // Act
-        // First click the row to select it
-        var row = cut.Find("tbody tr");
-        row.Click();
-
-        // Then click the load button
-        var loadButton = cut.Find("button.btn.btn-primary");
-        loadButton.Click();
+        var listGroupItem = cut.Find("div.list-group-item");
+        await listGroupItem.ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.NotNull(selectedConfig);
+        Assert.Equal("Test", selectedConfig.Name);
     }
 }

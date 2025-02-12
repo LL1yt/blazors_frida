@@ -1,3 +1,5 @@
+@using System.ComponentModel.DataAnnotations
+
 @if (Show)
 {
     <div class="alert alert-@Color alert-dismissible fade show @Class" role="alert">
@@ -16,11 +18,11 @@
 @code {
     [Parameter] public bool Show { get; set; } = true;
     [Parameter] public string Color { get; set; } = "primary";
-    [Parameter] public string Icon { get; set; }
-    [Parameter] public string Class { get; set; }
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string Class { get; set; } = string.Empty;
     [Parameter] public bool Dismissible { get; set; }
     [Parameter] public EventCallback OnDismissed { get; set; }
-    [Parameter] public RenderFragment ChildContent { get; set; }
+    [Parameter, Required] public RenderFragment ChildContent { get; set; } = default!;
 
     private async Task OnDismiss()
     {

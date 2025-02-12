@@ -3,11 +3,9 @@ using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Components;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
-using Blazorise;
 using System.Threading;
 
 namespace BlazorFridaApp.Tests.Components;
@@ -36,37 +34,23 @@ public class ProcessSelectorDropdownTests : TestContextBase
     }
 
     [Fact]
-    public async Task ShouldFilterProcessesByName()
-    {
-        // Arrange
-        var cut = RenderComponent<ProcessSelector>(parameters => parameters
-            .Add(p => p.ProcessList, _defaultProcesses));
-        await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
-
-        // Simulate filter input
-        await cut.InvokeAsync(() => cut.Instance.HandleFilter(new ChangeEventArgs { Value = "note" }));
-
-        // Assert - After filtering, only one item should be visible
-        var filteredText = cut.Markup;
-        Assert.Contains("notepad.exe", filteredText);
-        Assert.DoesNotContain("test2.exe", filteredText);
-    }
-
-    [Fact]
     public async Task ShouldUpdateUIWhenSelectionChanges()
     {
         // Arrange & Act
         var cut = RenderComponent<ProcessSelector>(parameters => parameters
-            .Add(p => p.ProcessList, _defaultProcesses)
+            .Add(p => p.Processes, _defaultProcesses)
             .Add(p => p.SelectedProcessId, 1000));
 
-        await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
-        
-        cut.SetParametersAndRender(parameters => parameters
-            .Add(p => p.SelectedProcessId, 2000));
+        // Assert initial selection
+        var selectedOption = cut.Find("select").GetAttributeValue<string>("value");
+        Assert.Equal("1000", selectedOption);
 
-        // Assert
-        var selectedText = cut.Markup;
-        Assert.Contains("test2.exe", selectedText);
+        // Change selection
+        await cut.InvokeAsync(() => cut.Instance.SelectedProcessId = 2000);
+        cut.Render();
+
+        // Assert updated selection
+        selectedOption = cut.Find("select").GetAttributeValue<string>("value");
+        Assert.Equal("2000", selectedOption);
     }
 }

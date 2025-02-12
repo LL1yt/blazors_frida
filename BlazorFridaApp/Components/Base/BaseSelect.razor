@@ -1,4 +1,5 @@
 @typeparam TValue
+@using System.ComponentModel.DataAnnotations
 
 <div class="form-group @WrapperClass">
     @if (!string.IsNullOrEmpty(Label))
@@ -25,15 +26,15 @@
 
 @code {
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
-    [Parameter] public string Label { get; set; }
-    [Parameter] public string Class { get; set; }
-    [Parameter] public string WrapperClass { get; set; }
-    [Parameter] public TValue Value { get; set; }
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Class { get; set; } = string.Empty;
+    [Parameter] public string WrapperClass { get; set; } = string.Empty;
+    [Parameter] public TValue Value { get; set; } = default!;
     [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
-    [Parameter] public string Placeholder { get; set; }
+    [Parameter] public string Placeholder { get; set; } = string.Empty;
     [Parameter] public bool Disabled { get; set; }
-    [Parameter] public Expression<Func<TValue>> ValidationFor { get; set; }
-    [Parameter, Required] public RenderFragment ChildContent { get; set; }
+    [Parameter] public Expression<Func<TValue>>? ValidationFor { get; set; }
+    [Parameter] public RenderFragment ChildContent { get; set; } = default!;
 
     private ElementReference SelectElement;
     private TValue CurrentValue
@@ -49,19 +50,29 @@
         }
     }
 
-    private async Task OnChangeHandler(ChangeEventArgs e)
+    private void OnChangeHandler(ChangeEventArgs e)
     {
+        if (e.Value == null) return;
+        
         if (typeof(TValue) == typeof(string))
         {
-            CurrentValue = (TValue)e.Value;
+            CurrentValue = (TValue)(object)(e.Value.ToString() ?? string.Empty);
         }
         else if (typeof(TValue).IsEnum)
         {
-            CurrentValue = (TValue)Enum.Parse(typeof(TValue), e.Value.ToString());
+            var strValue = e.Value.ToString();
+            if (strValue != null)
+            {
+                CurrentValue = (TValue)Enum.Parse(typeof(TValue), strValue);
+            }
         }
         else if (typeof(TValue) == typeof(int))
         {
-            CurrentValue = (TValue)(object)int.Parse(e.Value.ToString());
+            var strValue = e.Value.ToString();
+            if (strValue != null && int.TryParse(strValue, out var intValue))
+            {
+                CurrentValue = (TValue)(object)intValue;
+            }
         }
     }
 } 

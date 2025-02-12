@@ -34,9 +34,9 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <ProcessSelector
-                        ProcessList="@_state.ProcessList"
+                        Processes="@_state.ProcessList"
                         SelectedProcessId="@_state.SelectedProcessId"
-                        OnProcessSelected="@(async (int? id) => await HandleProcessSelected(id))"
+                        SelectedProcessIdChanged="@(async (int? id) => await HandleProcessSelected(id))"
                         OnRefreshClick="@(async () => await RefreshProcessList())"
                         IsLoading="@_state.IsLoading" />
                 </div>
@@ -93,12 +93,12 @@
         <div class="card">
             <div class="card-body">
                 <ScanResultsGrid
-                    Results="@(_state.ScanResults?.Select(addr => new ScanResult { AddressesJson = JsonSerializer.Serialize(new List<long> { addr.ToInt64() }) }).ToList() ?? new List<ScanResult>())"
-                    ValueType="@_state.SelectedValueType"
-                    GetCurrentValue="@(new Func<long, byte[]>(addr => GetCurrentValueSync(addr)))"
-                    IsFrozen="@(new Func<long, bool>(addr => IsFrozen(addr)))"
-                    OnValueChanged="@(new Func<(long, double), Task>(async args => await OnValueChanged(args.Item1, BitConverter.GetBytes(args.Item2))))"
-                    OnFreezeToggle="@(new Func<long, Task>(async addr => await ToggleFreeze(addr, GetDefaultValueBytes(_state.SelectedValueType))))" />
+                    Results="@(_state.ScanResults?.Select(addr => new ScanResult { 
+                        AddressesJson = JsonSerializer.Serialize(new List<long> { addr.ToInt64() }), 
+                        ValueType = _state.SelectedValueType.ToString(),
+                        Value = GetCurrentValueSync((nint)addr)
+                    }).ToList() ?? new List<ScanResult>())"
+                    OnFreezeClick="@(async (result) => await ToggleFreeze(result.Addresses.First(), GetDefaultValueBytes(_state.SelectedValueType)))" />
             </div>
         </div>
     </div>
@@ -245,9 +245,9 @@
     private bool _loadConfigModalVisible;
     private new MemoryScannerState _state = new();
 
-    private int GetCurrentValueSync(nint addr)
+    private byte[] GetCurrentValueSync(nint addr)
     {
-        return BitConverter.ToInt32(GetCurrentValue(addr).Result, 0);
+        return GetCurrentValue(addr).Result;
     }
 
     protected override void OnInitialized()

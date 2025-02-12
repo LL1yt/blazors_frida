@@ -3,13 +3,14 @@ using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components;
 using Xunit;
 
 namespace BlazorFridaApp.Tests.Components;
 
 public class ScanControlsValidationTests : TestBase
 {
-    private IRenderedComponent<ScanControls> _component;
+    private required IRenderedComponent<ScanControls> _component;
     private bool _scanClicked;
 
     public ScanControlsValidationTests()
@@ -214,4 +215,4 @@ public class ScanControlsValidationTests : TestBase
         // Assert
         Assert.Equal("test string", _component.Instance.StringSearchValue);
     }
-} 
+}

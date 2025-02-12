@@ -1,3 +1,5 @@
+@using System.ComponentModel.DataAnnotations
+
 @typeparam TItem
 
 <div class="table-responsive @WrapperClass">
@@ -24,11 +26,11 @@
 </div>
 
 @code {
-    [Parameter] public IEnumerable<TItem> Items { get; set; }
-    [Parameter] public RenderFragment HeaderTemplate { get; set; }
-    [Parameter] public RenderFragment<TItem> RowTemplate { get; set; }
-    [Parameter] public string Class { get; set; }
-    [Parameter] public string WrapperClass { get; set; }
+    [Parameter, Required] public IEnumerable<TItem> Items { get; set; } = default!;
+    [Parameter, Required] public RenderFragment HeaderTemplate { get; set; } = default!;
+    [Parameter, Required] public RenderFragment<TItem> RowTemplate { get; set; } = default!;
+    [Parameter] public string Class { get; set; } = string.Empty;
+    [Parameter] public string WrapperClass { get; set; } = string.Empty;
     [Parameter] public int ColumnCount { get; set; }
     [Parameter] public string EmptyText { get; set; } = "No data available";
 } 

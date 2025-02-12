@@ -3,6 +3,7 @@ using BlazorFridaApp.MemoryScanner.Components;
 using BlazorFridaApp.MemoryScanner.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
@@ -84,7 +85,7 @@ public class ScanResultsGridTests : TestContextBase
 
         // Act
         var freezeButton = component.Find("button");
-        await freezeButton.ClickAsync();
+        await freezeButton.ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.NotNull(clickedResult);

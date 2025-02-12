@@ -10,6 +10,7 @@
 
   <!-- NuGet Packages -->
   <ItemGroup>
+    <PackageReference Include="Blazorise" Version="1.7.4" />
     <PackageReference Include="Blazorise.Bootstrap5" Version="1.7.4" />
     <PackageReference Include="Blazorise.Components" Version="1.7.4" />
     <PackageReference Include="Blazorise.DataGrid" Version="1.7.4" />

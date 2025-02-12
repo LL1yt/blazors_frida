@@ -42,8 +42,7 @@ public class ProcessSelectorTests : TestContextBase
         var cut = RenderComponent<ProcessSelector>();
 
         // Assert
-        var select = cut.FindComponent<Select<int?>>();
-        Assert.NotNull(select);
+        Assert.NotNull(cut.Find("select"));
     }
 
     [Fact]
@@ -57,15 +56,15 @@ public class ProcessSelectorTests : TestContextBase
         
         // Wait for loading to complete and process list to be populated
         cut.WaitForState(() => !cut.Instance.IsLoading);
-        cut.WaitForState(() => cut.Instance.ProcessList.Count == _defaultProcesses.Count);
+        cut.WaitForState(() => cut.Instance.Processes.Count == _defaultProcesses.Count);
         
         // Force a re-render to ensure UI is updated
         cut.Render();
         
         // Assert
         _processServiceMock.Verify(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        var selectItems = cut.FindComponents<SelectItem<int?>>();
-        Assert.Equal(_defaultProcesses.Count + 1, selectItems.Count); // +1 for the default "Select a process" item
+        var options = cut.FindAll("option");
+        Assert.Equal(_defaultProcesses.Count + 1, options.Count); // +1 for the default "Select a process" item
     }
 
     [Fact]

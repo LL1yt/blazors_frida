@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
 using Blazorise;
-using Blazorise.Bootstrap;
+using Blazorise.Bootstrap5;
 using Blazorise.Icons.FontAwesome;
 
 namespace BlazorFridaApp.Tests.Components;
@@ -27,12 +27,12 @@ public class ValueFreezerTests : TestContextBase
         
         Services
             .AddBlazorise()
-            .AddBootstrapProviders()
+            .AddBootstrap5Providers()
             .AddFontAwesomeIcons();
             
         // Add style provider
         JSInterop.SetupModule("_content/Blazorise/blazorise.js");
-        JSInterop.SetupModule("_content/Blazorise.Bootstrap/blazorise.bootstrap.js");
+        JSInterop.SetupModule("_content/Blazorise.Bootstrap5/blazorise.bootstrap5.js");
     }
 
     [Fact]
