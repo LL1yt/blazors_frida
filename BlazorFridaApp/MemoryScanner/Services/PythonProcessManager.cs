@@ -26,6 +26,7 @@ public class PythonProcessManager : IPythonProcessManager, IDisposable
     private readonly SemaphoreSlim _connectionLock = new(1, 1);
     private GrpcChannel? _healthChannel;
     private Health.HealthClient? _healthClient;
+    private readonly Health.HealthClient? _injectedHealthClient;
     private const int maxRetries = 10;
     private const int retryDelayMs = 500;
     private const int timeoutMs = 2000;
@@ -33,10 +34,11 @@ public class PythonProcessManager : IPythonProcessManager, IDisposable
     public bool IsRunning => _pythonProcess != null && !_pythonProcess.HasExited;
     public int Port => _port;
 
-    public PythonProcessManager(ILogger<PythonProcessManager> logger, int port)
+    public PythonProcessManager(ILogger<PythonProcessManager> logger, int port, Health.HealthClient? healthClient = null)
     {
         _logger = logger;
         _port = port;
+        _injectedHealthClient = healthClient;
         _channelOptions = new GrpcChannelOptions
         {
             MaxReceiveMessageSize = null,
@@ -89,6 +91,9 @@ public class PythonProcessManager : IPythonProcessManager, IDisposable
 
     private async Task<Health.HealthClient> GetHealthClientAsync()
     {
+        if (_injectedHealthClient != null)
+            return _injectedHealthClient;
+
         if (_healthClient == null)
         {
             var channel = await GetHealthChannelAsync();

@@ -3,7 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.MemoryScanner.Base;
+using BlazorFridaApp.MemoryScanner.Services;
+using Microsoft.Extensions.Logging;
 using Moq;
+using Grpc.Health.V1;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 
@@ -11,12 +14,16 @@ public abstract class TestBase : TestContext
 {
     protected readonly TestContext Context;
     protected readonly Mock<IProcessMemoryScanner> ScannerMock;
+    protected readonly Mock<Health.HealthClient> HealthClientMock;
+    protected readonly Mock<ILogger<PythonProcessManager>> LoggerMock;
 
     protected TestBase()
     {
         Context = new TestContext();
         Context.JSInterop.Mode = JSRuntimeMode.Loose;
         ScannerMock = new Mock<IProcessMemoryScanner>();
+        LoggerMock = new Mock<ILogger<PythonProcessManager>>();
+        HealthClientMock = GrpcTestHelper.CreateHealthClientMock(LoggerMock.Object);
         
         // Add any common services here
         Context.Services.AddScoped<IServiceProvider>(sp => sp);
@@ -33,5 +40,9 @@ public abstract class TestBase : TestContext
         
         // Register scanner mock
         services.AddScoped<IProcessMemoryScanner>(_ => ScannerMock.Object);
+
+        // Register PythonProcessManager with mocked dependencies
+        services.AddScoped<IPythonProcessManager>(sp => 
+            new PythonProcessManager(LoggerMock.Object, 50051, HealthClientMock.Object));
     }
 }
