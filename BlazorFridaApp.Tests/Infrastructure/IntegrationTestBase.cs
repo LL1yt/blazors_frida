@@ -96,10 +96,24 @@ public class IntegrationTestBase : IAsyncLifetime
         Logger.LogInformation("[IntegrationTestBase] InitializeAsync started");
         try
         {
-            await Task.Delay(100); // Small delay before first connection attempt
+            // Add a small delay before first connection attempt to allow for server startup
+            await Task.Delay(2000);
             Logger.LogInformation("[IntegrationTestBase] Verifying gRPC server connection");
-            await ProcessManager.VerifyConnection();
-            Logger.LogInformation("[IntegrationTestBase] Successfully connected to gRPC server");
+            
+            try
+            {
+                await ProcessManager.VerifyConnection();
+                Logger.LogInformation("[IntegrationTestBase] Successfully connected to gRPC server");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "[IntegrationTestBase] Initial connection attempt failed, retrying...");
+                
+                // One more retry with a longer delay
+                await Task.Delay(5000);
+                await ProcessManager.VerifyConnection();
+                Logger.LogInformation("[IntegrationTestBase] Successfully connected to gRPC server on retry");
+            }
         }
         catch (Exception ex)
         {
@@ -148,4 +162,4 @@ public class IntegrationTestBase : IAsyncLifetime
             }
         }
     }
-} 
+}

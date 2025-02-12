@@ -57,12 +57,28 @@ public class PythonProcessManager : IPythonProcessManager, IDisposable
 
             if (_healthChannel != null)
             {
-                await _healthChannel.ShutdownAsync();
-                _healthChannel.Dispose();
+                try
+                {
+                    await _healthChannel.ShutdownAsync();
+                    _healthChannel.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[GetHealthChannelAsync] Error shutting down existing channel");
+                }
             }
 
             var endpoint = $"http://127.0.0.1:{_port}";
-            _healthChannel = GrpcChannel.ForAddress(endpoint, _channelOptions);
+            var options = new GrpcChannelOptions
+            {
+                MaxReceiveMessageSize = null,
+                MaxSendMessageSize = null,
+                DisposeHttpClient = true,
+                MaxRetryAttempts = 3,
+                MaxRetryBufferSize = 1024 * 1024 * 5 // 5MB retry buffer
+            };
+
+            _healthChannel = GrpcChannel.ForAddress(endpoint, options);
             return _healthChannel;
         }
         finally
@@ -86,9 +102,9 @@ public class PythonProcessManager : IPythonProcessManager, IDisposable
         _logger.LogInformation("[VerifyConnection] Starting connection verification to gRPC server on port {Port}", _port);
         var activity = new Activity("VerifyGrpcConnection").Start();
         
-        const int maxRetries = 1; // Changed from 10 to 1
-        const int timeoutMs = 5000;
-        const int retryDelayMs = 500;
+        const int maxRetries = 3; // Increased retries
+        const int timeoutMs = 10000; // Increased timeout
+        const int retryDelayMs = 1000; // Increased delay between retries
         var attempts = 0;
         Exception? lastException = null;
 
