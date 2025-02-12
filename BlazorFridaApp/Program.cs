@@ -32,6 +32,7 @@ using Blazorise.LoadingIndicator;
 using Blazorise.Sidebar;
 using Blazorise.Snackbar;
 using Blazorise.TreeView;
+using Microsoft.Extensions.FileProviders;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -215,6 +216,12 @@ try
 
     app.UseHttpsRedirection();
     app.UseStaticFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(
+            Path.Combine(builder.Environment.ContentRootPath, "wwwroot/_content")),
+        RequestPath = "/_content"
+    });
     app.UseAntiforgery();
 
     app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
