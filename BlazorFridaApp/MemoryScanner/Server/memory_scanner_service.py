@@ -115,7 +115,7 @@ class MemoryScannerService(memory_scanner_pb2_grpc.MemoryScannerServicer):
 
                 # Give the scanner time to fully initialize
                 retry_count = 0
-                max_retries = 10  # Increased from 5
+                max_retries = 1  # Changed from 10 to 1
                 while retry_count < max_retries:
                     if frida_scanner.is_initialized:
                         break

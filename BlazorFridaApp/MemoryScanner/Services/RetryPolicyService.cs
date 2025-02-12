@@ -8,7 +8,7 @@ namespace BlazorFridaApp.MemoryScanner.Services;
 public class RetryPolicyService
 {
     private readonly ILogger<RetryPolicyService> _logger;
-    private const int MaxRetries = 3;
+    private const int MaxRetries = 1;  // Changed from 3 to 1
     private const int InitialDelayMs = 100;
 
     public RetryPolicyService(ILogger<RetryPolicyService> logger)

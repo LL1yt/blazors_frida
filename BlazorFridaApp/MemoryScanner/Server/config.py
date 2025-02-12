@@ -47,7 +47,7 @@ RATE_LIMITS = {
 
 # Retry configuration
 RETRY_CONFIG = {
-    "max_retries": int(os.getenv("MEMORY_SCANNER_MAX_RETRIES", "3")),
+    "max_retries": int(os.getenv("MEMORY_SCANNER_MAX_RETRIES", "1")),  # Changed from 3 to 1
     "retry_delay": float(os.getenv("MEMORY_SCANNER_RETRY_DELAY", "0.5")),
     "max_retry_delay": float(os.getenv("MEMORY_SCANNER_MAX_RETRY_DELAY", "5.0")),
 }

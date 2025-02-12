@@ -25,7 +25,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 # Constants
 GRPC_SERVER_ADDRESS = "localhost:50051"
 DOTNET_HEALTH_URL = "https://localhost:7235/health"
-MAX_RETRIES = 3
+MAX_RETRIES = 1
 RETRY_DELAY = 2
 
 
