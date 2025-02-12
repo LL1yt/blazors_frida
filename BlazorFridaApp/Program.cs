@@ -25,7 +25,7 @@ using Microsoft.Extensions.Http;
 using Scrutor;
 using Microsoft.Extensions.Options;
 using Blazorise;
-using Blazorise.Bootstrap;
+using Blazorise.Bootstrap5;
 using Blazorise.Icons.FontAwesome;
 using Blazorise.RichTextEdit;
 using Blazorise.LoadingIndicator;
@@ -61,11 +61,8 @@ try
 
     // Add Blazorise
     builder.Services
-        .AddBlazorise(options =>
-        {
-            options.Immediate = true;
-        })
-        .AddBootstrapProviders()
+        .AddBlazorise()
+        .AddBootstrap5Providers()
         .AddFontAwesomeIcons()
         .AddBlazoriseRichTextEdit();
 
@@ -220,7 +217,15 @@ try
     app.UseHttpsRedirection();
     app.UseStaticFiles();
 
-    // Map content root path for library static assets
+    // Serve static files from wwwroot
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(
+            Path.Combine(builder.Environment.ContentRootPath, "wwwroot")),
+        RequestPath = ""
+    });
+
+    // Serve static files from NuGet packages
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(

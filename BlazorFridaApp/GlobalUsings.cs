@@ -27,7 +27,7 @@ global using Microsoft.Extensions.Logging;
 
 // UI Components
 global using Blazorise;
-global using Blazorise.Bootstrap;
+global using Blazorise.Bootstrap5;
 
 // Common Collections
 global using System.Collections.Generic;

@@ -4,15 +4,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>BlazorFridaApp</RootNamespace>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
-    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
-    <PreserveCompilationContext>true</PreserveCompilationContext>
-    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <GenerateStaticWebAssetsManifest>true</GenerateStaticWebAssetsManifest>
   </PropertyGroup>
+
+  <!-- NuGet Packages -->
   <ItemGroup>
     <PackageReference Include="Blazorise" Version="1.7.4" />
-    <PackageReference Include="Blazorise.Bootstrap" Version="1.7.4" />
+    <PackageReference Include="Blazorise.Bootstrap5" Version="1.7.4" />
     <PackageReference Include="Blazorise.Components" Version="1.7.4" />
     <PackageReference Include="Blazorise.DataGrid" Version="1.7.4" />
     <PackageReference Include="Blazorise.Icons.FontAwesome" Version="1.7.4" />
@@ -44,47 +43,26 @@
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.11.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.GrpcNetClient" Version="1.11.0-beta.1" />
   </ItemGroup>
+
   <!-- Proto Files -->
   <ItemGroup>
     <Protobuf Include="MemoryScanner\Proto\health.proto" GrpcServices="Client" />
     <Protobuf Include="MemoryScanner\Proto\memory_scanner.proto" GrpcServices="Client" />
   </ItemGroup>
-  <!-- Global Usings and Program -->
+
+  <!-- Content Files -->
   <ItemGroup>
-    <Compile Include="GlobalUsings.cs" />
-    <Compile Include="Program.cs" />
-  </ItemGroup>
-  <!-- Memory Scanner -->
-  <ItemGroup>
-    <Compile Include="MemoryScanner\**\*.cs" />
-    <Content Include="MemoryScanner\**\*.razor" />
-  </ItemGroup>
-  <!-- Services -->
-  <ItemGroup>
-    <Compile Include="Services\**\*.cs" />
-  </ItemGroup>
-  <!-- Components -->
-  <ItemGroup>
-    <Compile Include="Components\**\*.cs" />
-    <Content Include="Components\**\*.razor" />
-  </ItemGroup>
-  <!-- Persistence -->
-  <ItemGroup>
-    <Compile Include="Persistence\**\*.cs" />
-    <Compile Include="Migrations\**\*.cs" />
-  </ItemGroup>
-  <!-- Static Web Content -->
-  <ItemGroup>
-    <Content Include="wwwroot\**\*" />
-    <Content Include="appsettings.json" />
-    <Content Include="appsettings.Development.json" />
-  </ItemGroup>
-  <!-- SQLite Database -->
-  <ItemGroup>
-    <None Update="gamememory.db">
+    <Content Include="wwwroot\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
+
   <!-- Python Files -->
   <ItemGroup>
     <Content Include="MemoryScanner\Native\**\*.py">
@@ -100,15 +78,41 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <!-- Database Files -->
+  <ItemGroup>
+    <None Update="gamememory.db">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- Assembly Attributes -->
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>BlazorFridaApp.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
+
   <!-- Razor Components -->
   <ItemGroup>
-    <Content Include="**\*.razor" Exclude="obj\**\*.razor" />
-    <None Remove="**\_Imports.razor" />
-    <Content Include="**\_Imports.razor" />
+    <Content Include="**\*.razor" />
+  </ItemGroup>
+
+  <!-- Static Web Assets -->
+  <ItemGroup>
+    <StaticWebAsset Include="_content/**">
+      <SourceType>Package</SourceType>
+      <SourceId>Blazorise</SourceId>
+      <ContentRoot>$(NuGetPackageRoot)blazorise\1.7.4\staticwebassets\</ContentRoot>
+      <BasePath>_content/Blazorise</BasePath>
+      <RelativePath>**</RelativePath>
+    </StaticWebAsset>
+    <StaticWebAsset Include="_content/**">
+      <SourceType>Package</SourceType>
+      <SourceId>Blazorise.Bootstrap5</SourceId>
+      <ContentRoot>$(NuGetPackageRoot)blazorise.bootstrap5\1.7.4\staticwebassets\</ContentRoot>
+      <BasePath>_content/Blazorise.Bootstrap5</BasePath>
+      <RelativePath>**</RelativePath>
+    </StaticWebAsset>
   </ItemGroup>
 </Project>
