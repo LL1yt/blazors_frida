@@ -1,0 +1,79 @@
+name: UI Tests
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'BlazorFridaApp/**'
+      - 'BlazorFridaApp.Tests/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'BlazorFridaApp/**'
+      - 'BlazorFridaApp.Tests/**'
+
+jobs:
+  ui-tests:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Install dependencies
+      run: dotnet restore
+
+    - name: Setup Playwright
+      run: pwsh -Command "& { $env:PLAYWRIGHT_BROWSERS_PATH='${{ github.workspace }}\playwright-browsers'; npx playwright install chromium }"
+
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Create test directories
+      run: |
+        mkdir TestResults
+        mkdir TestResults\Screenshots
+        mkdir TestResults\Traces
+        mkdir TestResults\Baselines
+
+    - name: Run Basic UI Tests
+      run: dotnet test --filter "FullyQualifiedName~BlazorFridaApp.Tests.UI&TestCategory=BasicTests" --results-directory TestResults
+      
+    - name: Run Integration Tests
+      run: dotnet test --filter "FullyQualifiedName~BlazorFridaApp.Tests.UI&TestCategory=IntegrationTests" --results-directory TestResults
+      
+    - name: Run Performance Tests
+      run: dotnet test --filter "FullyQualifiedName~BlazorFridaApp.Tests.UI&TestCategory=PerformanceTests" --results-directory TestResults
+      
+    - name: Run Regression Tests
+      run: dotnet test --filter "FullyQualifiedName~BlazorFridaApp.Tests.UI&TestCategory=RegressionTests" --results-directory TestResults
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: |
+          TestResults/**/*.png
+          TestResults/**/*.zip
+          TestResults/**/*.trx
+
+    - name: Process test results
+      if: always()
+      run: |
+        pwsh -Command "& {
+          $testResults = Get-ChildItem -Path TestResults -Filter *.trx -Recurse
+          $failed = $false
+          foreach ($result in $testResults) {
+            $xml = [xml](Get-Content $result.FullName)
+            if ($xml.TestRun.ResultSummary.outcome -eq 'Failed') {
+              $failed = $true
+              Write-Host '::error::Tests failed in ' + $result.Name
+            }
+          }
+          if ($failed) { exit 1 }
+        }"
