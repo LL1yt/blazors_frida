@@ -14,10 +14,12 @@ public static class TestCategories
 }
 
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
-public sealed class TestCategoryAttribute : Xunit.TraitAttribute
+public sealed class TestCategoryAttribute : Attribute
 {
-    public TestCategoryAttribute(string category) 
-        : base("Category", category)
+    private readonly TraitAttribute _trait;
+
+    public TestCategoryAttribute(string category)
     {
+        _trait = new TraitAttribute("Category", category);
     }
 }

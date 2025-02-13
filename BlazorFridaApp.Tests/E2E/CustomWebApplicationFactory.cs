@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.Tests.E2E;
 
-public class CustomWebApplicationFactory : WebApplicationFactory<Program>
+internal class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly E2ETestConfiguration _configuration;
     private readonly Action<IServiceCollection>? _configureTestServices;

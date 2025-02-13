@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
 using BlazorFridaApp.MemoryScanner.Models;
-using System.Net.Http;
 using Xunit;
 
 namespace BlazorFridaApp.Tests.E2E;
 
-public abstract class E2ETestBase : IAsyncLifetime
+internal abstract class E2ETestBase : IAsyncLifetime
 {
     protected readonly WebApplicationFactory<Program> Factory;
     protected readonly HttpClient Client;
