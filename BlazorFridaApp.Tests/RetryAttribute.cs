@@ -1,4 +1,5 @@
 using Xunit.Sdk;
+using Xunit.Abstractions;
 
 namespace BlazorFridaApp.Tests;
 
