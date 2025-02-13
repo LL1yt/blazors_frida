@@ -1,3 +1,5 @@
+using Xunit;
+
 namespace BlazorFridaApp.Tests;
 
 public static class TestCategories
@@ -12,7 +14,7 @@ public static class TestCategories
 }
 
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
-public class TestCategoryAttribute : Xunit.TraitAttribute
+public sealed class TestCategoryAttribute : Xunit.TraitAttribute
 {
     public TestCategoryAttribute(string category) 
         : base("Category", category)

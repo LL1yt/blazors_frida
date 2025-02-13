@@ -1,3 +1,6 @@
+using Xunit.Abstractions;
+using Xunit.Sdk;
+
 [assembly: Xunit.TestCaseOrderer("BlazorFridaApp.Tests.UI.PriorityOrderer", "BlazorFridaApp.Tests")]
 
 namespace BlazorFridaApp.Tests.UI;

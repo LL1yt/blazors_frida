@@ -81,7 +81,7 @@ public abstract class UITestBase : IAsyncLifetime
         await Page.WaitForSelectorAsync(".scanner-controls", new() { State = WaitForSelectorState.Visible });
     }
 
-    protected async Task TakeScreenshotAsync([CallerMemberName] string testName = null)
+    protected async Task TakeScreenshotAsync([CallerMemberName] string? testName = "")
     {
         var screenshotPath = Path.Combine(ScreenshotsPath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
         await Page.ScreenshotAsync(new() 
@@ -92,7 +92,7 @@ public abstract class UITestBase : IAsyncLifetime
         Logger.LogInformation("Screenshot saved to {Path}", screenshotPath);
     }
 
-    protected async Task TakeScreenshotOnFailureAsync(Exception ex, [CallerMemberName] string testName = null)
+    protected async Task TakeScreenshotOnFailureAsync(Exception ex, [CallerMemberName] string? testName = "")
     {
         var screenshotPath = Path.Combine(ScreenshotsPath, $"{testName}_FAILED_{DateTime.Now:yyyyMMdd_HHmmss}.png");
         await Page.ScreenshotAsync(new() 
