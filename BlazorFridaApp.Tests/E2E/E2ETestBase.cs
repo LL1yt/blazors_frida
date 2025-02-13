@@ -7,15 +7,15 @@ using Xunit;
 
 namespace BlazorFridaApp.Tests.E2E;
 
-internal abstract class E2ETestBase : IAsyncLifetime
+public abstract class E2ETestBase : IAsyncLifetime
 {
-    internal readonly WebApplicationFactory<Program> Factory;
+    private readonly WebApplicationFactory<Program> _factory;
     protected readonly HttpClient Client;
     protected readonly ILogger Logger;
 
     protected E2ETestBase()
     {
-        Factory = new WebApplicationFactory<Program>()
+        _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.ConfigureServices(services =>
@@ -25,7 +25,7 @@ internal abstract class E2ETestBase : IAsyncLifetime
                 });
             });
 
-        Client = Factory.CreateClient();
+        Client = _factory.CreateClient();
         Logger = LoggerFactory
             .Create(builder => builder
                 .AddConsole()
@@ -46,7 +46,7 @@ internal abstract class E2ETestBase : IAsyncLifetime
     public virtual async Task DisposeAsync()
     {
         Client.Dispose();
-        await Factory.DisposeAsync();
+        await _factory.DisposeAsync();
     }
 
     protected async Task<HttpResponseMessage> GetAsync(string endpoint)

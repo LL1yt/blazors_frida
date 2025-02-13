@@ -5,7 +5,7 @@ using Xunit;
 namespace BlazorFridaApp.Tests.E2E;
 
 [Collection("E2E Tests")]
-internal class MemoryScanWorkflowE2ETests : E2ETestBase
+public class MemoryScanWorkflowE2ETests : E2ETestBase
 {
     public MemoryScanWorkflowE2ETests() : base()
     {
