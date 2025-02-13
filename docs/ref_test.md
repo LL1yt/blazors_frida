@@ -4,8 +4,8 @@
 
 - Создан BaseTestGrpcService ✅
 - Удалено дублирование в IntegrationTestBase ✅:
-  - Удален _channels (уже есть в BaseGrpcService) ✅
-  - Удален _channelLock (уже есть в BaseGrpcService) ✅
+  - Удален \_channels (уже есть в BaseGrpcService) ✅
+  - Удален \_channelLock (уже есть в BaseGrpcService) ✅
   - Удален Propagator (уже есть в BaseGrpcService) ✅
   - Перенесены специфичные настройки канала в конфигурацию ✅
 
@@ -80,6 +80,7 @@
 ```
 
 ### d. Существующие тесты обновлены для использования новой структуры ⏳:
+
 - Компонентные тесты ⏳
 - UI тесты ⏳
 - E2E тесты ⏳
@@ -158,6 +159,7 @@
 ## 13. Следующие шаги:
 
 ### a. Обновление компонентных тестов ⏳:
+
 ```csharp
 - Создать ComponentTestBase ⏳
 - Интегрировать bUnit ⏳
@@ -165,6 +167,7 @@
 ```
 
 ### b. Обновление UI тестов ✅:
+
 ```csharp
 - Создан UITestBase ✅
 - Интегрирован Playwright ✅
@@ -175,6 +178,7 @@
 ```
 
 ### c. Обновление E2E тестов ⏳:
+
 ```csharp
 - Создать E2ETestBase ⏳
 - Интегрировать WebApplicationFactory ⏳
