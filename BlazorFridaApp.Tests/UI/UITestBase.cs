@@ -48,7 +48,7 @@ public abstract class UITestBase : IAsyncLifetime
             RecordVideoDir = VideosPath
         });
 
-        await Context.TracingStartAsync(new()
+        await Context.Tracing.StartAsync(new()
         {
             Screenshots = true,
             Snapshots = true,
@@ -58,7 +58,7 @@ public abstract class UITestBase : IAsyncLifetime
 
         Page = await Context.NewPageAsync();
         await Page.SetDefaultNavigationTimeoutAsync(10000);
-        await Page.SetDefaultTimeoutAsync(5000);
+        await Page.SetDefaultTimeout(5000);
 
         // Add error handling
         Page.Console += (_, e) => 
@@ -71,7 +71,7 @@ public abstract class UITestBase : IAsyncLifetime
 
         Page.PageError += (_, e) => 
         {
-            Logger.LogError("Page error: {Message}", e.Message);
+            Logger.LogError("Page error: {0}", e);
         };
     }
 
@@ -133,7 +133,7 @@ public abstract class UITestBase : IAsyncLifetime
         try
         {
             var tracePath = Path.Combine(TracesPath, $"{GetType().Name}_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
-            await Context.TracingStopAsync(new() { Path = tracePath });
+            await Context.Tracing.StopAsync(new() { Path = tracePath });
             Logger.LogInformation("Trace saved to {Path}", tracePath);
         }
         catch (Exception ex)

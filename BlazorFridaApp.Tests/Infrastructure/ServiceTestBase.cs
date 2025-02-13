@@ -6,7 +6,7 @@ namespace BlazorFridaApp.Tests.Infrastructure;
 
 public abstract class ServiceTestBase : IntegrationTestBase
 {
-    protected readonly IConfiguration Configuration;
+    protected readonly TestGrpcConfiguration Configuration;
     protected readonly TestServiceFactory ServiceFactory;
     protected readonly ITestHealthService HealthService;
     protected readonly ITestMemoryService MemoryService;
@@ -17,9 +17,7 @@ public abstract class ServiceTestBase : IntegrationTestBase
 
     protected ServiceTestBase() : base()
     {
-        Configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.Test.json")
-            .Build();
+        Configuration = new TestGrpcConfiguration();
         ServiceFactory = new TestServiceFactory(Configuration);
         HealthService = ServiceFactory.CreateHealthService();
         MemoryService = ServiceFactory.CreateMemoryService();

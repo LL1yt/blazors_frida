@@ -18,7 +18,7 @@ public class TestStateService : BaseTestGrpcService, ITestStateService
     private readonly IStateGrpcService _stateService;
 
     public TestStateService(
-        ILogger<TestStateService> logger,
+        ILogger<StateGrpcService> logger,
         IPythonProcessManager processManager)
         : base(logger, processManager)
     {
