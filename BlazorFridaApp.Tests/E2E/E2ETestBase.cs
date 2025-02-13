@@ -7,7 +7,7 @@ using Xunit;
 
 namespace BlazorFridaApp.Tests.E2E;
 
-internal abstract class E2ETestBase : IAsyncLifetime
+public abstract class E2ETestBase : IAsyncLifetime
 {
     protected readonly WebApplicationFactory<Program> Factory;
     protected readonly HttpClient Client;

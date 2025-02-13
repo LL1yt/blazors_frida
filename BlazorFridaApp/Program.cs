@@ -40,6 +40,11 @@ Log.Logger = new LoggerConfiguration()
         retainedFileCountLimit: 7)
     .CreateLogger();
 
+public class Program 
+{
+    // Entry point is handled by top-level statements
+}
+
 try
 {
     var builder = WebApplication.CreateBuilder(args);
