@@ -5,7 +5,8 @@ using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.Tests.E2E;
 
-public class MemoryScannerE2ETests : E2ETestBase
+[Collection("E2E Tests")]
+internal class MemoryScannerE2ETests : E2ETestBase
 {
     private readonly E2ETestConfiguration _configuration;
 

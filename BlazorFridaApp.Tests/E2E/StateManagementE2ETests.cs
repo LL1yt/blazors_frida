@@ -5,7 +5,7 @@ using Xunit;
 namespace BlazorFridaApp.Tests.E2E;
 
 [Collection("E2E Tests")]
-public class StateManagementE2ETests : E2ETestBase
+internal class StateManagementE2ETests : E2ETestBase
 {
     public StateManagementE2ETests() : base()
     {
