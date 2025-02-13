@@ -7,8 +7,6 @@ using Microsoft.AspNetCore.Components.Web;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
-using Blazorise;
-using Blazorise.DataGrid;
 
 namespace BlazorFridaApp.Tests.Components;
 

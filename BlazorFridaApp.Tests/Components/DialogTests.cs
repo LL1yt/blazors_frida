@@ -4,7 +4,6 @@ using BlazorFridaApp.Components.Dialogs;
 using BlazorFridaApp.Services;
 using BlazorFridaApp.MemoryScanner.Models;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
-using Blazorise;
 using Moq;
 using Xunit;
 using Microsoft.AspNetCore.Components;
@@ -23,8 +22,8 @@ public class DialogTests : TestContextBase
             .Add(p => p.OnConfigSaved, EventCallback.Factory.Create<string>(this, name => savedConfig = name)));
 
         // Act
-        var textEdit = cut.FindComponent<TextEdit>();
-        await textEdit.InvokeAsync(() => textEdit.Instance.TextChanged.InvokeAsync("TestConfig"));
+        var input = cut.Find("input.form-control");
+        await input.ChangeAsync(new ChangeEventArgs { Value = "TestConfig" });
 
         var saveButton = cut.Find("button.btn-primary");
         await saveButton.ClickAsync(new MouseEventArgs());

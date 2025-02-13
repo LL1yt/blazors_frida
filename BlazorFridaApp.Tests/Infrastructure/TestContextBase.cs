@@ -1,9 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using BlazorFridaApp.Services;
-using Blazorise;
-using Blazorise.Bootstrap5;
-using Blazorise.Icons.FontAwesome;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -14,13 +11,6 @@ public class TestContextBase : TestContext, IAsyncDisposable
     protected TestContextBase()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-
-        Services.AddBlazorise(options =>
-        {
-            options.Immediate = true;
-        })
-        .AddBootstrap5Providers()
-        .AddFontAwesomeIcons();
 
         // Mock INotificationService for tests
         var notificationServiceMock = new Mock<BlazorFridaApp.Services.INotificationService>();

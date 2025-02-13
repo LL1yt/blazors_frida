@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 using System.Collections.Generic;
-using Blazorise;
 using Microsoft.AspNetCore.Components;
 using BlazorFridaApp.MemoryScanner.Base;
 

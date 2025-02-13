@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
-using Blazorise;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using AngleSharp.Dom;
@@ -24,7 +23,6 @@ public abstract class ComponentTestBase : TestContext, IAsyncLifetime
             .CreateLogger(GetType());
 
         ConfigureServices();
-        ConfigureBlazorise();
     }
 
     protected virtual void ConfigureServices()
@@ -48,12 +46,6 @@ public abstract class ComponentTestBase : TestContext, IAsyncLifetime
     protected Mock<T> GetMock<T>() where T : class
     {
         return (Mock<T>)Mocks[typeof(T)];
-    }
-
-    private void ConfigureBlazorise()
-    {
-        Services.AddBlazorise()
-            .AddBlazoriseBootstrap();
     }
 
     protected void AssertComponentRendered<T>(IRenderedComponent<T> component) where T : IComponent
