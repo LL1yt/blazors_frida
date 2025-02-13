@@ -83,7 +83,7 @@
 
 - Компонентные тесты ⏳
 - UI тесты ⏳
-- E2E тесты ⏳:
+- E2E тесты ✅:
   ```csharp
   // Реализована базовая инфраструктура:
   - E2ETestBase - базовый класс для E2E тестов ✅
@@ -99,9 +99,9 @@
   // Реализованные тесты:
   - MemoryScannerE2ETests - базовые тесты ✅
   - MemoryScanWorkflowE2ETests - комплексные сценарии ✅
-  - ProcessManagementE2ETests ⏳
-  - StateManagementE2ETests ⏳
-  - ErrorHandlingE2ETests ⏳
+  - ProcessManagementE2ETests ✅
+  - StateManagementE2ETests ✅
+  - ErrorHandlingE2ETests ✅
   ```
 
 ## 6. Создание моков для тестирования ✅
