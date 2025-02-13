@@ -21,22 +21,22 @@ public class TestServiceFactory
         _processManager = new PythonProcessManager(processManagerLogger, _configuration.Server.Port);
     }
 
-    public ITestHealthService CreateHealthService() => 
+    public virtual ITestHealthService CreateHealthService() => 
         new TestHealthService(_loggerFactory.CreateLogger<TestHealthService>(), _processManager);
 
-    public ITestMemoryService CreateMemoryService() => 
+    public virtual ITestMemoryService CreateMemoryService() => 
         new TestMemoryService(_loggerFactory.CreateLogger<TestMemoryService>(), _processManager);
 
-    public ITestProcessService CreateProcessService() => 
+    public virtual ITestProcessService CreateProcessService() => 
         new TestProcessService(_loggerFactory.CreateLogger<TestProcessService>(), _processManager);
 
-    public ITestScannerService CreateScannerService() => 
+    public virtual ITestScannerService CreateScannerService() => 
         new TestScannerService(_loggerFactory.CreateLogger<TestScannerService>(), _processManager);
 
-    public ITestStateService CreateStateService() => 
+    public virtual ITestStateService CreateStateService() => 
         new TestStateService(_loggerFactory.CreateLogger<TestStateService>(), _processManager);
 
-    public ITestFreezeService CreateFreezeService() => 
+    public virtual ITestFreezeService CreateFreezeService() => 
         new TestFreezeService(_loggerFactory.CreateLogger<TestFreezeService>(), _processManager);
 
     public IPythonProcessManager GetProcessManager() => _processManager;

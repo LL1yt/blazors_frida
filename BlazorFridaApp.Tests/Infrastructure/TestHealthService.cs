@@ -5,7 +5,12 @@ using Grpc.Core;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 
-public class TestHealthService : BaseTestGrpcService
+public interface ITestHealthService
+{
+    Task<HealthCheckResponse> CheckHealthAsync(CancellationToken cancellationToken = default);
+}
+
+public class TestHealthService : BaseTestGrpcService, ITestHealthService
 {
     public TestHealthService(
         ILogger<TestHealthService> logger,
@@ -24,4 +29,4 @@ public class TestHealthService : BaseTestGrpcService
             deadline: DateTime.UtcNow.AddSeconds(5),
             cancellationToken: cancellationToken);
     }
-} 
+}
