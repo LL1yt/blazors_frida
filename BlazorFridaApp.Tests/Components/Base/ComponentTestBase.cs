@@ -6,6 +6,8 @@ using Xunit;
 using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 using Blazorise;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
+using AngleSharp.Dom;
 
 namespace BlazorFridaApp.Tests.Components.Base;
 
@@ -60,7 +62,7 @@ public abstract class ComponentTestBase : TestContext, IAsyncLifetime
         Assert.Empty(component.Nodes.Where(n => n.NodeType == NodeType.Text && n.TextContent.Contains("Error")));
     }
 
-    protected async Task AssertNoErrorsLogged(IRenderedComponent<T> component) where T : IComponent
+    protected async Task AssertNoErrorsLogged<T>(IRenderedComponent<T> component) where T : IComponent
     {
         // Wait for any async operations
         await Task.Delay(100);

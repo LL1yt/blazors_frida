@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using BlazorFridaApp.MemoryScanner.Models;
 using System.Net.Http;
 using Xunit;
 

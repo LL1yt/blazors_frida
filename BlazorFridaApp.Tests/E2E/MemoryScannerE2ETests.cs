@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using Xunit;
+using BlazorFridaApp.MemoryScanner.Models;
 
 namespace BlazorFridaApp.Tests.E2E;
 
@@ -43,7 +44,7 @@ public class MemoryScannerE2ETests : E2ETestBase
     {
         // Arrange
         var endpoint = "/api/memory/scan";
-        var request = new ScanRequest
+        var request = new MemoryScanRequest  // Renamed to avoid conflict
         {
             ProcessId = 1234,
             Pattern = "test pattern"
@@ -66,7 +67,7 @@ public class ProcessInfo
     public string Name { get; set; } = string.Empty;
 }
 
-public class ScanRequest
+public class MemoryScanRequest  // Renamed from ScanRequest to avoid conflict
 {
     public int ProcessId { get; set; }
     public string Pattern { get; set; } = string.Empty;
