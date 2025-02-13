@@ -40,9 +40,9 @@ Log.Logger = new LoggerConfiguration()
         retainedFileCountLimit: 7)
     .CreateLogger();
 
-public class Program
+public partial class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
