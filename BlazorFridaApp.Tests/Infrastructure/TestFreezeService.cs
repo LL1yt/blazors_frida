@@ -20,7 +20,7 @@ public class TestFreezeService : BaseTestGrpcService, ITestFreezeService
     private readonly IFreezeGrpcService _freezeService;
 
     public TestFreezeService(
-        ILogger<TestFreezeService> logger,
+        ILogger<FreezeGrpcService> logger,
         IPythonProcessManager processManager)
         : base(logger, processManager)
     {

@@ -19,7 +19,12 @@ public abstract class TestBase : TestContext
 
     protected TestBase()
     {
-        Context = new TestContext();
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.Test.json")
+            .Build();
+        var serviceFactory = new TestServiceFactory(configuration);
+            
+        Context = new TestContext(serviceFactory, "test");
         Context.JSInterop.Mode = JSRuntimeMode.Loose;
         ScannerMock = new Mock<IProcessMemoryScanner>();
         LoggerMock = new Mock<ILogger<PythonProcessManager>>();

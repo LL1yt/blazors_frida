@@ -5,9 +5,6 @@ using BlazorFridaApp.MemoryScanner.Base;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
-using Blazorise;
-using Blazorise.Bootstrap5;
-using Blazorise.Icons.FontAwesome;
 
 namespace BlazorFridaApp.Tests.Components;
 
@@ -20,21 +17,17 @@ public class ScanControlsTests : TestContextBase
         _scannerMock = new Mock<IProcessMemoryScanner>();
         Services.AddSingleton(_scannerMock.Object);
         
-        Services
-            .AddBlazorise()
-            .AddBootstrap5Providers()
-            .AddFontAwesomeIcons();
+        // Configure services needed by MemoryScannerComponentBase
+        Services.AddLogging();
+        Services.AddScoped<BlazorFridaApp.Services.INotificationService>(_ => Mock.Of<BlazorFridaApp.Services.INotificationService>());
     }
 
     [Fact]
     public void ShouldRenderScanTypeDropdown()
     {
-        // Arrange
-        var scanTypes = new[] { ScanType.ExactValue, ScanType.Pattern };
-
-        // Act
+        // Arrange & Act
         var cut = RenderComponent<ScanControls>(parameters => parameters
-            .Add(p => p.ScanTypes, scanTypes)
+            .Add(p => p.ScanTypes, new[] { ScanType.ExactValue, ScanType.Pattern })
             .Add(p => p.ValueTypes, new[] { MemoryValueType.Int32 })
             .Add(p => p.ScanType, ScanType.ExactValue)
             .Add(p => p.ValueType, MemoryValueType.Int32));

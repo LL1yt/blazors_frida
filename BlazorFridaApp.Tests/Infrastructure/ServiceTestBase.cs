@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 
 public abstract class ServiceTestBase : IntegrationTestBase
 {
+    protected readonly IConfiguration Configuration;
     protected readonly TestServiceFactory ServiceFactory;
     protected readonly ITestHealthService HealthService;
     protected readonly ITestMemoryService MemoryService;
@@ -15,6 +17,9 @@ public abstract class ServiceTestBase : IntegrationTestBase
 
     protected ServiceTestBase() : base()
     {
+        Configuration = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.Test.json")
+            .Build();
         ServiceFactory = new TestServiceFactory(Configuration);
         HealthService = ServiceFactory.CreateHealthService();
         MemoryService = ServiceFactory.CreateMemoryService();
