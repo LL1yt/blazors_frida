@@ -29,10 +29,10 @@ public abstract class ComponentTestBase : TestContext, IAsyncLifetime
     {
         // Add common service mocks
         AddMockService<IProcessService>();
-        AddMockService<IMemoryService>();
-        AddMockService<IScannerService>();
-        AddMockService<IStateService>();
-        AddMockService<IFreezeService>();
+        AddMockService<IMemoryReaderService>();
+        AddMockService<IScannerGrpcService>();
+        AddMockService<IStateGrpcService>();
+        AddMockService<IFreezeGrpcService>();
     }
 
     protected Mock<T> AddMockService<T>() where T : class
