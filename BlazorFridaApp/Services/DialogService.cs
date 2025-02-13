@@ -10,9 +10,9 @@ public interface IModalService
 
 public class DialogService : IModalService
 {
-    private readonly IAppNotificationService _notificationService;
+    private readonly INotificationService _notificationService;
 
-    public DialogService(IAppNotificationService notificationService)
+    public DialogService(INotificationService notificationService)
     {
         _notificationService = notificationService;
     }

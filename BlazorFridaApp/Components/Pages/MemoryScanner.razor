@@ -247,7 +247,13 @@
 
     private byte[] GetCurrentValueSync(nint addr)
     {
-        return GetCurrentValue(addr).Result;
+        try {
+            return GetCurrentValue(addr).GetAwaiter().GetResult();
+        }
+        catch (Exception ex) {
+            Logger.LogError(ex, "Error getting current value for address {Address}", addr);
+            return Array.Empty<byte>();
+        }
     }
 
     protected override void OnInitialized()
