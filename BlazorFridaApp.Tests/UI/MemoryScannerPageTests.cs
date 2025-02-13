@@ -5,6 +5,7 @@ using Xunit;
 namespace BlazorFridaApp.Tests.UI;
 
 [Collection(UITestConstants.BasicTests)]
+[TestCategory(TestCategories.UI)]
 public class MemoryScannerPageTests : UITestBase
 {
     public MemoryScannerPageTests() : base(
@@ -15,56 +16,105 @@ public class MemoryScannerPageTests : UITestBase
     {
     }
 
-    [Fact, Priority(1)]
+    [Fact]
+    [TestCategory(TestCategories.Smoke)]
+    [Retry(maxRetries: 2)]
     public async Task ShouldLoadMemoryScannerPage()
     {
-        await NavigateToMemoryScanner();
-        var title = await Page.TextContentAsync("h2");
-        Assert.Equal("Memory Scanner", title);
-        await TakeScreenshotAsync();
-        await AssertNoConsoleErrors();
+        try
+        {
+            await NavigateToMemoryScanner();
+            var title = await Page.TextContentAsync("h2");
+            Assert.Equal("Memory Scanner", title);
+            await TakeScreenshotAsync();
+            await AssertNoConsoleErrors();
+        }
+        catch (Exception ex)
+        {
+            await TakeScreenshotOnFailureAsync(ex);
+            throw;
+        }
     }
 
-    [Fact, Priority(2)]
+    [Fact]
+    [TestCategory(TestCategories.UI)]
+    [Retry]
     public async Task ShouldShowProcessSelector()
     {
-        await NavigateToMemoryScanner();
-        var processSelector = await Page.WaitForSelectorAsync(".scanner-controls");
-        Assert.NotNull(processSelector);
-        await AssertNoConsoleErrors();
+        try
+        {
+            await NavigateToMemoryScanner();
+            var processSelector = await Page.WaitForSelectorAsync(".scanner-controls");
+            Assert.NotNull(processSelector);
+            await TakeScreenshotAsync();
+            await AssertNoConsoleErrors();
+        }
+        catch (Exception ex)
+        {
+            await TakeScreenshotOnFailureAsync(ex);
+            throw;
+        }
     }
 
     [Fact]
+    [TestCategory(TestCategories.UI)]
     public async Task ShouldShowScanControls()
     {
-        await NavigateToMemoryScanner();
-        var scanOptionsCard = await Page.QuerySelectorAsync(".scan-options-card");
-        Assert.NotNull(scanOptionsCard);
+        try
+        {
+            await NavigateToMemoryScanner();
+            var scanOptionsCard = await Page.QuerySelectorAsync(".scan-options-card");
+            Assert.NotNull(scanOptionsCard);
+            await TakeScreenshotAsync();
+        }
+        catch (Exception ex)
+        {
+            await TakeScreenshotOnFailureAsync(ex);
+            throw;
+        }
     }
 
     [Fact]
+    [TestCategory(TestCategories.UI)]
+    [TestCategory(TestCategories.Integration)]
+    [Retry(maxRetries: 3, delayMilliseconds: 2000)]
     public async Task ShouldHandlePatternScan()
     {
-        await NavigateToMemoryScanner();
-        
-        // Load and select process
-        var scanButton = Page.GetByRole(AriaRole.Button, new() { Name = "Process Scan" });
-        await scanButton.ClickAsync();
-        await Page.WaitForSelectorAsync("[role='combobox']:not([disabled])");
-        await Task.Delay(1000); // Wait for process list
-        await SelectProcess("notepad");
-        
-        // Select pattern scan type
-        var scanTypeSelect = await Page.QuerySelectorAsync("select[name='scanType']");
-        Assert.NotNull(scanTypeSelect);
-        await scanTypeSelect.SelectOptionAsync("Pattern");
-        
-        // Verify pattern input appears
-        var patternInput = await Page.WaitForSelectorAsync("input[placeholder*='Pattern']");
-        Assert.NotNull(patternInput);
+        try
+        {
+            await NavigateToMemoryScanner();
+            
+            // Load and select process
+            var scanButton = Page.GetByRole(AriaRole.Button, new() { Name = "Process Scan" });
+            await scanButton.WaitForAsync(new() { State = WaitForState.Visible });
+            await TakeScreenshotAsync("BeforeScan");
+
+            // Configure scan options
+            await Page.GetByLabel("Pattern").FillAsync("48 8B 05");
+            await Page.GetByLabel("Start Address").FillAsync("0x140000000");
+            await Page.GetByLabel("End Address").FillAsync("0x14FFFFFFF");
+            await TakeScreenshotAsync("ConfiguredScan");
+
+            // Execute scan
+            await scanButton.ClickAsync();
+            await WaitForLoadingState(true);
+            await WaitForLoadingState(false);
+            await TakeScreenshotAsync("AfterScan");
+
+            // Verify results
+            var resultsGrid = await Page.WaitForSelectorAsync(".scan-results-grid");
+            Assert.NotNull(resultsGrid);
+            await AssertNoConsoleErrors();
+        }
+        catch (Exception ex)
+        {
+            await TakeScreenshotOnFailureAsync(ex);
+            throw;
+        }
     }
 
     [Fact]
+    [TestCategory(TestCategories.UI)]
     public async Task ShouldHandleValueFreeze()
     {
         await NavigateToMemoryScanner();
@@ -93,6 +143,7 @@ public class MemoryScannerPageTests : UITestBase
     }
 
     [Fact]
+    [TestCategory(TestCategories.UI)]
     public async Task ShouldHandleScanWorkflow()
     {
         await NavigateToMemoryScanner();

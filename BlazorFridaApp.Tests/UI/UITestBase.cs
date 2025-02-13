@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using System.IO;
 
 namespace BlazorFridaApp.Tests.UI;
 
@@ -13,9 +14,21 @@ public abstract class UITestBase : IAsyncLifetime
     protected IBrowserContext Context { get; private set; }
     protected ILogger Logger { get; }
 
+    protected readonly string TestResultsPath = Path.Combine("TestResults", DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
+    protected readonly string ScreenshotsPath;
+    protected readonly string TracesPath;
+    protected readonly string VideosPath;
+
     protected UITestBase(ILogger logger)
     {
         Logger = logger;
+        ScreenshotsPath = Path.Combine(TestResultsPath, "Screenshots");
+        TracesPath = Path.Combine(TestResultsPath, "Traces");
+        VideosPath = Path.Combine(TestResultsPath, "Videos");
+        
+        Directory.CreateDirectory(ScreenshotsPath);
+        Directory.CreateDirectory(TracesPath);
+        Directory.CreateDirectory(VideosPath);
     }
 
     public async Task InitializeAsync()
@@ -28,51 +41,38 @@ public abstract class UITestBase : IAsyncLifetime
             SlowMo = 50
         });
 
-        // Create context with tracing enabled
         Context = await Browser.NewContextAsync(new()
         {
             ViewportSize = new ViewportSize { Width = 1920, Height = 1080 },
             IgnoreHTTPSErrors = true,
-            RecordVideoDir = "TestResults/Videos"
+            RecordVideoDir = VideosPath
         });
 
-        // Start tracing
         await Context.TracingStartAsync(new()
         {
             Screenshots = true,
             Snapshots = true,
-            Sources = true
+            Sources = true,
+            Title = $"{GetType().Name}_{DateTime.Now:yyyyMMdd_HHmmss}"
         });
 
         Page = await Context.NewPageAsync();
         await Page.SetDefaultNavigationTimeoutAsync(10000);
         await Page.SetDefaultTimeoutAsync(5000);
-    }
 
-    public async Task DisposeAsync()
-    {
-        try
+        // Add error handling
+        Page.Console += (_, e) => 
         {
-            var testName = TestContext.Current?.Test?.TestCase?.TestMethod?.Method?.Name ?? "UnknownTest";
-            
-            // Stop tracing and save
-            await Context.TracingStopAsync(new() 
-            { 
-                Path = $"TestResults/Traces/{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.zip" 
-            });
+            if (e.Type == "error")
+            {
+                Logger.LogError("Browser console error: {Message}", e.Text);
+            }
+        };
 
-            Logger.LogInformation("Saved test trace for {TestName}", testName);
-        }
-        catch (Exception ex)
+        Page.PageError += (_, e) => 
         {
-            Logger.LogError(ex, "Failed to save test trace");
-        }
-        finally
-        {
-            if (Context != null) await Context.CloseAsync();
-            if (Browser != null) await Browser.DisposeAsync();
-            Playwright?.Dispose();
-        }
+            Logger.LogError("Page error: {Message}", e.Message);
+        };
     }
 
     protected async Task NavigateToMemoryScanner()
@@ -81,12 +81,26 @@ public abstract class UITestBase : IAsyncLifetime
         await Page.WaitForSelectorAsync(".scanner-controls", new() { State = WaitForSelectorState.Visible });
     }
 
-    protected async Task TakeScreenshotAsync([CallerMemberName] string testName = "")
+    protected async Task TakeScreenshotAsync([CallerMemberName] string testName = null)
     {
-        var screenshotPath = Path.Combine("TestResults", "Screenshots", $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-        Directory.CreateDirectory(Path.Combine("TestResults", "Screenshots"));
-        await Page.ScreenshotAsync(new() { Path = screenshotPath, FullPage = true });
+        var screenshotPath = Path.Combine(ScreenshotsPath, $"{testName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+        await Page.ScreenshotAsync(new() 
+        { 
+            Path = screenshotPath,
+            FullPage = true
+        });
         Logger.LogInformation("Screenshot saved to {Path}", screenshotPath);
+    }
+
+    protected async Task TakeScreenshotOnFailureAsync(Exception ex, [CallerMemberName] string testName = null)
+    {
+        var screenshotPath = Path.Combine(ScreenshotsPath, $"{testName}_FAILED_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+        await Page.ScreenshotAsync(new() 
+        { 
+            Path = screenshotPath,
+            FullPage = true
+        });
+        Logger.LogError(ex, "Test failed. Screenshot saved to {Path}", screenshotPath);
     }
 
     protected async Task WaitForLoadingState(bool expectedState)
@@ -112,5 +126,23 @@ public abstract class UITestBase : IAsyncLifetime
     protected async Task WaitForAjax()
     {
         await Page.WaitForFunctionAsync("() => window.jQuery?.active === 0");
+    }
+
+    public async Task DisposeAsync()
+    {
+        try
+        {
+            var tracePath = Path.Combine(TracesPath, $"{GetType().Name}_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
+            await Context.TracingStopAsync(new() { Path = tracePath });
+            Logger.LogInformation("Trace saved to {Path}", tracePath);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save trace");
+        }
+
+        await Context?.CloseAsync();
+        await Browser?.CloseAsync();
+        Playwright?.Dispose();
     }
 }

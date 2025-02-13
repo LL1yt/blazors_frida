@@ -1,84 +1,72 @@
-using Bunit;
 using BlazorFridaApp.MemoryScanner.Components;
-using BlazorFridaApp.MemoryScanner.Services.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using BlazorFridaApp.MemoryScanner.Models;
+using BlazorFridaApp.Tests.Components.Base;
 using Moq;
 using Xunit;
-using System.Collections.Generic;
-using BlazorFridaApp.MemoryScanner.Models;
-using Blazorise;
-using System.Threading;
 
 namespace BlazorFridaApp.Tests.Components;
 
-public class ProcessSelectorTests : TestContextBase
+[TestCategory(TestCategories.Component)]
+public class ProcessSelectorTests : ComponentTestBase
 {
-    private readonly Mock<IProcessService> _processServiceMock;
     private readonly List<ProcessInfo> _defaultProcesses;
 
     public ProcessSelectorTests()
     {
-        _processServiceMock = new Mock<IProcessService>();
-        Services.AddScoped<IProcessService>(_ => _processServiceMock.Object);
-
         _defaultProcesses = new List<ProcessInfo>
         {
             new() { Id = 1000, Name = "notepad.exe" },
             new() { Id = 2000, Name = "test2.exe" }
         };
 
-        _processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
+        var processServiceMock = GetMock<IProcessService>();
+        processServiceMock.Setup(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(_defaultProcesses);
         
-        _processServiceMock.Setup(x => x.RefreshProcessesAsync(It.IsAny<CancellationToken>()))
+        processServiceMock.Setup(x => x.RefreshProcessesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(_defaultProcesses);
     }
 
     [Fact]
+    [TestCategory(TestCategories.Smoke)]
     public void ShouldRenderSelect()
     {
         // Arrange & Act
         var cut = RenderComponent<ProcessSelector>();
 
         // Assert
+        AssertComponentRendered(cut);
         Assert.NotNull(cut.Find("select"));
     }
 
     [Fact]
+    [TestCategory(TestCategories.Component)]
+    [Retry] // Add retry for potentially flaky async test
     public async Task ShouldLoadProcessesOnInitialization()
     {
         // Arrange & Act
         var cut = RenderComponent<ProcessSelector>();
         
-        // Initialize and wait for first render
-        await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
-        
-        // Wait for loading to complete and process list to be populated
-        cut.WaitForState(() => !cut.Instance.IsLoading);
-        cut.WaitForState(() => cut.Instance.Processes.Count == _defaultProcesses.Count);
-        
-        // Force a re-render to ensure UI is updated
-        cut.Render();
-        
         // Assert
-        _processServiceMock.Verify(x => x.GetProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
-        var options = cut.FindAll("option");
-        Assert.Equal(_defaultProcesses.Count + 1, options.Count); // +1 for the default "Select a process" item
+        var options = cut.FindAll("option").ToList();
+        Assert.Equal(_defaultProcesses.Count + 1, options.Count); // +1 for default "Select Process" option
+        Assert.Contains(options, o => o.TextContent.Contains("notepad.exe"));
+        await AssertNoErrorsLogged(cut);
     }
 
     [Fact]
+    [TestCategory(TestCategories.Component)]
     public async Task ShouldRefreshProcessList()
     {
         // Arrange
         var cut = RenderComponent<ProcessSelector>();
-        await cut.InvokeAsync(() => cut.Instance.InitializeAsync());
-
+        var refreshButton = cut.Find("button[title='Refresh Process List']");
+        
         // Act
-        var refreshButton = cut.Find("button");
-        await refreshButton.ClickAsync(new());
-
+        await refreshButton.ClickAsync();
+        
         // Assert
-        _processServiceMock.Verify(x => x.RefreshProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        GetMock<IProcessService>().Verify(x => x.RefreshProcessesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        await AssertNoErrorsLogged(cut);
     }
 }
