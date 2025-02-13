@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using BlazorFridaApp.MemoryScanner.Services;
+using BlazorFridaApp.MemoryScanner.Services.Interfaces;
 
 namespace BlazorFridaApp.Tests.Infrastructure;
 

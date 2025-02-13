@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Xunit;
+using BlazorFridaApp.Tests.Infrastructure;
 
 namespace BlazorFridaApp.Tests.Integration;
 
