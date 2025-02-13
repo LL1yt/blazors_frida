@@ -25,9 +25,6 @@ using Microsoft.Extensions.Http;
 using Scrutor;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.FileProviders;
-using Blazorise;
-using Blazorise.Bootstrap5;
-using Blazorise.Icons.FontAwesome;
 
 // Setup Serilog
 Log.Logger = new LoggerConfiguration()
@@ -51,12 +48,7 @@ try
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
 
-    // Add Blazorise
-    builder.Services.AddBlazorise()
-        .AddBootstrap5Providers()
-        .AddFontAwesomeIcons();
-
-    // Add assets service
+    // Remove Blazorise services and continue with the rest of the configuration
     builder.Services.AddScoped<AssetsService>();
 
     // Add notification and dialog services

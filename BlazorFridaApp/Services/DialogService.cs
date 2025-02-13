@@ -1,13 +1,18 @@
 using Microsoft.AspNetCore.Components;
-using Blazorise;
 
 namespace BlazorFridaApp.Services;
 
-public class DialogService
+public interface IModalService
 {
-    private readonly INotificationService _notificationService;
+    Task<bool> Confirm(string message, string? title = null);
+    void Close(object? result = null);
+}
 
-    public DialogService(INotificationService notificationService)
+public class DialogService : IModalService
+{
+    private readonly IAppNotificationService _notificationService;
+
+    public DialogService(IAppNotificationService notificationService)
     {
         _notificationService = notificationService;
     }

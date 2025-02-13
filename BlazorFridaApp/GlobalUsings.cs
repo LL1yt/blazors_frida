@@ -34,5 +34,4 @@ global using Microsoft.Extensions.Logging;
 
 // UI Components
 global using BlazorFridaApp.Components;
-global using Blazorise;
-global using Blazorise.Bootstrap5;
+// Removed Blazorise usings since we're using Bootstrap directly now

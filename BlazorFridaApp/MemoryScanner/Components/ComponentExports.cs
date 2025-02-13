@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Components;
-using Blazorise;
 using BlazorFridaApp.MemoryScanner.Base;
 using BlazorFridaApp.Services;
 
